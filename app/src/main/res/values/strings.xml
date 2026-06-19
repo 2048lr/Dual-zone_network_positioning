@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Radio Area Locator</string>
+    <string name="app_name">双区网络定位</string>
     <string name="action_refresh">刷新定位</string>
     <string name="location_permission_required">需要定位权限才能获取当前位置</string>
     <string name="grant_permission">授予权限</string>
