@@ -31,3 +31,8 @@
 -keep class org.apache.commons.logging.** { *; }
 -keep class org.apache.commons.logging.impl.** { *; }
 -dontwarn org.apache.commons.logging.**
+
+# 自定义 commons-logging 工厂（通过 SPI 注册，类名必须保留）
+-keep class com.example.radioarealocator.logging.** { *; }
+-keep class com.example.radioarealocator.logging.AndroidLogFactory { *; }
+-keep class com.example.radioarealocator.logging.AndroidLog { *; }
