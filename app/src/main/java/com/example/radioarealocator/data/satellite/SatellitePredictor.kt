@@ -47,7 +47,12 @@ class SatellitePredictor {
                 val currentPos = predictor.getSatPos(now)
                 val isCurrentlyVisible = currentPos != null && currentPos.elevation > 0
 
-                val nextPass = predictor.nextSatPass(now, false)
+                // 在境时获取当前过境（含出境时间），即将入境时获取下次过境
+                val nextPass = if (isCurrentlyVisible) {
+                    predictor.nextSatPass(now, true)
+                } else {
+                    predictor.nextSatPass(now, false)
+                }
                 if (nextPass == null || nextPass.startTime == null || nextPass.endTime == null) continue
 
                 // 只取预测窗口内的过境

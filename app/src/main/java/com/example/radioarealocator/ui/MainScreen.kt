@@ -1,6 +1,7 @@
 package com.example.radioarealocator.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,13 +41,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.radioarealocator.R
 import com.example.radioarealocator.data.LocationResult
 import com.example.radioarealocator.data.satellite.SatelliteInfo
+import java.time.Duration
+import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -361,8 +363,7 @@ private val satelliteTimeFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 
 @Composable
 private fun SatelliteRow(satellite: SatelliteInfo) {
-    val startTime = satellite.aosTime.atZone(ZoneId.systemDefault())
-        .format(satelliteTimeFormatter)
+    val now = remember { Instant.now() }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -371,17 +372,26 @@ private fun SatelliteRow(satellite: SatelliteInfo) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (satellite.isCurrentlyVisible) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = CircleShape
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                }
+                // 状态指示点：在境为实心圆，即将入境为空心圆
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .then(
+                            if (satellite.isCurrentlyVisible) {
+                                Modifier.background(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape
+                                )
+                            } else {
+                                Modifier.border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape
+                                )
+                            }
+                        )
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = satellite.name,
                     style = MaterialTheme.typography.bodyLarge,
@@ -400,22 +410,72 @@ private fun SatelliteRow(satellite: SatelliteInfo) {
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                satellite.modes.forEach { mode ->
-                    ModeChip(mode = mode)
+        if (satellite.isCurrentlyVisible) {
+            // 在境：显示出境时间和剩余时间
+            val losTime = satellite.losTime.atZone(ZoneId.systemDefault())
+                .format(satelliteTimeFormatter)
+            val remainingSeconds = Duration.between(now, satellite.losTime).seconds
+            val remainingText = formatRemainingTime(remainingSeconds)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    satellite.modes.forEach { mode ->
+                        ModeChip(mode = mode)
+                    }
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "${stringResource(R.string.los_time)} $losTime",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${stringResource(R.string.time_remaining)} $remainingText",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
-            Text(
-                text = "${stringResource(R.string.aos_time)} $startTime",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        } else {
+            // 即将入境：显示入境时间
+            val aosTime = satellite.aosTime.atZone(ZoneId.systemDefault())
+                .format(satelliteTimeFormatter)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    satellite.modes.forEach { mode ->
+                        ModeChip(mode = mode)
+                    }
+                }
+                Text(
+                    text = "${stringResource(R.string.aos_time)} $aosTime",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
+    }
+}
+
+/**
+ * 格式化剩余时间，如 "3分20秒" 或 "45秒"。
+ */
+private fun formatRemainingTime(seconds: Long): String {
+    if (seconds <= 0) return "0秒"
+    val minutes = seconds / 60
+    val remainingSeconds = seconds % 60
+    return if (minutes > 0) {
+        "${minutes}分${remainingSeconds}秒"
+    } else {
+        "${remainingSeconds}秒"
     }
 }
 

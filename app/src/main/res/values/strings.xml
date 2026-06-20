@@ -23,6 +23,10 @@
     <string name="satellite_count">共 %d 颗</string>
     <string name="max_elevation">最大仰角</string>
     <string name="aos_time">入境</string>
+    <string name="los_time">出境</string>
+    <string name="time_remaining">剩余</string>
+    <string name="in_pass">在境</string>
+    <string name="upcoming">即将入境</string>
     <string name="satellite_need_location">获取定位后将显示近期过境卫星</string>
     <string name="no_satellites">暂无近期过境卫星</string>
     <string name="satellite_load_failed">卫星信息加载失败：%s</string>
