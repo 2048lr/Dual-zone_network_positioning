@@ -1,7 +1,5 @@
 package com.example.radioarealocator.ui
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,9 +31,11 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,22 +54,19 @@ fun MainScreen(
 ) {
     val uiState by viewModel.uiState
     val history by viewModel.history.collectAsState()
+    var showAbout by remember { mutableStateOf(false) }
+
+    if (showAbout) {
+        AboutScreen(onBackClick = { showAbout = false })
+        return
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
-                    val context = LocalContext.current
-                    TextButton(
-                        onClick = {
-                            val intent = Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse("https://github.com/fuxue-linkong/Dual-zone_network_positioning")
-                            )
-                            context.startActivity(intent)
-                        }
-                    ) {
+                    TextButton(onClick = { showAbout = true }) {
                         Text(
                             text = stringResource(R.string.about),
                             color = MaterialTheme.colorScheme.onPrimary
