@@ -91,7 +91,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 tles = tles,
                 latitude = latitude,
                 longitude = longitude,
-                limit = 10
+                limit = 25
             )
         } catch (e: Exception) {
             _uiState.value = _uiState.value.copy(satelliteError = e.message)
