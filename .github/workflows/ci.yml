@@ -25,6 +25,15 @@ jobs:
           gradle-version: '8.4'
           cache-disabled: true
 
+      - name: Verify JDK version
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+
+      - name: Set JAVA_HOME for Gradle
+        run: |
+          echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
+
       - name: Build Debug APK
         run: |
           gradle assembleDebug --no-daemon --stacktrace
