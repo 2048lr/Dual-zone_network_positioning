@@ -43,7 +43,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,17 +69,14 @@ fun MainScreen(
     onRequestPermission: () -> Unit
 ) {
     val uiState by viewModel.uiState
-    val history by viewModel.history.collectAsState()
     var showAbout by remember { mutableStateOf(false) }
-    var showHistory by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    BackHandler(enabled = showAbout || showHistory || showSettings) {
+    BackHandler(enabled = showAbout || showSettings) {
         when {
             showAbout -> showAbout = false
-            showHistory -> showHistory = false
             showSettings -> showSettings = false
         }
     }
@@ -88,16 +84,6 @@ fun MainScreen(
     when {
         showAbout -> {
             AboutScreen(onBackClick = { showAbout = false })
-            return
-        }
-
-        showHistory -> {
-            HistoryScreen(
-                history = history,
-                onClearHistory = { viewModel.clearHistory() },
-                onDeleteRecord = { viewModel.deleteHistoryRecord(it) },
-                onBackClick = { showHistory = false }
-            )
             return
         }
 
@@ -190,8 +176,6 @@ fun MainScreen(
                     satelliteError = uiState.satelliteError,
                     hasLocation = uiState.result != null
                 )
-
-                HistoryEntryCard(onClick = { showHistory = true })
             }
 
             uiState.error?.let { message ->
@@ -262,27 +246,6 @@ private fun LocationCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun HistoryEntryCard(onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = stringResource(R.string.history),
-                style = MaterialTheme.typography.titleMedium
-            )
         }
     }
 }

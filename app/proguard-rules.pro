@@ -20,10 +20,6 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
-# Room
--keep class * extends androidx.room.RoomDatabase
--dontwarn androidx.room.paging.**
-
 # predict4java and dependencies
 -keep class com.github.amsacode.predict4java.** { *; }
 -keep class org.apache.commons.lang.** { *; }
