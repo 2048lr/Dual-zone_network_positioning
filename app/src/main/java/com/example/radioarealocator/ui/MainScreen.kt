@@ -55,7 +55,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.radioarealocator.R
 import com.example.radioarealocator.data.LocationResult
@@ -397,72 +396,71 @@ private fun SatelliteRow(satellite: SatelliteInfo) {
     val now = remember { Instant.now() }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // 第一行：名称/标签与最大仰角，右侧固定宽度避免被挤压
+        // 第一行：状态点 + 卫星名称
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 左侧：状态点 + 名称 + chips，允许换行
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 状态指示点：在境为实心圆，即将入境为空心圆
-                Box(
-                    modifier = Modifier
-                        .padding(top = 6.dp)
-                        .size(8.dp)
-                        .then(
-                            if (satellite.isCurrentlyVisible) {
-                                Modifier.background(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    shape = CircleShape
-                                )
-                            } else {
-                                Modifier.border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    shape = CircleShape
-                                )
-                            }
-                        )
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Text(
-                        text = satellite.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = if (satellite.isCurrentlyVisible)
-                            MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurface
+            // 状态指示点：在境为实心圆，即将入境为空心圆
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .then(
+                        if (satellite.isCurrentlyVisible) {
+                            Modifier.background(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            )
+                        } else {
+                            Modifier.border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            )
+                        }
                     )
-                    if (satellite.source.isNotEmpty()) {
-                        SourceChip(source = satellite.source)
-                    }
-                    if (satellite.status.isNotEmpty()) {
-                        StatusChip(status = satellite.status)
-                    }
-                }
-            }
-
-            // 右侧：最大仰角，固定最小宽度，顶部对齐
+            )
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = "${stringResource(R.string.max_elevation)}\n${satellite.maxElevation.toInt()}°",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.End,
-                modifier = Modifier.padding(start = 8.dp)
+                text = satellite.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (satellite.isCurrentlyVisible)
+                    MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface
             )
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        // 第二行：模式 chips 与时间信息
+        // 第二行：来源标签、状态标签、最大仰角
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FlowRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                if (satellite.source.isNotEmpty()) {
+                    SourceChip(source = satellite.source)
+                }
+                if (satellite.status.isNotEmpty()) {
+                    StatusChip(status = satellite.status)
+                }
+            }
+            Text(
+                text = "${stringResource(R.string.max_elevation)} ${satellite.maxElevation.toInt()}°",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // 第三行：卫星类型（模式）与时间信息
         if (satellite.isCurrentlyVisible) {
             val losTime = satellite.losTime.atZone(ZoneId.systemDefault())
                 .format(satelliteTimeFormatter)
