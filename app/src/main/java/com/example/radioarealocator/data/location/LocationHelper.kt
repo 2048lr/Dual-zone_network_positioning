@@ -347,7 +347,7 @@ class LocationHelper(private val context: Context) {
      */
     suspend fun getAddress(latitude: Double, longitude: Double): String {
         return try {
-            withTimeout(5_000) {
+            withTimeout(3_000) {
                 suspendCancellableCoroutine { continuation ->
                     if (!Geocoder.isPresent()) {
                         continuation.resume("")

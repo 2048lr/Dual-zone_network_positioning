@@ -11,6 +11,7 @@ import com.example.radioarealocator.data.satellite.SatelliteDataSource
 import com.example.radioarealocator.data.satellite.SatelliteInfo
 import com.example.radioarealocator.data.satellite.SatellitePredictor
 import com.example.radioarealocator.data.zone.ZoneResolver
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -44,35 +45,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.value = _uiState.value.copy(
             isLoading = true,
+            isSatelliteLoading = true,
             error = null,
-            satelliteError = null
+            satelliteError = null,
+            result = null,
+            satellites = emptyList()
         )
         viewModelScope.launch {
             try {
                 val location = locationHelper.getCurrentLocation()
                 val zoneInfo = ZoneResolver.resolve(location.latitude, location.longitude)
-                val address = locationHelper.getAddress(location.latitude, location.longitude)
-                val result = LocationResult(
+
+                // 立即显示定位结果（不等待地址和卫星），减少用户感知等待时间
+                val baseResult = LocationResult(
                     latitude = location.latitude,
                     longitude = location.longitude,
                     cqZone = zoneInfo.cqZone,
                     ituZone = zoneInfo.ituZone,
                     maidenhead = zoneInfo.maidenhead,
-                    address = address
+                    address = ""
                 )
-
-                // 同步刷新卫星信息
-                val satellites = refreshSatellites(location.latitude, location.longitude)
-
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    result = result,
-                    satellites = satellites,
-                    error = null
+                    result = baseResult
+                )
+
+                // 后台并行加载地址与卫星信息
+                val addressDeferred = async {
+                    locationHelper.getAddress(location.latitude, location.longitude)
+                }
+                val satellitesDeferred = async {
+                    runCatching { refreshSatellites(location.latitude, location.longitude) }
+                }
+
+                val address = addressDeferred.await()
+                val satellitesResult = satellitesDeferred.await()
+
+                _uiState.value = _uiState.value.copy(
+                    result = baseResult.copy(address = address),
+                    satellites = satellitesResult.getOrNull() ?: emptyList(),
+                    satelliteError = satellitesResult.exceptionOrNull()?.message,
+                    isSatelliteLoading = false
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isSatelliteLoading = false,
                     error = e.message ?: "定位失败"
                 )
             }
@@ -100,6 +118,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 data class MainUiState(
     val isLoading: Boolean = false,
+    val isSatelliteLoading: Boolean = false,
     val result: LocationResult? = null,
     val satellites: List<SatelliteInfo> = emptyList(),
     val error: String? = null,

@@ -15,9 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -156,28 +155,31 @@ fun MainScreen(
                 )
             }
         ) { padding ->
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                LocationCard(
-                    isLoading = uiState.isLoading,
-                    result = uiState.result,
-                    hasPermission = viewModel.hasLocationPermission,
-                    onRequestPermission = onRequestPermission,
-                    onRefresh = { viewModel.refreshLocation() }
-                )
+                item {
+                    LocationCard(
+                        isLoading = uiState.isLoading,
+                        result = uiState.result,
+                        hasPermission = viewModel.hasLocationPermission,
+                        onRequestPermission = onRequestPermission,
+                        onRefresh = { viewModel.refreshLocation() }
+                    )
+                }
 
-                SatelliteCard(
-                    isLoading = uiState.isLoading,
-                    satellites = uiState.satellites,
-                    satelliteError = uiState.satelliteError,
-                    hasLocation = uiState.result != null
-                )
+                item {
+                    SatelliteCard(
+                        isLoading = uiState.isSatelliteLoading,
+                        satellites = uiState.satellites,
+                        satelliteError = uiState.satelliteError,
+                        hasLocation = uiState.result != null
+                    )
+                }
             }
 
             uiState.error?.let { message ->
@@ -402,7 +404,20 @@ private val satelliteTimeFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SatelliteRow(satellite: SatelliteInfo) {
-    val now = remember { Instant.now() }
+    // 缓存格式化后的时间文本，避免每次重组都重新计算
+    val timeInfo = remember(satellite.aosTime, satellite.losTime, satellite.isCurrentlyVisible) {
+        val formatter = satelliteTimeFormatter
+        val zone = ZoneId.systemDefault()
+        if (satellite.isCurrentlyVisible) {
+            val losTime = satellite.losTime.atZone(zone).format(formatter)
+            val remainingSeconds = Duration.between(Instant.now(), satellite.losTime).seconds
+            val remainingText = formatRemainingTime(remainingSeconds)
+            SatelliteTimeInfo.InPass(losTime, remainingText)
+        } else {
+            val aosTime = satellite.aosTime.atZone(zone).format(formatter)
+            SatelliteTimeInfo.Upcoming(aosTime)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // 第一行：状态点 + 卫星名称
@@ -470,65 +485,50 @@ private fun SatelliteRow(satellite: SatelliteInfo) {
         Spacer(modifier = Modifier.height(4.dp))
 
         // 第三行：卫星类型（模式）与时间信息
-        if (satellite.isCurrentlyVisible) {
-            val losTime = satellite.losTime.atZone(ZoneId.systemDefault())
-                .format(satelliteTimeFormatter)
-            val remainingSeconds = Duration.between(now, satellite.losTime).seconds
-            val remainingText = formatRemainingTime(remainingSeconds)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FlowRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                FlowRow(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    satellite.modes.forEach { mode ->
-                        ModeChip(mode = mode)
-                    }
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "${stringResource(R.string.los_time)} $losTime",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "${stringResource(R.string.time_remaining)} $remainingText",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                satellite.modes.forEach { mode ->
+                    ModeChip(mode = mode)
                 }
             }
-        } else {
-            val aosTime = satellite.aosTime.atZone(ZoneId.systemDefault())
-                .format(satelliteTimeFormatter)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FlowRow(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    satellite.modes.forEach { mode ->
-                        ModeChip(mode = mode)
+            when (timeInfo) {
+                is SatelliteTimeInfo.InPass -> {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "${stringResource(R.string.los_time)} ${timeInfo.losTime}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "${stringResource(R.string.time_remaining)} ${timeInfo.remainingText}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
-                Text(
-                    text = "${stringResource(R.string.aos_time)} $aosTime",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                is SatelliteTimeInfo.Upcoming -> {
+                    Text(
+                        text = "${stringResource(R.string.aos_time)} ${timeInfo.aosTime}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
+}
+
+private sealed class SatelliteTimeInfo {
+    data class InPass(val losTime: String, val remainingText: String) : SatelliteTimeInfo()
+    data class Upcoming(val aosTime: String) : SatelliteTimeInfo()
 }
 
 /**

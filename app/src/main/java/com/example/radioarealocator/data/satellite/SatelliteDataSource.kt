@@ -4,6 +4,8 @@ import com.github.amsacode.predict4java.TLE
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -31,6 +33,9 @@ class SatelliteDataSource {
         .build()
 
     private val amsatStatusApi = AmsatStatusApiService()
+
+    // 限制 SatNOGS 并发请求数，避免同时打开过多连接导致网络阻塞
+    private val satnogsSemaphore = Semaphore(8)
 
     /**
      * 获取业余卫星 TLE 列表。
@@ -113,12 +118,19 @@ class SatelliteDataSource {
     /**
      * 从 SatNOGS 获取我们关心的卫星 TLE（JSON 格式）。
      * 只查询 SatelliteCatalog 中的卫星，避免下载全部数据。
+     * 使用信号量限制并发数，防止同时发起过多请求导致卡顿或失败。
      */
     private suspend fun fetchSatnogsTLEs(): List<SourcedTLE> = withContext(Dispatchers.IO) {
         coroutineScope {
-            // 并行查询每颗卫星
+            // 并行查询每颗卫星，但限制并发数
             val deferreds = SatelliteCatalog.catalogNumbers.map { noradId ->
-                async { runCatching { fetchSingleSatnogsTLE(noradId) } }
+                async {
+                    runCatching {
+                        satnogsSemaphore.withPermit {
+                            fetchSingleSatnogsTLE(noradId)
+                        }
+                    }
+                }
             }
             val results = deferreds.map { it.await() }
 
