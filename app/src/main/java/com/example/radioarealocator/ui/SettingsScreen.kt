@@ -1,5 +1,6 @@
 package com.example.radioarealocator.ui
 
+import android.net.Uri
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -21,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +41,9 @@ import com.example.radioarealocator.R
 fun SettingsScreen(
     satelliteSource: String,
     onSourceSelected: (String) -> Unit,
+    backgroundUri: Uri?,
+    onPickBackground: () -> Unit,
+    onClearBackground: () -> Unit,
     onAboutClick: () -> Unit,
     contentPadding: PaddingValues
 ) {
@@ -99,6 +105,61 @@ fun SettingsScreen(
                         labels = labels,
                         selectedIndex = selectedIndex,
                         onSelected = { onSourceSelected(options[it]) }
+                    )
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.background_image),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.background_image_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                    )
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.background_pick)) },
+                        supportingContent = {
+                            Text(
+                                if (backgroundUri != null) {
+                                    stringResource(R.string.background_set)
+                                } else {
+                                    stringResource(R.string.background_unset)
+                                }
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null
+                            )
+                        },
+                        trailingContent = {
+                            if (backgroundUri != null) {
+                                TextButton(onClick = onClearBackground) {
+                                    Text(stringResource(R.string.clear))
+                                }
+                            }
+                        },
+                        modifier = Modifier.clickable(onClick = onPickBackground)
                     )
                 }
             }

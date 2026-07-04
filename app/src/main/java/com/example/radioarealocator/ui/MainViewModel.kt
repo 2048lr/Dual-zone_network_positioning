@@ -1,11 +1,13 @@
 package com.example.radioarealocator.ui
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.radioarealocator.data.LocationResult
+import com.example.radioarealocator.data.SettingsStore
 import com.example.radioarealocator.data.location.LocationHelper
 import com.example.radioarealocator.data.satellite.SatelliteDataSource
 import com.example.radioarealocator.data.satellite.SatelliteInfo
@@ -23,6 +25,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val locationHelper = LocationHelper(application)
     private val satelliteDataSource = SatelliteDataSource()
     private val satellitePredictor = SatellitePredictor()
+    private val settingsStore = SettingsStore(application)
 
     // 跟踪上一次刷新的 Job，避免用户快速多次点击导致并发竞态
     private var refreshJob: Job? = null
@@ -36,6 +39,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSatelliteSource(source: String) {
         _satelliteSource.value = source
+    }
+
+    // 背景图 URI：null 表示未设置
+    private val _backgroundUri = mutableStateOf<Uri?>(settingsStore.backgroundUri?.let(Uri::parse))
+    val backgroundUri: State<Uri?> = _backgroundUri
+
+    /**
+     * 设置背景图 URI 并持久化。null 表示清除。
+     * 调用方需先通过 [android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION] 获取持久化读取权限。
+     */
+    fun setBackgroundUri(uri: Uri?) {
+        _backgroundUri.value = uri
+        settingsStore.backgroundUri = uri?.toString()
     }
 
     val hasLocationPermission: Boolean

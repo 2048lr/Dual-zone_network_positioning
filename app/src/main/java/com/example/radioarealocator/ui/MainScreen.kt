@@ -19,6 +19,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
@@ -53,6 +56,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -73,6 +77,24 @@ fun MainScreen(
     val uiState by viewModel.uiState
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var showAbout by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // 背景图选择器（Photo Picker）
+    val pickBackgroundLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            // 尝试获取持久化读取权限；Photo Picker 在 Android 13+ 上的 URI 通常是临时的，
+            // 但低版本回退到 ACTION_OPEN_DOCUMENT 时此处会成功。失败也无碍——本次会话仍可读取。
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            viewModel.setBackgroundUri(uri)
+        }
+    }
 
     BackHandler(enabled = showAbout) {
         showAbout = false
@@ -84,6 +106,7 @@ fun MainScreen(
     }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -125,6 +148,13 @@ fun MainScreen(
             SettingsScreen(
                 satelliteSource = viewModel.satelliteSource.value,
                 onSourceSelected = { viewModel.setSatelliteSource(it) },
+                backgroundUri = viewModel.backgroundUri.value,
+                onPickBackground = {
+                    pickBackgroundLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                onClearBackground = { viewModel.setBackgroundUri(null) },
                 onAboutClick = { showAbout = true },
                 contentPadding = padding
             )

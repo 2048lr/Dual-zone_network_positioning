@@ -43,4 +43,10 @@
     <string name="status_telemetry_only">仅遥测</string>
     <string name="status_not_heard">无信号</string>
     <string name="status_crew_active">机组活跃</string>
+    <string name="background_image">背景图</string>
+    <string name="background_image_desc">选择背景图后，应用主题色将从背景图取色</string>
+    <string name="background_pick">选择背景图</string>
+    <string name="background_set">已设置背景图，点击重新选择</string>
+    <string name="background_unset">未设置，点击选择图片</string>
+    <string name="clear">清除</string>
 </resources>

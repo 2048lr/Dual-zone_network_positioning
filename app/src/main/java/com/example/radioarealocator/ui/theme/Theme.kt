@@ -1,8 +1,10 @@
 package com.example.radioarealocator.ui.theme
 
 import android.app.Activity
+import android.graphics.Color as AndroidColor
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
@@ -11,7 +13,13 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -70,11 +78,24 @@ private val DarkColorScheme = darkColorScheme(
 fun RadioAreaLocatorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
+    backgroundUri: android.net.Uri? = null,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    var backgroundScheme by remember { mutableStateOf<ColorScheme?>(null) }
+
+    // 背景图驱动 ColorScheme：异步提取色板并构造 ColorScheme
+    LaunchedEffect(backgroundUri, darkTheme) {
+        backgroundScheme = backgroundUri?.let { uri ->
+            BackgroundPalette.extractColors(context, uri)?.let { swatches ->
+                buildSchemeFromSwatches(swatches, darkTheme)
+            }
+        }
+    }
+
     val materialColorScheme = when {
+        backgroundScheme != null -> backgroundScheme!!
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
@@ -86,10 +107,15 @@ fun RadioAreaLocatorTheme(
     if (!view.isInEditMode) {
         SideEffect {
             // 安全转换：仅在 Context 为 Activity 时设置状态栏，避免在非 Activity 场景抛出 ClassCastException
-            val context = view.context
-            if (context is Activity) {
-                val window = context.window
-                window.statusBarColor = materialColorScheme.surface.toArgb()
+            val ctx = view.context
+            if (ctx is Activity) {
+                val window = ctx.window
+                // 背景图存在时让状态栏透明，否则用 surface 色
+                window.statusBarColor = if (backgroundUri != null) {
+                    AndroidColor.TRANSPARENT
+                } else {
+                    materialColorScheme.surface.toArgb()
+                }
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
             }
         }
@@ -102,4 +128,88 @@ fun RadioAreaLocatorTheme(
         motionScheme = MotionScheme.expressive(),
         content = content
     )
+}
+
+/**
+ * 将 Palette 提取的色板转换为 Material3 ColorScheme。
+ * 浅色与深色模式采用不同亮度策略，保证文字与背景对比度。
+ */
+private fun buildSchemeFromSwatches(
+    swatches: BackgroundPalette.PaletteSwatches,
+    dark: Boolean
+): ColorScheme {
+    val primary = Color(swatches.primary)
+    val onPrimary = BackgroundPalette.onColorFor(swatches.primary)
+    val secondary = Color(swatches.secondary)
+    val onSecondary = BackgroundPalette.onColorFor(swatches.secondary)
+    val tertiary = Color(swatches.tertiary)
+    val onTertiary = BackgroundPalette.onColorFor(swatches.tertiary)
+
+    val surfaceRgb = swatches.surface
+    val surface = if (dark) {
+        Color(surfaceRgb).copy(alpha = 1f).let {
+            // 深色模式：将 surface 调暗
+            Color(
+                red = it.red * 0.25f,
+                green = it.green * 0.25f,
+                blue = it.blue * 0.25f,
+                alpha = 1f
+            )
+        }
+    } else {
+        Color(
+            red = (Color(surfaceRgb).red + 1f) / 2f,
+            green = (Color(surfaceRgb).green + 1f) / 2f,
+            blue = (Color(surfaceRgb).blue + 1f) / 2f,
+            alpha = 1f
+        )
+    }
+    val onSurface = BackgroundPalette.onColorFor(surface.toArgb())
+
+    val primaryContainer = if (dark) {
+        Color(swatches.primary).copy(alpha = 1f).let {
+            Color(it.red * 0.4f, it.green * 0.4f, it.blue * 0.4f)
+        }
+    } else {
+        Color(
+            red = (Color(swatches.primary).red + 1f) / 2f,
+            green = (Color(swatches.primary).green + 1f) / 2f,
+            blue = (Color(swatches.primary).blue + 1f) / 2f
+        )
+    }
+    val onPrimaryContainer = BackgroundPalette.onColorFor(primaryContainer.toArgb())
+
+    return if (dark) {
+        darkColorScheme(
+            primary = primary,
+            onPrimary = onPrimary,
+            primaryContainer = primaryContainer,
+            onPrimaryContainer = onPrimaryContainer,
+            secondary = secondary,
+            onSecondary = onSecondary,
+            tertiary = tertiary,
+            onTertiary = onTertiary,
+            surface = surface,
+            onSurface = onSurface,
+            surfaceVariant = surface,
+            onSurfaceVariant = onSurface,
+            outline = onSurface.copy(alpha = 0.5f)
+        )
+    } else {
+        lightColorScheme(
+            primary = primary,
+            onPrimary = onPrimary,
+            primaryContainer = primaryContainer,
+            onPrimaryContainer = onPrimaryContainer,
+            secondary = secondary,
+            onSecondary = onSecondary,
+            tertiary = tertiary,
+            onTertiary = onTertiary,
+            surface = surface,
+            onSurface = onSurface,
+            surfaceVariant = surface,
+            onSurfaceVariant = onSurface,
+            outline = onSurface.copy(alpha = 0.5f)
+        )
+    }
 }
