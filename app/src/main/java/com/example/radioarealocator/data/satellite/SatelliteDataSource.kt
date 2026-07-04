@@ -71,10 +71,15 @@ class SatelliteDataSource {
             val satnogsResult = satnogsDeferred?.await()
             val amsatStatusResult = amsatStatusDeferred.await()
 
-            if (celestrakResult?.isFailure == true && satnogsResult?.isFailure == true) {
+            // 所有被请求的源都失败才抛异常；任一源成功则继续。
+            // 旧逻辑用 `&&` 在单源模式（另一个为 null）下永远不抛，会把网络失败伪装成"无卫星"。
+            val anyRequestedSuccess =
+                (needCelestrak && celestrakResult?.isSuccess == true) ||
+                    (needSatnogs && satnogsResult?.isSuccess == true)
+            if (!anyRequestedSuccess) {
                 throw IOException(
-                    "TLE 下载失败：CelesTrak=${celestrakResult.exceptionOrNull()?.message}, " +
-                        "SatNOGS=${satnogsResult.exceptionOrNull()?.message}"
+                    "TLE 下载失败：CelesTrak=${celestrakResult?.exceptionOrNull()?.message}, " +
+                        "SatNOGS=${satnogsResult?.exceptionOrNull()?.message}"
                 )
             }
 

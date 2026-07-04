@@ -32,6 +32,11 @@ class SatellitePredictor {
         limit: Int = 25,
         hoursAhead: Int = 48
     ): List<SatelliteInfo> = withContext(Dispatchers.Default) {
+        require(latitude in -90.0..90.0) { "纬度必须在 -90 到 90 之间" }
+        require(longitude in -180.0..180.0) { "经度必须在 -180 到 180 之间" }
+        require(limit >= 0) { "limit 不能为负" }
+        require(hoursAhead > 0) { "hoursAhead 必须为正" }
+
         val groundStation = GroundStationPosition(latitude, longitude, altitude)
         val now = Date()
         val searchEnd = Date(now.time + hoursAhead * 60L * 60L * 1000L)

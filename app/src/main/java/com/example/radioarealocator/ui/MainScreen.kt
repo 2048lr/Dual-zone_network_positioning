@@ -76,7 +76,7 @@ fun MainScreen(
 ) {
     val uiState by viewModel.uiState
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    var showAbout by remember { mutableStateOf(false) }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     // 背景图选择器（Photo Picker）

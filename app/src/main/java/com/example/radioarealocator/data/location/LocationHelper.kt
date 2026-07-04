@@ -395,6 +395,9 @@ class LocationHelper(private val context: Context) {
                     }
                 }
             }
+        } catch (e: TimeoutCancellationException) {
+            // withTimeout 超时不属于真正的协程取消，按文档约定返回空字符串
+            ""
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

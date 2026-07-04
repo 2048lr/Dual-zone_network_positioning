@@ -98,7 +98,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 // 后台并行加载地址与卫星信息
                 val addressDeferred = async {
-                    locationHelper.getAddress(location.latitude, location.longitude)
+                    // 与 satellitesDeferred 保持一致的异常兜底，避免地址加载失败波及卫星加载
+                    try {
+                        Result.success(locationHelper.getAddress(location.latitude, location.longitude))
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Result.failure(e)
+                    }
                 }
                 val satellitesDeferred = async {
                     // 显式 try-catch 替代 runCatching，避免吞掉 CancellationException
@@ -111,7 +118,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                val address = addressDeferred.await()
+                val address = addressDeferred.await().getOrDefault("")
                 val satellitesResult = satellitesDeferred.await()
 
                 _uiState.value = _uiState.value.copy(
