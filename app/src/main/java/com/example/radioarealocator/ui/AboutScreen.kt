@@ -230,5 +230,11 @@ private val MAINTAINERS = listOf(
         role = "主要维护者",
         githubUrl = "https://github.com/fuxue-linkong",
         avatarUrl = "https://github.com/fuxue-linkong.png"
+    ),
+    Maintainer(
+        name = "Run Liu",
+        role = "维护者",
+        githubUrl = "https://github.com/2048lr",
+        avatarUrl = "https://github.com/2048lr.png"
     )
 )
