@@ -1155,6 +1155,7 @@ private fun SatelliteSectionHeader(
  * 卫星筛选弹窗：以 Dialog 形式呈现，支持模式多选与开关筛选，
  * 底部提供"更多"入口进入三级页面。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SatelliteFilterPopup(
     filter: SatelliteFilter,
