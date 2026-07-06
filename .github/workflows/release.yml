@@ -25,6 +25,11 @@ on:
         type: boolean
         default: true
 
+# 并发控制：发布流程不取消进行中的运行，避免中断发布
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     name: Run Unit Tests
@@ -37,6 +42,7 @@ jobs:
     name: Build Release APK
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
@@ -55,16 +61,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.4.1'
-          cache-disabled: true
-
-      - name: Verify JDK version
-        run: |
-          echo "JAVA_HOME=$JAVA_HOME"
-          java -version
-
-      - name: Set JAVA_HOME for Gradle
-        run: |
-          echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
+          # cache-disabled 已移除：启用 Gradle 依赖缓存，避免每次构建重复下载依赖
 
       # 解析发布参数：tag 触发时从 $GITHUB_REF 推断，手动触发从 inputs 读取
       - name: Resolve release parameters
@@ -289,6 +286,7 @@ jobs:
     needs: [test, build]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       checks: write
@@ -303,11 +301,17 @@ jobs:
           echo "| 构建发布 | ${{ needs.build.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.build.result }}" = "success" ]; then
-            echo "✅ 整体状态: 成功" >> "$GITHUB_STEP_SUMMARY"
+          # skipped 视为正常（如 bot 提交时 job 被跳过）
+          TEST_OK=false
+          BUILD_OK=false
+          [ "${{ needs.test.result }}" = "success" ] || [ "${{ needs.test.result }}" = "skipped" ] && TEST_OK=true
+          [ "${{ needs.build.result }}" = "success" ] || [ "${{ needs.build.result }}" = "skipped" ] && BUILD_OK=true
+
+          if [ "$TEST_OK" = "true" ] && [ "$BUILD_OK" = "true" ]; then
+            echo "✅ 整体状态: 成功"
             echo "GitHub 将自动向仓库 Watchers 和提交者发送成功通知邮件。"
           else
-            echo "❌ 整体状态: 失败" >> "$GITHUB_STEP_SUMMARY"
+            echo "❌ 整体状态: 失败"
             echo "GitHub 将自动向提交者和 Watchers 发送失败通知邮件。"
             # 显式失败以触发 GitHub 的失败通知系统
             exit 1
