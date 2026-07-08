@@ -121,6 +121,8 @@ jobs:
             exit 1
           }
 
+      # 敏感信息已通过 secrets.dat 加密入库，Release 构建无需 GitHub Secrets。
+      # secrets.dat 在 app/src/main/assets/ 中，由 SecretManager 运行时解密。
       - name: Build Release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/signing/release.keystore

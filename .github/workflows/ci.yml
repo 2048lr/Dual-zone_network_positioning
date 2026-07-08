@@ -55,6 +55,8 @@ jobs:
           mkdir -p log/ci
           rm -f log/ci/*
 
+      # 敏感信息已通过 secrets.dat 加密入库，CI 无需 GitHub Secrets。
+      # secrets.dat 在 app/src/main/assets/ 中，由 SecretManager 运行时解密。
       - name: Build Debug APK
         run: |
           set -o pipefail
