@@ -55,6 +55,20 @@ jobs:
           mkdir -p log/ci
           rm -f log/ci/*
 
+      # 注入 API Key：从仓库 Secrets 写入 local.properties，使构建出的
+      # debug APK 内置有效的高德天气/地图 Key。缺失 secret 时仍可构建，
+      # 但运行时天气功能会提示 "API Key 未配置" 而非笼统的网络错误。
+      - name: Configure API keys
+        env:
+          AMAP_API_KEY: ${{ secrets.AMAP_API_KEY }}
+          AMAP_SDK_KEY: ${{ secrets.AMAP_SDK_KEY }}
+        run: |
+          {
+            echo "amap.api.key=${AMAP_API_KEY}"
+            echo "amap.sdk.key=${AMAP_SDK_KEY}"
+          } > local.properties
+          echo "local.properties created (api key length: ${#AMAP_API_KEY}, sdk key length: ${#AMAP_SDK_KEY})"
+
       - name: Build Debug APK
         run: |
           set -o pipefail
