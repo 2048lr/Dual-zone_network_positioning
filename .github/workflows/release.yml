@@ -1,18 +1,30 @@
 name: Release Build APK
 
+# ─────────────────────────────────────────────────────────────
+# 发布工作流（对应发布流程第 3-5 步）
+#   3. 修复完成后，发布 beta 版到 GitHub（tag: v1.2.0-beta.1）
+#   4. 根据用户反馈继续修复，再次发布 beta 版（tag: v1.2.0-beta.2）
+#   5. 最后稳定后，发布正式版（tag: v1.2.0）
+#
+# Tag 规范：
+#   - Beta 预发布：v1.2.0-beta.1, v1.2.0-beta.2 ...
+#   - RC 候选版：  v1.2.0-rc.1 ...
+#   - 正式发布：   v1.2.0
+# 工作流会自动从 tag 检测是否为 Pre-release（包含 -beta/-rc/-alpha）。
+# 敏感信息已通过 secrets.dat 加密入库；签名密钥使用 GitHub Secrets。
+# ─────────────────────────────────────────────────────────────
 on:
   push:
-    # 语义化版本标签触发完整发布流程（v1.0.0、v2.1.3-rc1 等）
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag（例如 v1.0.0）'
+        description: 'Release tag（例如 v1.2.0 或 v1.2.0-beta.1）'
         required: true
         type: string
       version_name:
-        description: '版本名称（例如 1.0.0），留空则自动从 tag 推断'
+        description: '版本名称（例如 1.2.0），留空则自动从 tag 推断'
         required: false
         type: string
       version_code:
@@ -25,7 +37,7 @@ on:
         type: boolean
         default: true
       prerelease:
-        description: '是否为预发布（Pre-release）'
+        description: '是否为预发布（留空则根据 tag 自动判断）'
         required: false
         type: boolean
         default: false
@@ -62,13 +74,13 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # 启用 Gradle 依赖缓存，避免每次构建重复下载
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.4.1'
 
       # 解析发布参数：tag 触发时从 $GITHUB_REF 推断，手动触发从 inputs 读取
+      # 自动检测 prerelease：tag 包含 -beta/-rc/-alpha 视为预发布
       - name: Resolve release parameters
         id: params
         run: |
@@ -82,6 +94,29 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Resolved tag: $TAG"
 
+          # 自动检测 prerelease：tag 包含 -beta/-rc/-alpha 视为预发布
+          if echo "$TAG" | grep -qE '-(beta|rc|alpha)\.'; then
+            IS_PRERELEASE=true
+            echo "Detected pre-release tag: $TAG"
+          else
+            IS_PRERELEASE=false
+            echo "Detected stable tag: $TAG"
+          fi
+
+          # 手动触发时，若用户显式指定 prerelease，则优先使用用户指定值
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+              IS_PRERELEASE=true
+              echo "Manual override: pre-release enabled by user"
+            elif [ "${{ github.event.inputs.prerelease }}" = "false" ]; then
+              IS_PRERELEASE=false
+              echo "Manual override: stable release enabled by user"
+            fi
+          fi
+
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "Final prerelease flag: $IS_PRERELEASE"
+
       - name: Update version
         id: version
         run: |
@@ -89,8 +124,9 @@ jobs:
           VERSION_NAME="${{ github.event.inputs.version_name || '' }}"
           VERSION_CODE="${{ github.event.inputs.version_code || '' }}"
 
-          # 从 tag 推断 version_name（去除前缀 v）
+          # 从 tag 推断 version_name（去除前缀 v 和预发布后缀）
           if [ -z "$VERSION_NAME" ]; then
+            # v1.2.0-beta.1 → 1.2.0-beta.1
             VERSION_NAME="${TAG#v}"
           fi
 
@@ -126,7 +162,6 @@ jobs:
           }
 
       # 敏感信息已通过 secrets.dat 加密入库，Release 构建无需额外 GitHub Secrets。
-      # secrets.dat 在 app/src/main/assets/ 中，由 SecretManager 运行时解密。
       - name: Build Release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/signing/release.keystore
@@ -177,6 +212,7 @@ jobs:
           Build Tag:     ${{ steps.params.outputs.tag }}
           Build Date:    $(date -u '+%Y-%m-%d %H:%M:%S UTC')
           Commit:        ${{ github.sha }}
+          Pre-release:   ${{ steps.params.outputs.is_prerelease }}
 
           SHA-1:         $FINGERPRINT_SHA1
           SHA-256:       $FINGERPRINT_SHA256
@@ -204,6 +240,7 @@ jobs:
           echo "| SHA-256 | \`${{ steps.signature.outputs.fingerprint_sha256 }}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Version | ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }}) |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Tag | ${{ steps.params.outputs.tag }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Pre-release | ${{ steps.params.outputs.is_prerelease }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "If this fingerprint differs from the previous Release, users must uninstall the old version first." >> "$GITHUB_STEP_SUMMARY"
 
@@ -237,6 +274,7 @@ jobs:
           git push origin HEAD:main
 
       # 创建 GitHub Release，包含 APK、签名指纹、自动变更日志
+      # prerelease 标志：由上方步骤自动检测（tag 后缀）或用户手动指定
       - name: Create Release
         id: release
         uses: softprops/action-gh-release@v2
@@ -251,6 +289,7 @@ jobs:
             ### Version Info
             - Version: ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }})
             - Commit: ${{ github.sha }}
+            - Pre-release: ${{ steps.params.outputs.is_prerelease }}
 
             ### Signature Info
             - SHA-1: `${{ steps.signature.outputs.fingerprint_sha1 }}`
@@ -263,8 +302,8 @@ jobs:
             ### Changelog
             See auto-generated Release Notes below.
           generate_release_notes: true
-          # 手动触发时根据 inputs.prerelease 决定；标签触发时默认为正式发布
-          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          # 使用自动检测的 prerelease 标志（tag 后缀自动判断 + 手动覆盖）
+          prerelease: ${{ steps.params.outputs.is_prerelease == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -279,6 +318,7 @@ jobs:
           echo "| Trigger | ${{ github.event_name }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Tag | ${{ steps.params.outputs.tag }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Version | ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }}) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Pre-release | ${{ steps.params.outputs.is_prerelease }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Test | ${{ needs.test.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Build | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -288,7 +328,7 @@ jobs:
             echo "❌ Release failed, check logs above" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  # 工作流状态通知：在失败时通过 GitHub Checks API 标记
+  # 状态通知：汇总测试与构建结果
   notify:
     name: Status Notification
     needs: [test, build]

@@ -1,5 +1,11 @@
 name: CI Build APK
 
+# ─────────────────────────────────────────────────────────────
+# 内部测试工作流（对应发布流程第 1-2 步）
+#   1. 修复 bug、实现新功能 → push 触发单元测试
+#   2. 内部测试 → 构建 Debug APK 供开发团队验证
+# 敏感信息已通过 secrets.dat 加密入库，CI 无需 GitHub Secrets。
+# ─────────────────────────────────────────────────────────────
 on:
   push:
     branches:
@@ -11,13 +17,13 @@ on:
       - 'log/**'
   workflow_dispatch:
 
-# 并发控制：同一分支的新推送自动取消旧运行，避免资源浪费
+# 并发控制：同分支新推送取消旧运行
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # 先测试：复用 test.yml，覆盖率不强制（CI 仅提示）
+  # 先测试：复用 test.yml（CI 不强制覆盖率）
   test:
     name: Run Unit Tests
     uses: ./.github/workflows/test.yml
@@ -25,7 +31,7 @@ jobs:
       contents: read
       checks: write
 
-  # 后打包：构建 Debug APK 供开发团队内部测试
+  # 后打包：构建 Debug APK 供内部测试
   build:
     name: Build Debug APK
     needs: test
@@ -45,7 +51,6 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # 启用 Gradle 依赖缓存，避免每次构建重复下载
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -56,8 +61,6 @@ jobs:
           mkdir -p log/ci
           rm -f log/ci/*
 
-      # 敏感信息已通过 secrets.dat 加密入库，CI 无需 GitHub Secrets。
-      # secrets.dat 在 app/src/main/assets/ 中，由 SecretManager 运行时解密。
       - name: Build Debug APK
         run: |
           set -o pipefail
@@ -94,7 +97,6 @@ jobs:
             git push
           fi
 
-      # 构建状态报告：输出到 Step Summary
       - name: Publish CI status report
         if: always()
         run: |
@@ -113,7 +115,7 @@ jobs:
             echo "❌ CI build failed, check logs above or download build-reports artifact" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  # 工作流状态通知：汇总测试与构建结果
+  # 状态通知：汇总测试与构建结果
   notify:
     name: Status Notification
     needs: [test, build]
