@@ -65,6 +65,14 @@ fun assembleMasterKey(): ByteArray {
 fun xorBytes(a: ByteArray, b: ByteArray): ByteArray =
     ByteArray(a.size) { i -> (a[i].toInt() xor b[i % b.size].toInt()).toByte() }
 
+/** 转义 JSON 字符串中的特殊字符，防止注入。 */
+fun escapeJson(value: String): String = value
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+    .replace("\n", "\\n")
+    .replace("\r", "\\r")
+    .replace("\t", "\\t")
+
 /**
  * AES-256-GCM 加密明文，输出 secrets.dat 二进制格式：
  * [4B magic "SCL1"] [4B version] [12B IV] [NB 密文+认证标签]
@@ -293,16 +301,16 @@ tasks.register("encryptSecrets") {
             return@doLast
         }
 
-        // 构建明文 JSON
+        // 构建明文 JSON（对特殊字符转义，防止注入）
         val json = StringBuilder("{")
         var first = true
         if (apiKey.isNotEmpty()) {
-            json.append("\"amap.api.key\":\"$apiKey\"")
+            json.append("\"amap.api.key\":\"${escapeJson(apiKey)}\"")
             first = false
         }
         if (sdkKey.isNotEmpty()) {
             if (!first) json.append(",")
-            json.append("\"amap.sdk.key\":\"$sdkKey\"")
+            json.append("\"amap.sdk.key\":\"${escapeJson(sdkKey)}\"")
         }
         json.append("}")
 

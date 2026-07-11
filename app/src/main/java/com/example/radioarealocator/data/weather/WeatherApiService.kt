@@ -87,28 +87,26 @@ class WeatherApiService {
      * @throws WeatherApiException 高德 API 返回 status!=1
      */
     private suspend fun fetchAdcode(lat: Double, lng: Double, key: String): Pair<String, String> {
-        return withContext(Dispatchers.IO) {
-            // 高德 API location 参数格式：经度,纬度（lng,lat）
-            val location = String.format("%.6f,%.6f", lng, lat)
-            val url = "$REGEO_BASE_URL?location=$location&key=$key"
-            val response = executeRequest(url)
-            val json = JSONObject(response)
-            checkApiStatus(json)
-            val regeocode = json.optJSONObject("regeocode")
-                ?: throw WeatherApiException("regeo 响应缺少 regeocode 字段")
-            val addrComponent = regeocode.optJSONObject("addressComponent")
-                ?: throw WeatherApiException("regeo 响应缺少 addressComponent 字段")
+        // 高德 API location 参数格式：经度,纬度（lng,lat）
+        val location = String.format("%.6f,%.6f", lng, lat)
+        val url = "$REGEO_BASE_URL?location=$location&key=$key"
+        val response = executeRequest(url)
+        val json = JSONObject(response)
+        checkApiStatus(json)
+        val regeocode = json.optJSONObject("regeocode")
+            ?: throw WeatherApiException("regeo 响应缺少 regeocode 字段")
+        val addrComponent = regeocode.optJSONObject("addressComponent")
+            ?: throw WeatherApiException("regeo 响应缺少 addressComponent 字段")
 
-            val adcode = addrComponent.optString("adcode")
-            if (adcode.isEmpty()) throw WeatherApiException("adcode 为空")
+        val adcode = addrComponent.optString("adcode")
+        if (adcode.isEmpty()) throw WeatherApiException("adcode 为空")
 
-            // city 可能为空（直辖市），回退到 province
-            val city = addrComponent.optString("city")
-            val province = addrComponent.optString("province")
-            val cityName = if (city.isNotEmpty()) city else province
+        // city 可能为空（直辖市），回退到 province
+        val city = addrComponent.optString("city")
+        val province = addrComponent.optString("province")
+        val cityName = if (city.isNotEmpty()) city else province
 
-            if (cityName.isEmpty()) throw WeatherApiException("城市名为空") else Pair(adcode, cityName)
-        }
+        if (cityName.isEmpty()) throw WeatherApiException("城市名为空") else return Pair(adcode, cityName)
     }
 
     /**
@@ -123,27 +121,25 @@ class WeatherApiService {
      * @throws WeatherApiException 高德 API 返回 status!=1 或数据为空
      */
     private suspend fun fetchNowWeather(adcode: String, key: String): WeatherNow {
-        return withContext(Dispatchers.IO) {
-            val url = "$WEATHER_BASE_URL?city=$adcode&key=$key&extensions=base"
-            val response = executeRequest(url)
-            val json = JSONObject(response)
-            checkApiStatus(json)
+        val url = "$WEATHER_BASE_URL?city=$adcode&key=$key&extensions=base"
+        val response = executeRequest(url)
+        val json = JSONObject(response)
+        checkApiStatus(json)
 
-            val livesArr = json.optJSONArray("lives")
-                ?: throw WeatherApiException("lives 为空")
-            if (livesArr.length() == 0) throw WeatherApiException("lives 数组为空")
+        val livesArr = json.optJSONArray("lives")
+            ?: throw WeatherApiException("lives 为空")
+        if (livesArr.length() == 0) throw WeatherApiException("lives 数组为空")
 
-            val live = livesArr.optJSONObject(0)
-                ?: throw WeatherApiException("lives[0] 为空")
-            WeatherNow(
-                temp = live.optString("temperature"),
-                text = live.optString("weather"),
-                windDir = live.optString("winddirection"),
-                windPower = live.optString("windpower"),
-                humidity = live.optString("humidity"),
-                reportTime = live.optString("reporttime")
-            )
-        }
+        val live = livesArr.optJSONObject(0)
+            ?: throw WeatherApiException("lives[0] 为空")
+        return WeatherNow(
+            temp = live.optString("temperature"),
+            text = live.optString("weather"),
+            windDir = live.optString("winddirection"),
+            windPower = live.optString("windpower"),
+            humidity = live.optString("humidity"),
+            reportTime = live.optString("reporttime")
+        )
     }
 
     /**
@@ -158,36 +154,34 @@ class WeatherApiService {
      * @throws WeatherApiException 高德 API 返回 status!=1 或数据为空
      */
     private suspend fun fetchDailyForecast(adcode: String, key: String): List<WeatherDay> {
-        return withContext(Dispatchers.IO) {
-            val url = "$WEATHER_BASE_URL?city=$adcode&key=$key&extensions=all"
-            val response = executeRequest(url)
-            val json = JSONObject(response)
-            checkApiStatus(json)
+        val url = "$WEATHER_BASE_URL?city=$adcode&key=$key&extensions=all"
+        val response = executeRequest(url)
+        val json = JSONObject(response)
+        checkApiStatus(json)
 
-            val forecastsArr = json.optJSONArray("forecasts")
-                ?: throw WeatherApiException("forecasts 为空")
-            if (forecastsArr.length() == 0) throw WeatherApiException("forecasts 数组为空")
+        val forecastsArr = json.optJSONArray("forecasts")
+            ?: throw WeatherApiException("forecasts 为空")
+        if (forecastsArr.length() == 0) throw WeatherApiException("forecasts 数组为空")
 
-            val forecast = forecastsArr.optJSONObject(0)
-                ?: throw WeatherApiException("forecasts[0] 为空")
-            val castsArr = forecast.optJSONArray("casts")
-                ?: throw WeatherApiException("casts 为空")
+        val forecast = forecastsArr.optJSONObject(0)
+            ?: throw WeatherApiException("forecasts[0] 为空")
+        val castsArr = forecast.optJSONArray("casts")
+            ?: throw WeatherApiException("casts 为空")
 
-            (0 until castsArr.length()).mapNotNull { idx ->
-                val cast = castsArr.optJSONObject(idx) ?: return@mapNotNull null
-                WeatherDay(
-                    date = cast.optString("date"),
-                    week = cast.optString("week"),
-                    dayWeather = cast.optString("dayweather"),
-                    nightWeather = cast.optString("nightweather"),
-                    dayTemp = cast.optString("daytemp"),
-                    nightTemp = cast.optString("nighttemp"),
-                    dayWind = cast.optString("daywind"),
-                    nightWind = cast.optString("nightwind"),
-                    dayPower = cast.optString("daypower"),
-                    nightPower = cast.optString("nightpower")
-                )
-            }
+        return (0 until castsArr.length()).mapNotNull { idx ->
+            val cast = castsArr.optJSONObject(idx) ?: return@mapNotNull null
+            WeatherDay(
+                date = cast.optString("date"),
+                week = cast.optString("week"),
+                dayWeather = cast.optString("dayweather"),
+                nightWeather = cast.optString("nightweather"),
+                dayTemp = cast.optString("daytemp"),
+                nightTemp = cast.optString("nighttemp"),
+                dayWind = cast.optString("daywind"),
+                nightWind = cast.optString("nightwind"),
+                dayPower = cast.optString("daypower"),
+                nightPower = cast.optString("nightpower")
+            )
         }
     }
 

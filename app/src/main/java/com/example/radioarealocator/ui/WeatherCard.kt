@@ -346,7 +346,7 @@ private fun InitialState(
  */
 private fun formatTemperature(temp: String): String {
     val value = temp.toDoubleOrNull() ?: return "--"
-    return String.format("%.1f°C", value)
+    return String.format(java.util.Locale.US, "%.1f°C", value)
 }
 
 /**

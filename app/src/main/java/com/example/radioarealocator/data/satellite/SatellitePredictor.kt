@@ -3,6 +3,7 @@ package com.example.radioarealocator.data.satellite
 import com.github.amsacode.predict4java.GroundStationPosition
 import com.github.amsacode.predict4java.PassPredictor
 import com.github.amsacode.predict4java.SatNotFoundException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -120,9 +121,12 @@ class SatellitePredictor {
         } catch (_: IllegalArgumentException) {
             // TLE 或地面站参数异常，跳过
             null
+        } catch (e: CancellationException) {
+            // 协程取消：必须向上传播，不能静默吞掉
+            throw e
         } catch (_: Exception) {
             // predict4java 内部的其他异常（如 NPE、数组越界、轨道计算溢出），
-            // 跳过单颗卫星，避免整体崩溃。本函数非 suspend，不会吞掉 CancellationException。
+            // 跳过单颗卫星，避免整体崩溃。
             null
         }
     }

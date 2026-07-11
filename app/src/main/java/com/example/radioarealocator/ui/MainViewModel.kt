@@ -235,8 +235,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _dailyQuote = mutableStateOf(currentLocalFallbackQuote())
     val dailyQuote: State<String> = _dailyQuote
 
-    // 记录已获取一言的日期（dayOfYear），同一天内不重复请求
-    private var dailyQuoteDayOfYear: Int = -1
+    // 记录已获取一言的日期（dayOfYear），同一天内不重复请求（持久化，进程重启后仍有效）
+    private var dailyQuoteDayOfYear: Int = settingsStore.dailyQuoteDayOfYear
 
     /**
      * 刷新每日一言。
@@ -256,6 +256,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val quote = hitokotoApi.fetchQuote()
             if (quote != null) {
                 _dailyQuote.value = quote.toDisplayText()
+                settingsStore.dailyQuoteDayOfYear = dailyQuoteDayOfYear
             }
             // 失败时保留初始化时填入的本地兜底文案，不额外处理
         }
@@ -503,8 +504,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
                 // 持久化位置坐标，供后台 Worker 做过境预测时使用
-                settingsStore.lastLatitude = location.latitude.toFloat()
-                settingsStore.lastLongitude = location.longitude.toFloat()
+                settingsStore.lastLatitude = location.latitude
+                settingsStore.lastLongitude = location.longitude
 
                 // 后台加载地址
                 val addressDeferred = async {
@@ -597,8 +598,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         error = null
                     )
                     // 持久化位置坐标，供后台 Worker 做过境预测时使用
-                    settingsStore.lastLatitude = location.latitude.toFloat()
-                    settingsStore.lastLongitude = location.longitude.toFloat()
+                    settingsStore.lastLatitude = location.latitude
+                    settingsStore.lastLongitude = location.longitude
                     // 收到有效位置，重置退避计数
                     retryAttempt = 0
 
@@ -679,8 +680,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     lastLocationCity = city
                 )
                 // 持久化位置坐标，供后台 Worker 做过境预测时使用
-                settingsStore.lastLatitude = location.latitude.toFloat()
-                settingsStore.lastLongitude = location.longitude.toFloat()
+                settingsStore.lastLatitude = location.latitude
+                settingsStore.lastLongitude = location.longitude
                 // 用新定位重新预测
                 triggerPrediction(location.latitude, location.longitude)
 

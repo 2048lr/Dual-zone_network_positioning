@@ -81,7 +81,7 @@ class SatelliteCacheStore(context: Context) {
     }
 
     companion object {
-        private const val PREFS_NAME = "radio_area_settings"
+        private const val PREFS_NAME = "radio_area_tle_cache"
         private const val KEY_TLE_JSON = "cached_tle_json"
         private const val KEY_UPDATED_AT = "cached_tle_updated_at"
     }

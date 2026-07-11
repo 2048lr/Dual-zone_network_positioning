@@ -57,8 +57,8 @@ class ReminderRefreshWorker(
                 return Result.success()
             }
 
-            val latitude = settingsStore.lastLatitude.toDouble()
-            val longitude = settingsStore.lastLongitude.toDouble()
+            val latitude = settingsStore.lastLatitude
+            val longitude = settingsStore.lastLongitude
             val satelliteSource = settingsStore.satelliteSource
 
             // 获取 TLE 数据：优先使用缓存，超过 24 小时则重新下载

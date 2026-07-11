@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -135,8 +136,10 @@ class MainActivity : ComponentActivity() {
         // scrim 反向缩放：不透明度越高，遮罩越淡；0.82 为最大遮罩强度
         val scrimAlpha = (1f - bgAlpha) * 0.82f
         val context = LocalContext.current
-        var bitmap by remember(uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
+        var bitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
         LaunchedEffect(uri) {
+            // 回收旧 Bitmap 的 native 内存，避免等待 GC（GC 不感知 native 分配）
+            bitmap?.recycle()
             bitmap = withContext(Dispatchers.IO) {
                 runCatching {
                     // 两阶段解码：先读边界，再按目标尺寸下采样，避免超大图 OOM
@@ -157,6 +160,13 @@ class MainActivity : ComponentActivity() {
                         android.graphics.BitmapFactory.decodeStream(input, null, opts)
                     }
                 }.getOrNull()
+            }
+        }
+        // composable 销毁时回收当前 Bitmap 的 native 内存。
+        // URI 切换时的回收由 LaunchedEffect(uri) 处理（先 recycle 旧的再加载新的）。
+        DisposableEffect(Unit) {
+            onDispose {
+                bitmap?.recycle()
             }
         }
         bitmap?.let { bmp ->

@@ -51,28 +51,40 @@ class SettingsStore(context: Context) {
 
     /**
      * 最后已知纬度。供后台 Worker 做过境预测时使用，避免依赖应用进程存活。
-     * 默认 0.0 表示无有效位置。
+     * 使用 String 存储 Double，避免 Float 精度丢失（Float 仅 ~7 位有效数字）。
      */
-    var lastLatitude: Float
-        get() = prefs.getFloat(KEY_LAST_LAT, 0f)
+    var lastLatitude: Double
+        get() = prefs.getString(KEY_LAST_LAT, null)?.toDoubleOrNull() ?: 0.0
         set(value) {
-            prefs.edit().putFloat(KEY_LAST_LAT, value).apply()
+            prefs.edit().putString(KEY_LAST_LAT, value.toString()).apply()
         }
 
     /**
      * 最后已知经度。供后台 Worker 做过境预测时使用。
+     * 使用 String 存储 Double，避免 Float 精度丢失。
      */
-    var lastLongitude: Float
-        get() = prefs.getFloat(KEY_LAST_LON, 0f)
+    var lastLongitude: Double
+        get() = prefs.getString(KEY_LAST_LON, null)?.toDoubleOrNull() ?: 0.0
         set(value) {
-            prefs.edit().putFloat(KEY_LAST_LON, value).apply()
+            prefs.edit().putString(KEY_LAST_LON, value.toString()).apply()
         }
 
     /**
-     * 最后位置是否有效（latitude 和 longitude 均非 0）。
+     * 最后位置是否有效（latitude 和 longitude 均已存储）。
      */
     fun hasLastLocation(): Boolean =
         prefs.contains(KEY_LAST_LAT) && prefs.contains(KEY_LAST_LON)
+
+    /**
+     * 每日一言最近一次成功获取的 dayOfYear。
+     * 避免进程重启后同一天内重复请求 hitokoto API。
+     * -1 表示从未获取。
+     */
+    var dailyQuoteDayOfYear: Int
+        get() = prefs.getInt(KEY_DAILY_QUOTE_DOY, -1)
+        set(value) {
+            prefs.edit().putInt(KEY_DAILY_QUOTE_DOY, value).apply()
+        }
 
     companion object {
         private const val PREFS_NAME = "radio_area_settings"
@@ -82,5 +94,6 @@ class SettingsStore(context: Context) {
         private const val KEY_SATELLITE_SOURCE = "satellite_source"
         private const val KEY_LAST_LAT = "last_lat"
         private const val KEY_LAST_LON = "last_lon"
+        private const val KEY_DAILY_QUOTE_DOY = "daily_quote_doy"
     }
 }
