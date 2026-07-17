@@ -140,13 +140,19 @@ private const val NAV_ANIM_DURATION_MS = 300
 // 关于页淡入淡出动画时长（毫秒）
 private const val ABOUT_ANIM_DURATION_MS = 250
 
+@Suppress("UnusedPrivateMember")
+private val navSlideTween = tween<IntOffset>(NAV_ANIM_DURATION_MS)
+private val navFadeTween = tween<Float>(NAV_ANIM_DURATION_MS)
+private val aboutFadeTween = tween<Float>(ABOUT_ANIM_DURATION_MS)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
     onRequestPermission: () -> Unit
 ) {
-    val uiState by viewModel.uiState
+    val locationState by viewModel.locationState
+    val satelliteState by viewModel.satelliteState
     val favorites by viewModel.favoriteSatellites
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var showAbout by remember { mutableStateOf(false) }
@@ -233,7 +239,8 @@ fun MainScreen(
                 val tab = key[0]; val home = key[1]; val settings = key[2]; val cw = key[3]
                 when {
                 tab == 0 && home == 0 -> HomeHeader(
-                    uiState = uiState,
+                    locationState = locationState,
+                    satellites = satelliteState.satellites,
                     weather = viewModel.weather.value,
                     weatherLoading = viewModel.weatherLoading.value,
                     weatherError = viewModel.weatherError.value,
@@ -359,18 +366,18 @@ fun MainScreen(
                 val targetDepth = depthOf(targetState)
                 val forward = targetDepth >= initialDepth
                 val enter = if (forward) {
-                    slideInHorizontally(animationSpec = tween(NAV_ANIM_DURATION_MS)) { fullWidth -> fullWidth } +
-                        fadeIn(animationSpec = tween(NAV_ANIM_DURATION_MS))
+                    slideInHorizontally(animationSpec = navSlideTween) { fullWidth -> fullWidth } +
+                        fadeIn(animationSpec = navFadeTween)
                 } else {
-                    slideInHorizontally(animationSpec = tween(NAV_ANIM_DURATION_MS)) { fullWidth -> -fullWidth } +
-                        fadeIn(animationSpec = tween(NAV_ANIM_DURATION_MS))
+                    slideInHorizontally(animationSpec = navSlideTween) { fullWidth -> -fullWidth } +
+                        fadeIn(animationSpec = navFadeTween)
                 }
                 val exit = if (forward) {
-                    slideOutHorizontally(animationSpec = tween(NAV_ANIM_DURATION_MS)) { fullWidth -> -fullWidth } +
-                        fadeOut(animationSpec = tween(NAV_ANIM_DURATION_MS))
+                    slideOutHorizontally(animationSpec = navSlideTween) { fullWidth -> -fullWidth } +
+                        fadeOut(animationSpec = navFadeTween)
                 } else {
-                    slideOutHorizontally(animationSpec = tween(NAV_ANIM_DURATION_MS)) { fullWidth -> fullWidth } +
-                        fadeOut(animationSpec = tween(NAV_ANIM_DURATION_MS))
+                    slideOutHorizontally(animationSpec = navSlideTween) { fullWidth -> fullWidth } +
+                        fadeOut(animationSpec = navFadeTween)
                 }
                 enter togetherWith exit
             },
@@ -387,7 +394,7 @@ fun MainScreen(
                         contentPadding = padding
                     )
                     1 -> LocationDetailContent(
-                        uiState = uiState,
+                        locationState = locationState,
                         hasLocationPermission = viewModel.hasLocationPermission,
                         onRequestPermission = onRequestPermission,
                         onRefresh = { viewModel.refreshLocation() },
@@ -395,7 +402,8 @@ fun MainScreen(
                         contentPadding = padding
                     )
                     2 -> SatelliteDetailContent(
-                        uiState = uiState,
+                        locationState = locationState,
+                        satelliteState = satelliteState,
                         filter = viewModel.satelliteFilter.value,
                         onFilterChange = viewModel::updateSatelliteFilter,
                         onGetLocation = { viewModel.refreshLocationOnly() },
@@ -407,7 +415,8 @@ fun MainScreen(
                         contentPadding = padding
                     )
                     3 -> SatelliteManagementContent(
-                        uiState = uiState,
+                        locationState = locationState,
+                        satelliteState = satelliteState,
                         favorites = favorites,
                         onToggleFavorite = viewModel::toggleFavorite,
                         contentPadding = padding
@@ -510,8 +519,8 @@ fun MainScreen(
     // visible=false 时 AnimatedVisibility 仍会播放 exit 动画，期间 AboutScreen 在最上层覆盖。
     AnimatedVisibility(
         visible = showAbout,
-        enter = fadeIn(animationSpec = tween(ABOUT_ANIM_DURATION_MS)),
-        exit = fadeOut(animationSpec = tween(ABOUT_ANIM_DURATION_MS))
+        enter = fadeIn(animationSpec = aboutFadeTween),
+        exit = fadeOut(animationSpec = aboutFadeTween)
     ) {
         AboutScreen(onBackClick = { showAbout = false })
     }
@@ -525,7 +534,8 @@ fun MainScreen(
  */
 @Composable
 private fun HomeHeader(
-    uiState: MainUiState,
+    locationState: LocationUiState,
+    satellites: List<SatelliteInfo>,
     weather: com.example.radioarealocator.data.weather.WeatherResult?,
     weatherLoading: Boolean,
     weatherError: String?,
@@ -541,7 +551,7 @@ private fun HomeHeader(
         }
     }
 
-    val stateColor = if (uiState.result != null) {
+    val stateColor = if (locationState.result != null) {
         MaterialTheme.colorScheme.primary
     } else {
         MaterialTheme.colorScheme.outline
@@ -566,7 +576,7 @@ private fun HomeHeader(
         }
     }
     // 下颗即将过境的卫星（AOS 在未来且非当前在境），用于显示过境天气预测
-    val nextSatellite = uiState.satellites.firstOrNull {
+    val nextSatellite = satellites.firstOrNull {
         !it.isCurrentlyVisible && it.aosTime.isAfter(now)
     }
 
@@ -816,7 +826,7 @@ private fun HomeListItem(
 
 @Composable
 private fun LocationDetailContent(
-    uiState: MainUiState,
+    locationState: LocationUiState,
     hasLocationPermission: Boolean,
     onRequestPermission: () -> Unit,
     onRefresh: () -> Unit,
@@ -832,35 +842,36 @@ private fun LocationDetailContent(
     ) {
         item {
             LocationStatusCard(
-                isLoading = uiState.isLoading,
-                result = uiState.result,
+                isLoading = locationState.isLoading,
+                result = locationState.result,
                 hasPermission = hasLocationPermission,
                 onRequestPermission = onRequestPermission,
                 onRefresh = onRefresh
             )
         }
 
-        if (uiState.result != null) {
+        if (locationState.result != null) {
             item {
-                ZoneInfoCard(result = uiState.result)
+                ZoneInfoCard(result = locationState.result)
             }
             item {
                 AMapCard(
-                    latitude = uiState.result.latitude,
-                    longitude = uiState.result.longitude
+                    latitude = locationState.result.latitude,
+                    longitude = locationState.result.longitude
                 )
             }
         }
     }
 
-    uiState.error?.let { message ->
+    locationState.error?.let { message ->
         ErrorDialog(message = message, onDismiss = onDismissError)
     }
 }
 
 @Composable
 private fun SatelliteDetailContent(
-    uiState: MainUiState,
+    locationState: LocationUiState,
+    satelliteState: SatelliteUiState,
     filter: SatelliteFilter,
     onFilterChange: (SatelliteFilter) -> Unit,
     onGetLocation: () -> Unit,
@@ -875,10 +886,10 @@ private fun SatelliteDetailContent(
     // 使每颗卫星的 isStatusInherited 标记与有效状态值得以及时更新
     @Suppress("UnusedVariable")
     val statusEntries = statusTracker.statusMap.value
-    val filteredSatellites = remember(uiState.satellites, filter, favorites) {
-        uiState.satellites.applyFilter(filter, favorites)
+    val filteredSatellites = remember(satelliteState.satellites, filter, favorites) {
+        satelliteState.satellites.applyFilter(filter, favorites)
     }
-    val totalCount = uiState.satellites.size
+    val totalCount = satelliteState.satellites.size
 
     // 统一的倒计时时钟：仅当有在境卫星时才每秒更新，
     // 避免每颗在境卫星各自启动 LaunchedEffect 导致 N 次/秒重组
@@ -902,18 +913,18 @@ private fun SatelliteDetailContent(
     ) {
         item {
             SatelliteActionCard(
-                isLoading = uiState.isLoading,
-                isSatelliteLoading = uiState.isSatelliteLoading,
-                lastLocationTime = uiState.lastLocationUpdateTime,
-                lastLocationCity = uiState.lastLocationCity,
-                lastSatelliteTime = uiState.lastSatelliteUpdateTime,
+                isLoading = locationState.isLoading,
+                isSatelliteLoading = satelliteState.isSatelliteLoading,
+                lastLocationTime = locationState.lastLocationUpdateTime,
+                lastLocationCity = locationState.lastLocationCity,
+                lastSatelliteTime = satelliteState.lastSatelliteUpdateTime,
                 onGetLocation = onGetLocation,
                 onUpdateSource = onUpdateSource
             )
         }
         item {
             SatelliteSectionHeader(
-                isLoading = uiState.isSatelliteLoading,
+                isLoading = satelliteState.isSatelliteLoading,
                 filteredCount = filteredSatellites.size,
                 totalCount = totalCount,
                 isActive = filter.isActive,
@@ -923,23 +934,23 @@ private fun SatelliteDetailContent(
             )
         }
         when {
-            uiState.isSatelliteLoading && filteredSatellites.isEmpty() -> {
+            satelliteState.isSatelliteLoading && filteredSatellites.isEmpty() -> {
                 item {
                     SatellitePlaceholderCard { CircularProgressIndicator() }
                 }
             }
-            uiState.satelliteError != null -> {
+            satelliteState.satelliteError != null -> {
                 item {
                     SatellitePlaceholderCard {
                         Text(
-                            text = stringResource(R.string.satellite_load_failed, uiState.satelliteError),
+                            text = stringResource(R.string.satellite_load_failed, satelliteState.satelliteError),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             }
-            uiState.result == null -> {
+            locationState.result == null -> {
                 item {
                     SatellitePlaceholderCard {
                         Text(
@@ -981,7 +992,7 @@ private fun SatelliteDetailContent(
                         onToggleFavorite = { onToggleFavorite(sat.catalogNumber) },
                         nowMillis = if (sat.isCurrentlyVisible) inPassNowMillis else 0L,
                         isStatusInherited = isInherited,
-                        statusSegments = uiState.segmentStatuses[sat.catalogNumber]
+                        statusSegments = satelliteState.segmentStatuses[sat.catalogNumber]
                     )
                 }
             }
@@ -994,12 +1005,13 @@ private fun SatelliteDetailContent(
  */
 @Composable
 private fun SatelliteManagementContent(
-    uiState: MainUiState,
+    locationState: LocationUiState,
+    satelliteState: SatelliteUiState,
     favorites: Set<Int>,
     onToggleFavorite: (Int) -> Unit,
     contentPadding: PaddingValues
 ) {
-    val satellites = uiState.satellites
+    val satellites = satelliteState.satellites
     val favoriteCount = satellites.count { it.catalogNumber in favorites }
 
     LazyColumn(
@@ -1046,12 +1058,12 @@ private fun SatelliteManagementContent(
             }
         }
         when {
-            uiState.isSatelliteLoading && satellites.isEmpty() -> {
+            satelliteState.isSatelliteLoading && satellites.isEmpty() -> {
                 item {
                     SatellitePlaceholderCard { CircularProgressIndicator() }
                 }
             }
-            uiState.result == null -> {
+            locationState.result == null -> {
                 item {
                     SatellitePlaceholderCard {
                         Text(

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Thunderstorm
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
  * @param daily 4 天预报列表
  * @param fetchTimeMillis 数据获取时间戳，用于缓存过期判断
  */
+@Immutable
 data class WeatherResult(
     val cityName: String,
     val now: WeatherNow,
@@ -41,6 +43,7 @@ data class WeatherResult(
  * @param humidity 湿度百分比
  * @param reportTime 数据报告时间（如"2026-07-07 22:03:09"）
  */
+@Immutable
 data class WeatherNow(
     val temp: String,
     val text: String,
@@ -64,6 +67,7 @@ data class WeatherNow(
  * @param dayPower 白天风力
  * @param nightPower 夜间风力
  */
+@Immutable
 data class WeatherDay(
     val date: String,
     val week: String = "",

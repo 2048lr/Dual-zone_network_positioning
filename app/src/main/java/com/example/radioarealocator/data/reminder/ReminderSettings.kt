@@ -1,5 +1,7 @@
 package com.example.radioarealocator.data.reminder
 
+import androidx.compose.runtime.Immutable
+
 /**
  * 日程提醒设置项。
  *
@@ -9,6 +11,7 @@ package com.example.radioarealocator.data.reminder
  * @param soundEnabled 通知声音开关
  * @param vibrationEnabled 通知振动开关
  */
+@Immutable
 data class ReminderSettings(
     val enabled: Boolean = true,
     val leadMinutes: Int = 10,
@@ -38,6 +41,7 @@ enum class RepeatMode {
  *
  * 自动跟随收藏状态生成/删除，无需用户手动创建。
  */
+@Immutable
 data class ReminderItem(
     /** NORAD 编号，作为唯一标识 */
     val catalogNumber: Int,

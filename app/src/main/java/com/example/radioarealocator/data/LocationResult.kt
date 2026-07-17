@@ -1,7 +1,9 @@
 package com.example.radioarealocator.data
 
+import androidx.compose.runtime.Immutable
 import java.time.Instant
 
+@Immutable
 data class LocationResult(
     val latitude: Double,
     val longitude: Double,

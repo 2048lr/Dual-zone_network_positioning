@@ -3,6 +3,7 @@ package com.example.radioarealocator.data
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.Immutable
 import com.example.radioarealocator.data.network.HttpClientProvider
 import okhttp3.Request
 import org.json.JSONObject
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit
  * @param content 一言正文
  * @param from 来源（作品名），可能为空
  */
+@Immutable
 data class HitokotoQuote(
     val content: String,
     val from: String

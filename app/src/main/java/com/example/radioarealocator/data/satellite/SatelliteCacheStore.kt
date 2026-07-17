@@ -2,6 +2,7 @@ package com.example.radioarealocator.data.satellite
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.runtime.Immutable
 import com.github.amsacode.predict4java.TLE
 import org.json.JSONArray
 import org.json.JSONObject
@@ -90,6 +91,7 @@ class SatelliteCacheStore(context: Context) {
 /**
  * 缓存的 TLE 数据及其更新时间。
  */
+@Immutable
 data class CachedTLEs(
     val tles: List<SourcedTLE>,
     val updatedAt: Instant

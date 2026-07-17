@@ -2,6 +2,7 @@ package com.example.radioarealocator.data.satellite
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.Immutable
 import com.example.radioarealocator.data.network.HttpClientProvider
 import okhttp3.Request
 import org.json.JSONArray
@@ -19,6 +20,7 @@ import java.util.concurrent.TimeUnit
  * 用于客户端 15 分钟时间槽延续算法：[reportTime] 标记该状态被确认的时间，
  * 供 [SatelliteStatusTracker] 计算时间槽与状态延续。
  */
+@Immutable
 data class SatelliteStatusReport(
     val name: String,
     val status: String,

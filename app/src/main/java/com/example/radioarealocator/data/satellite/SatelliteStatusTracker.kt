@@ -10,6 +10,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import androidx.compose.runtime.Immutable
 import java.time.Instant
 
 /**
@@ -18,6 +19,7 @@ import java.time.Instant
  * [absoluteSlot] 为从 epoch 起的绝对 15 分钟时间槽序号（epochSecond / 900），
  * 用于跨天正确计算延续差值；语义上等价于"一天 96 个 15 分钟时间槽"。
  */
+@Immutable
 data class SatelliteStatusEntry(
     val status: String,
     val reportTime: Instant,
@@ -27,6 +29,7 @@ data class SatelliteStatusEntry(
 /**
  * 卫星状态查询结果：包含状态值与是否为"延续自上一时段"的标记。
  */
+@Immutable
 data class SatelliteStatusQuery(
     val status: String,
     val reportTime: Instant,

@@ -1,5 +1,7 @@
 package com.example.radioarealocator.data.cw
 
+import androidx.compose.runtime.Immutable
+
 enum class CharacterSet {
     LETTERS, NUMBERS, SYMBOLS, CUSTOM
 }
@@ -8,6 +10,7 @@ enum class PlayMode {
     CONTINUOUS, INTERVAL
 }
 
+@Immutable
 data class CWSettings(
     val wpm: Int = 15,
     val frequency: Int = 600,

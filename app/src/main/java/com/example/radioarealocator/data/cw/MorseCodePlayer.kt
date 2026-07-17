@@ -7,6 +7,7 @@ import kotlin.math.sin
 
 class MorseCodePlayer {
     private val lock = Any()
+    private val pauseLock = Object()
     @Volatile private var isPlaying = false
     @Volatile private var isPaused = false
     private var audioTrack: AudioTrack? = null
@@ -69,8 +70,12 @@ class MorseCodePlayer {
                 for (char in morseCode) {
                     if (!isPlaying) break
 
-                    while (isPaused && isPlaying) {
-                        Thread.sleep(100)
+                    if (isPaused && isPlaying) {
+                        synchronized(pauseLock) {
+                            while (isPaused && isPlaying) {
+                                pauseLock.wait()
+                            }
+                        }
                     }
                     if (!isPlaying) break
 
@@ -92,6 +97,8 @@ class MorseCodePlayer {
 
                 completedNormally = true
                 onComplete()
+            } catch (e: InterruptedException) {
+                // Thread interrupted during wait state — exit gracefully
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -131,6 +138,9 @@ class MorseCodePlayer {
 
     fun resume() {
         isPaused = false
+        synchronized(pauseLock) {
+            pauseLock.notifyAll()
+        }
         synchronized(lock) {
             audioTrack?.play()
         }
@@ -139,6 +149,10 @@ class MorseCodePlayer {
     fun stop() {
         isPlaying = false
         isPaused = false
+        // 唤醒等待中的播放线程
+        synchronized(pauseLock) {
+            pauseLock.notifyAll()
+        }
         // 不在此处 release：release 仅由播放线程在 finally 中执行，
         // 这里通过 pause + flush 让阻塞中的 write() 尽快返回
         synchronized(lock) {

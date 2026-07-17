@@ -3,6 +3,7 @@ package com.example.radioarealocator.ui
 import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.State
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -87,7 +88,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var locationOnlyJob: Job? = null
     private var satelliteOnlyJob: Job? = null
     private var predictJob: Job? = null
-    // 卫星分段状态拉取 Job：与主刷新解耦，结果异步回填 uiState.segmentStatuses
+    // 卫星分段状态拉取 Job：与主刷新解耦，结果异步回填 satelliteState.segmentStatuses
     private var segmentStatusJob: Job? = null
     // 分段状态最近一次拉取时间，1 小时内不重复请求 AMSAT
     private var segmentStatusFetchedAt: Instant? = null
@@ -105,8 +106,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var weatherAutoRefreshJob: Job? = null
     private var initialized = false
 
-    private val _uiState = mutableStateOf(MainUiState())
-    val uiState: State<MainUiState> = _uiState
+    private val _locationState = mutableStateOf(LocationUiState())
+    val locationState: State<LocationUiState> = _locationState
+
+    private val _satelliteState = mutableStateOf(SatelliteUiState())
+    val satelliteState: State<SatelliteUiState> = _satelliteState
 
     // CW练习状态
     private val _cwSettings = mutableStateOf(CWSettings())
@@ -208,7 +212,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * @param force true 表示忽略缓存强制刷新（用户手动触发）
      */
     fun refreshWeather(force: Boolean = false) {
-        val result = _uiState.value.result
+        val result = _locationState.value.result
         if (result == null) {
             _weatherError.value = "需要定位权限才能获取天气"
             return
@@ -259,7 +263,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (weatherAutoRefreshJob?.isActive == true) return
         weatherAutoRefreshJob = viewModelScope.launch {
             while (true) {
-                if (_uiState.value.result != null) {
+                if (_locationState.value.result != null) {
                     refreshWeather(force = false)
                 }
                 delay(WEATHER_REFRESH_INTERVAL_MS)
@@ -360,7 +364,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val nowFavorite = catalogNumber in updated
         if (nowFavorite) {
             // 收藏：查找已预测的卫星过境信息，自动创建提醒
-            val satInfo = _uiState.value.satellites.firstOrNull { it.catalogNumber == catalogNumber }
+            val satInfo = _satelliteState.value.satellites.firstOrNull { it.catalogNumber == catalogNumber }
             if (satInfo != null && !satInfo.isCurrentlyVisible) {
                 // 仅对未来过境创建提醒（在境卫星 AOS 已过去）
                 addReminderForSatellite(satInfo)
@@ -489,12 +493,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // 先从本地缓存恢复 TLE 与时间戳（IO 密集型，避免在主线程解析 JSON）
         val cached = withContext(Dispatchers.IO) { satelliteCache.load() }
         if (cached != null) {
-            _uiState.value = _uiState.value.copy(
-                cachedTles = cached.tles,
-                lastSatelliteUpdateTime = cached.updatedAt
-            )
-            // 缓存存在但有定位时立即预测一次
-            val current = _uiState.value.result
+            _satelliteState.value = _satelliteState.value.copy(
+                    cachedTles = cached.tles,
+                    lastSatelliteUpdateTime = cached.updatedAt
+                )
+                // 缓存存在但有定位时立即预测一次
+                val current = _locationState.value.result
             if (current != null) {
                 triggerPrediction(current.latitude, current.longitude)
             }
@@ -517,7 +521,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshLocation() {
         if (!locationHelper.hasPermission()) {
-            _uiState.value = _uiState.value.copy(
+            _locationState.value = _locationState.value.copy(
                 isLoading = false,
                 error = "需要定位权限"
             )
@@ -530,7 +534,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // 注意：不清空已有 result，避免刷新过程中 AMapCard/ZoneInfoCard 消失导致 UI 闪烁，
         // 也避免定位失败时丢失上一次的有效位置（与 refreshLocationOnly 行为一致）。
-        _uiState.value = _uiState.value.copy(
+        _locationState.value = _locationState.value.copy(
             isLoading = true,
             error = null
         )
@@ -548,7 +552,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     maidenhead = zoneInfo.maidenhead,
                     address = ""
                 )
-                _uiState.value = _uiState.value.copy(
+                _locationState.value = _locationState.value.copy(
                     isLoading = false,
                     result = baseResult,
                     lastLocationUpdateTime = Instant.now(),
@@ -570,7 +574,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val address = addressDeferred.await()
                 val city = cityDeferred.await()
 
-                _uiState.value = _uiState.value.copy(
+                _locationState.value = _locationState.value.copy(
                     result = baseResult.copy(address = address),
                     lastLocationCity = city
                 )
@@ -586,7 +590,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
+                _locationState.value = _locationState.value.copy(
                     isLoading = false,
                     error = e.message ?: "定位失败"
                 )
@@ -622,7 +626,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val backoff = (LOCATION_RETRY_BASE_MS shl retryAttempt.coerceAtMost(4))
                         .coerceAtMost(LOCATION_RETRY_MAX_MS)
                     retryAttempt++
-                    _uiState.value = _uiState.value.copy(
+                    _locationState.value = _locationState.value.copy(
                         error = "位置监听中断：${cause.message ?: "未知错误"}，${backoff / 1000}s 后自动恢复"
                     )
                     delay(backoff)
@@ -632,7 +636,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .collect { location ->
                     // 1. 立即更新经纬度 + zone 信息（本地计算，毫秒级）
                     val zoneInfo = ZoneResolver.resolve(location.latitude, location.longitude)
-                    val previous = _uiState.value.result
+                    val previous = _locationState.value.result
                     val updated = LocationResult(
                         latitude = location.latitude,
                         longitude = location.longitude,
@@ -642,7 +646,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         // 保留旧地址，等去抖后再覆盖
                         address = previous?.address ?: ""
                     )
-                    _uiState.value = _uiState.value.copy(
+                    _locationState.value = _locationState.value.copy(
                         isLoading = false,
                         result = updated,
                         lastLocationUpdateTime = Instant.now(),
@@ -661,12 +665,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         delay(ADDRESS_DEBOUNCE_MS)
                         val address = locationHelper.getAddress(location.latitude, location.longitude)
                         val city = locationHelper.getCityAddress(location.latitude, location.longitude)
-                        val current = _uiState.value.result
+                        val current = _locationState.value.result
                         if (current != null &&
                             current.latitude == location.latitude &&
                             current.longitude == location.longitude
                         ) {
-                            _uiState.value = _uiState.value.copy(
+                            _locationState.value = _locationState.value.copy(
                                 result = current.copy(address = address),
                                 lastLocationCity = city
                             )
@@ -700,14 +704,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun refreshLocationOnly() {
         if (!locationHelper.hasPermission()) {
-            _uiState.value = _uiState.value.copy(
+            _locationState.value = _locationState.value.copy(
                 error = "需要定位权限"
             )
             return
         }
 
         locationOnlyJob?.cancel()
-        _uiState.value = _uiState.value.copy(
+        _locationState.value = _locationState.value.copy(
             isLoading = true,
             error = null
         )
@@ -726,7 +730,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     maidenhead = zoneInfo.maidenhead,
                     address = address
                 )
-                _uiState.value = _uiState.value.copy(
+                _locationState.value = _locationState.value.copy(
                     isLoading = false,
                     result = newResult,
                     lastLocationUpdateTime = Instant.now(),
@@ -743,7 +747,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
+                _locationState.value = _locationState.value.copy(
                     isLoading = false,
                     error = e.message ?: "定位失败"
                 )
@@ -757,20 +761,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun refreshSatelliteSourceOnly() {
         satelliteOnlyJob?.cancel()
-        _uiState.value = _uiState.value.copy(
+        _satelliteState.value = _satelliteState.value.copy(
             isSatelliteLoading = true,
             satelliteError = null
         )
         satelliteOnlyJob = viewModelScope.launch {
             try {
                 val tles = fetchAndCacheTLEs()
-                val current = _uiState.value.result
+                val current = _locationState.value.result
                 if (current != null) {
                     // 有定位：重新预测
                     triggerPrediction(current.latitude, current.longitude, tles)
                 } else {
                     // 无定位：仅更新缓存，等待定位后再预测
-                    _uiState.value = _uiState.value.copy(
+                    _satelliteState.value = _satelliteState.value.copy(
                         isSatelliteLoading = false,
                         cachedTles = tles,
                         lastSatelliteUpdateTime = Instant.now()
@@ -781,7 +785,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
+                _satelliteState.value = _satelliteState.value.copy(
                     isSatelliteLoading = false,
                     satelliteError = e.message ?: "卫星源更新失败"
                 )
@@ -790,7 +794,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 拉取并聚合各卫星的 BJT 分段运行状态（含延续逻辑），结果回填 [MainUiState.segmentStatuses]。
+     * 拉取并聚合各卫星的 BJT 分段运行状态（含延续逻辑），结果回填 [SatelliteUiState.segmentStatuses]。
      *
      * 为目录中所有有 AMSAT 名称的卫星并行请求 sat_info.php，单星失败不影响其它卫星。
      * 1 小时内不重复拉取，避免对 AMSAT 服务器造成压力。
@@ -821,7 +825,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }.awaitAll().filterNotNull().toMap()
             }
             segmentStatusFetchedAt = Instant.now()
-            _uiState.value = _uiState.value.copy(segmentStatuses = results)
+            _satelliteState.value = _satelliteState.value.copy(segmentStatuses = results)
         }
     }
 
@@ -844,7 +848,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         longitude: Double,
         tlesOverride: List<SourcedTLE>? = null
     ) {
-        val tles = tlesOverride ?: _uiState.value.cachedTles
+        val tles = tlesOverride ?: _satelliteState.value.cachedTles
         predictJob?.cancel()
         if (tles.isEmpty()) {
             // 无 TLE 数据，先拉取再预测
@@ -855,7 +859,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    _uiState.value = _uiState.value.copy(
+                    _satelliteState.value = _satelliteState.value.copy(
                         isSatelliteLoading = false,
                         satelliteError = e.message ?: "卫星源更新失败"
                     )
@@ -882,7 +886,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Math.abs(longitude - cachedPredictionLon) < 0.001 &&
                 java.time.Duration.between(cachedTime, Instant.now()).toMinutes() < 15
             ) {
-                _uiState.value = _uiState.value.copy(
+                _satelliteState.value = _satelliteState.value.copy(
                     isSatelliteLoading = false,
                     satellites = cached,
                     cachedTles = tles,
@@ -892,7 +896,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return
             }
 
-            _uiState.value = _uiState.value.copy(isSatelliteLoading = true)
+            _satelliteState.value = _satelliteState.value.copy(isSatelliteLoading = true)
             val satellites = withContext(Dispatchers.Default) {
                 satellitePredictor.predictUpcomingPasses(
                     sourcedTles = tles,
@@ -906,7 +910,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             cachedPredictionLon = longitude
             cachedPredictionTime = Instant.now()
 
-            _uiState.value = _uiState.value.copy(
+            _satelliteState.value = _satelliteState.value.copy(
                 isSatelliteLoading = false,
                 satellites = satellites,
                 cachedTles = tles,
@@ -920,7 +924,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(
+            _satelliteState.value = _satelliteState.value.copy(
                 isSatelliteLoading = false,
                 satelliteError = e.message ?: "卫星过境预测失败"
             )
@@ -976,7 +980,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissError() {
-        _uiState.value = _uiState.value.copy(error = null)
+        _locationState.value = _locationState.value.copy(error = null)
     }
 
     // ---- CW练习方法 ----
@@ -1266,21 +1270,21 @@ fun List<SatelliteInfo>.applyFilter(
     }
 }
 
-data class MainUiState(
+@Immutable
+data class LocationUiState(
     val isLoading: Boolean = false,
-    val isSatelliteLoading: Boolean = false,
     val result: LocationResult? = null,
-    val satellites: List<SatelliteInfo> = emptyList(),
     val error: String? = null,
-    val satelliteError: String? = null,
-    /** 最近一次定位成功的时间，null 表示从未获取 */
     val lastLocationUpdateTime: Instant? = null,
-    /** 最近一次定位的市级地址，空字符串表示尚未获取 */
-    val lastLocationCity: String = "",
-    /** 最近一次卫星源更新时间，null 表示从未更新 */
+    val lastLocationCity: String = ""
+)
+
+@Immutable
+data class SatelliteUiState(
+    val isSatelliteLoading: Boolean = false,
+    val satellites: List<SatelliteInfo> = emptyList(),
+    val satelliteError: String? = null,
     val lastSatelliteUpdateTime: Instant? = null,
-    /** 本地缓存的 TLE 列表，进程重启后可从 [SatelliteCacheStore] 恢复 */
     val cachedTles: List<SourcedTLE> = emptyList(),
-    /** 每颗卫星（按 NORAD 编号）的 BJT 分段运行状态（已应用延续逻辑） */
     val segmentStatuses: Map<Int, List<SegmentStatus>> = emptyMap()
 )

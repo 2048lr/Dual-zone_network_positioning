@@ -1,10 +1,12 @@
 package com.example.radioarealocator.data.satellite
 
+import androidx.compose.runtime.Immutable
 import java.time.Instant
 
 /**
  * 卫星过境信息，用于界面展示。
  */
+@Immutable
 data class SatelliteInfo(
     val name: String,
     val catalogNumber: Int,

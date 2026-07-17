@@ -1,5 +1,6 @@
 package com.example.radioarealocator.data.satellite
 
+import androidx.compose.runtime.Immutable
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -35,6 +36,7 @@ enum class BjtSegment(val startHour: Int, val endHour: Int, val label: String) {
  *
  * [report] 为 API 原始状态文本，如 "Heard" / "Telemetry Only" / "Not Heard" / "Crew Active"。
  */
+@Immutable
 data class AmsatStatusReport(
     val reportedTime: Instant,
     val callsign: String,
@@ -48,6 +50,7 @@ data class AmsatStatusReport(
  * [status] 为 null 表示该时段无任何报告且无可延续的前序状态（真正未知）。
  * [carriedOver] 为 true 表示该状态由前序时段延续而来，而非本时段直接报告。
  */
+@Immutable
 data class SegmentStatus(
     val date: LocalDate,
     val segment: BjtSegment,
