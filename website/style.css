@@ -398,20 +398,7 @@ main {
     transform: translateY(-4px);
 }
 .feature:hover::before { opacity: 1; }
-.feature[data-trigger] {
-    cursor: pointer;
-}
 .feature--wide { grid-column: span 3; }
-.feature--accent {
-    background: linear-gradient(135deg, rgba(77,143,255,0.08) 0%, rgba(90,200,200,0.04) 100%);
-    border-color: rgba(77,143,255,0.2);
-}
-@media (prefers-color-scheme: light) {
-    .feature--accent {
-        background: linear-gradient(135deg, rgba(45,107,255,0.06) 0%, rgba(90,200,200,0.03) 100%);
-        border-color: rgba(45,107,255,0.18);
-    }
-}
 .feature__icon {
     width: 44px;
     height: 44px;
