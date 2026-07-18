@@ -668,6 +668,11 @@ main { position: relative; z-index: 1; }
     gap: 48px;
     align-items: start;
 }
+/* 无截图版本：纯文字说明卡，自动 2×2 网格 */
+.showcase--text {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
 .showcase__frame {
     margin: 0;
     position: relative;
@@ -1090,7 +1095,7 @@ main { position: relative; z-index: 1; }
     .hero__grid { grid-template-columns: 1fr; gap: 48px; }
     .features { grid-template-columns: repeat(2, 1fr); }
     .feature--wide { grid-column: span 2; }
-    .showcase { grid-template-columns: 1fr; }
+    .showcase, .showcase--text { grid-template-columns: 1fr; }
     .crypto { grid-template-columns: 1fr; }
     .crypto__diagram { grid-template-columns: 1fr 1fr; }
     .crypto__diagram .shard__op { display: none; }
