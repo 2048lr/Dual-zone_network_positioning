@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -125,10 +128,18 @@ private fun UpdateDialogsMiuix(
                     MiuixText(text = "${stringResource(R.string.update_latest_version)}: ${info.versionName}")
                     if (info.changelog.isNotBlank()) {
                         Spacer(Modifier.height(8.dp))
-                        MiuixText(
-                            text = info.changelog,
-                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        )
+                        // 长简介放在限高可滚动容器内，避免撑高对话框把按钮推出屏幕
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 280.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            MiuixText(
+                                text = info.changelog,
+                                color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            )
+                        }
                     }
                     MiuixDialogButtons(
                         confirmText = stringResource(R.string.update_download),
