@@ -51,6 +51,7 @@ fun HomePager(
             mainViewModel.initializeIfNeeded()
             mainViewModel.startWeatherAutoRefresh()
             mainViewModel.refreshDailyQuote()
+            mainViewModel.refreshLocation()
         }
     }
 
