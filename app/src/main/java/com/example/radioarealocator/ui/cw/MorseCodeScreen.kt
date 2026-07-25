@@ -68,14 +68,25 @@ private val morseMap = mapOf(
 
 private val reverseMorseMap = morseMap.entries.associate { (k, v) -> v to k }
 
+// 十六进制字符集：用于 Unicode 转码（中文等非摩斯字符走此路径）
+private val hexChars = "0123456789ABCDEF"
+
 private fun encode(text: String): String {
     return text.uppercase()
         .split(Regex("\\s+"))
         .filter { it.isNotEmpty() }
         .joinToString(" / ") { word ->
-            word.filter { it in morseMap }
-                .map { morseMap[it]!! }
-                .joinToString(" ")
+            word.flatMap { ch ->
+                if (ch in morseMap) {
+                    // ASCII 字符直接编码
+                    listOf(morseMap[ch]!!)
+                } else {
+                    // 非摩斯字符（如中文）：转为 Unicode 十六进制后逐位编码
+                    // 用 U 前缀标识，便于 decode 时还原
+                    val hex = Integer.toHexString(ch.code).uppercase()
+                    listOf(morseMap['U']!!) + hex.map { morseMap[it]!! }
+                }
+            }.joinToString(" ")
         }
 }
 
@@ -83,11 +94,34 @@ private fun decode(morse: String): String {
     return morse.trim()
         .split("/")
         .joinToString(" ") { word ->
-            word.trim()
-                .split(Regex("\\s+"))
-                .filter { it.isNotEmpty() }
-                .mapNotNull { reverseMorseMap[it] }
-                .joinToString("")
+            val codes = word.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+            val sb = StringBuilder()
+            var i = 0
+            while (i < codes.size) {
+                if (codes[i] == morseMap['U'] && i + 1 < codes.size) {
+                    // U 前缀：后续连续 hex 字符组成一个 Unicode 码点
+                    val hexBuilder = StringBuilder()
+                    var j = i + 1
+                    while (j < codes.size) {
+                        val ch = reverseMorseMap[codes[j]]
+                        if (ch != null && ch in hexChars) {
+                            hexBuilder.append(ch)
+                            j++
+                        } else break
+                    }
+                    if (hexBuilder.isNotEmpty()) {
+                        val codePoint = Integer.parseInt(hexBuilder.toString(), 16)
+                        sb.appendCodePoint(codePoint)
+                        i = j
+                    } else {
+                        i++  // U 后无 hex，按普通字符处理
+                    }
+                } else {
+                    reverseMorseMap[codes[i]]?.let { sb.append(it) }
+                    i++
+                }
+            }
+            sb.toString()
         }
         .trim()
 }

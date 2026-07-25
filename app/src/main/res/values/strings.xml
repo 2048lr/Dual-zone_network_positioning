@@ -258,7 +258,7 @@
     <string name="morsecode_decode" translatable="false">解码</string>
     <string name="morsecode_input_hint_text" translatable="false">输入文本</string>
     <string name="morsecode_input_hint_morse" translatable="false">输入摩斯电码</string>
-    <string name="morsecode_support_hint" translatable="false">支持 A-Z 和 0-9</string>
+    <string name="morsecode_support_hint" translatable="false">支持 A-Z、0-9 和中文（自动转 Unicode 编码）</string>
     <string name="morsecode_reference_table" translatable="false">摩斯电码对照表</string>
     <string name="morsecode_empty_input" translatable="false">请输入内容</string>
     <string name="morsecode_copy" translatable="false">复制</string>
