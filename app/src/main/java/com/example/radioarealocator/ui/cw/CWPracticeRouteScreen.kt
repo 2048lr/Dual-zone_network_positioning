@@ -48,13 +48,18 @@ fun CWPracticeRouteScreen() {
 
     var page by rememberSaveable { mutableStateOf(CWPage.Main) }
 
-    // 子页面返回逻辑：教程练习页回教程列表，其余回主菜单；主菜单再退回上一级路由
+    // 子页面返回逻辑：练习页回设置页/列表页，其余回主菜单；主菜单再退回上一级路由
     BackHandler(enabled = page != CWPage.Main) {
-        if (page == CWPage.TutorialPractice) {
-            cwViewModel.stopPractice()
-            page = CWPage.Tutorial
-        } else {
-            page = CWPage.Main
+        when (page) {
+            CWPage.FreePractice -> {
+                cwViewModel.stopPractice()
+                page = CWPage.FreeSettings
+            }
+            CWPage.TutorialPractice -> {
+                cwViewModel.stopPractice()
+                page = CWPage.Tutorial
+            }
+            else -> page = CWPage.Main
         }
     }
 
@@ -67,6 +72,7 @@ fun CWPracticeRouteScreen() {
     val title = when (page) {
         CWPage.Main -> stringResource(R.string.cw_practice)
         CWPage.FreeSettings -> stringResource(R.string.free_practice)
+        CWPage.FreePractice -> stringResource(R.string.free_practice)
         CWPage.Tutorial -> stringResource(R.string.tutorial_practice)
         CWPage.TutorialPractice -> stringResource(R.string.tutorial_practice)
         CWPage.MorseCode -> stringResource(R.string.morsecode_codec)
@@ -74,6 +80,7 @@ fun CWPracticeRouteScreen() {
 
     val onBack: () -> Unit = when (page) {
         CWPage.Main -> dropUnlessResumed { navigator.pop() }
+        CWPage.FreePractice -> { { cwViewModel.stopPractice(); page = CWPage.FreeSettings } }
         CWPage.TutorialPractice -> { { cwViewModel.stopPractice(); page = CWPage.Tutorial } }
         else -> { { page = CWPage.Main } }
     }
@@ -119,12 +126,40 @@ fun CWPracticeRouteScreen() {
                     settings = settings,
                     onSettingsChange = cwViewModel::updateSettings,
                     onStartPractice = {
-                        // 生成练习文本并开始播放；此处仅停留在设置页，播放进度由设置项控制
                         cwViewModel.generatePracticeText(settings.characterSet, settings.practiceLength)
                         cwViewModel.startPractice()
+                        page = CWPage.FreePractice
                     },
                     contentPadding = innerPadding
                 )
+
+                CWPage.FreePractice -> {
+                    val currentText by cwViewModel.currentText.collectAsStateWithLifecycle()
+                    val morseCode by cwViewModel.morseCode.collectAsStateWithLifecycle()
+                    val userInput by cwViewModel.userInput.collectAsStateWithLifecycle()
+                    val isPlaying by cwViewModel.isPlaying.collectAsStateWithLifecycle()
+                    val isPaused by cwViewModel.isPaused.collectAsStateWithLifecycle()
+                    val accuracy by cwViewModel.accuracy.collectAsStateWithLifecycle()
+                    PracticeScreen(
+                        currentText = currentText,
+                        morseCode = morseCode,
+                        userInput = userInput,
+                        isPlaying = isPlaying,
+                        isPaused = isPaused,
+                        accuracy = accuracy,
+                        isTutorialMode = false,
+                        onUserInputChange = cwViewModel::updateUserInput,
+                        onGenerateText = {
+                            cwViewModel.generatePracticeText(settings.characterSet, settings.practiceLength)
+                        },
+                        onStartPractice = cwViewModel::startPractice,
+                        onPausePractice = cwViewModel::pausePractice,
+                        onResumePractice = cwViewModel::resumePractice,
+                        onStopPractice = cwViewModel::stopPractice,
+                        onCheckResults = cwViewModel::checkResults,
+                        contentPadding = innerPadding
+                    )
+                }
 
                 CWPage.Tutorial -> {
                     val courseProgress by cwViewModel.courseProgress.collectAsStateWithLifecycle()
@@ -183,4 +218,4 @@ fun CWPracticeRouteScreen() {
     }
 }
 
-private enum class CWPage { Main, FreeSettings, Tutorial, TutorialPractice, MorseCode }
+private enum class CWPage { Main, FreeSettings, FreePractice, Tutorial, TutorialPractice, MorseCode }
