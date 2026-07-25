@@ -49,6 +49,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
@@ -406,7 +407,33 @@ private fun AboutContent(
                     modifier = Modifier
                         .fillParentMaxHeight()
                         .padding(bottom = innerPadding.calculateBottomPadding() + 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    // 应用简介卡
+                    Card(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        colors = CardDefaults.defaultColors(
+                            if (enableBlur) Color.Transparent else colorScheme.surfaceContainer,
+                            Color.Transparent,
+                        ),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.about_description_title),
+                                color = colorScheme.onBackground,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp,
+                            )
+                            Text(
+                                modifier = Modifier.padding(top = 6.dp),
+                                text = state.description,
+                                color = colorScheme.onSurfaceVariantSummary,
+                                fontSize = 14.sp,
+                            )
+                        }
+                    }
+
+                    // 链接卡：项目主页 / 问题反馈 / 开源许可
                     Card(
                         modifier = Modifier
                             .padding(horizontal = 12.dp)
@@ -435,6 +462,31 @@ private fun AboutContent(
                             )
                         }
                     }
+
+                    // 免责声明卡
+                    Card(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        colors = CardDefaults.defaultColors(
+                            if (enableBlur) Color.Transparent else colorScheme.surfaceContainer,
+                            Color.Transparent,
+                        ),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.about_disclaimer_title),
+                                color = colorScheme.onBackground,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp,
+                            )
+                            Text(
+                                modifier = Modifier.padding(top = 6.dp),
+                                text = state.disclaimer,
+                                color = colorScheme.onSurfaceVariantSummary,
+                                fontSize = 13.sp,
+                            )
+                        }
+                    }
+
                     Spacer(
                         Modifier.height(
                             WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +

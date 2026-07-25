@@ -3,11 +3,6 @@
     <string name="app_name" translatable="false">双区网络定位</string>
 
     <!-- UI Kit UI strings (English default) -->
-    <string name="home_sample_notification" translatable="false">This is a sample notification</string>
-    <string name="home_example_link_title" translatable="false">This is a sample link</string>
-    <string name="home_example_link_subtitle" translatable="false">This is a subtitle of the sample link</string>
-    <string name="home_example_link_url" translatable="false">https://github.com/chenaizhang/KernelSU-Style-UI-Kit</string>
-    <string name="about_source_link" translatable="false">View source on %1$s</string>
     <string name="permission_section">Permissions</string>
     <string name="permission_ready">Core permissions are ready.</string>
     <string name="permission_missing">Grant missing permissions first.</string>
@@ -124,7 +119,13 @@
     <string name="original_text" translatable="false">原文</string>
     <string name="morse_code" translatable="false">摩斯电码</string>
     <string name="input_what_you_hear" translatable="false">输入你听到的内容</string>
-    <string name="about_description" translatable="false">一款基于手机定位自动生成 CQ/ITU 分区和梅登兰德定位的小工具。</string>
+    <string name="about_description" translatable="false">基于手机定位的业余无线电辅助工具，提供 CQ/ITU 分区、梅登兰德定位、卫星过境预测、天气与 CW 练习等功能。</string>
+    <string name="about_disclaimer" translatable="false">本应用提供的卫星过境预测、天气、定位等信息仅供参考，实际通联请以官方公布数据为准。使用本应用产生的一切后果由用户自行承担。</string>
+    <string name="about_project_home" translatable="false">项目主页</string>
+    <string name="about_report_issue" translatable="false">问题反馈</string>
+    <string name="about_license" translatable="false">开源许可</string>
+    <string name="about_disclaimer_title" translatable="false">免责声明</string>
+    <string name="about_description_title" translatable="false">应用简介</string>
     <string name="nearby_satellites" translatable="false">附近卫星</string>
     <string name="satellite_count" translatable="false">共 %d 颗</string>
     <string name="satellite_count_filtered" translatable="false">%1$d / %2$d 颗</string>

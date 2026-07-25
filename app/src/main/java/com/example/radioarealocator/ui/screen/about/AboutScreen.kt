@@ -10,19 +10,29 @@ import com.example.radioarealocator.ui.LocalUiMode
 import com.example.radioarealocator.ui.UiMode
 import com.example.radioarealocator.ui.navigation3.LocalNavigator
 
+private const val PROJECT_REPO = "https://github.com/fuxue-linkong/Dual-zone_network_positioning"
+
 @Composable
 fun AboutScreen() {
     val navigator = LocalNavigator.current
     val uriHandler = LocalUriHandler.current
-    val htmlString = stringResource(
-        id = R.string.about_source_link,
-        "<b><a href=\"https://github.com/chenaizhang/KernelSU-Style-UI-Kit\">Github</a></b>"
-    )
+
+    val links = buildList {
+        // 项目主页
+        add(LinkInfo(stringResource(R.string.about_project_home), PROJECT_REPO))
+        // 问题反馈：直接跳转 Issues
+        add(LinkInfo(stringResource(R.string.about_report_issue), "$PROJECT_REPO/issues"))
+        // 开源许可
+        add(LinkInfo(stringResource(R.string.about_license), "$PROJECT_REPO/blob/miuix/LICENSE"))
+    }
+
     val state = AboutUiState(
         title = stringResource(R.string.about),
         appName = stringResource(R.string.app_name),
         versionName = BuildConfig.VERSION_NAME,
-        links = extractLinks(htmlString),
+        description = stringResource(R.string.about_description),
+        links = links,
+        disclaimer = stringResource(R.string.about_disclaimer),
     )
     val actions = AboutScreenActions(
         onBack = dropUnlessResumed { navigator.pop() },
