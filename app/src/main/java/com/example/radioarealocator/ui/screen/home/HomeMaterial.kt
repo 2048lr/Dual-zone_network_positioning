@@ -138,11 +138,13 @@ private fun HomeHeaderMaterial(
     }
 
     // 状态色与天气卡保持一致：有天气数据 → primary，无 → outline
+    // Material 主题使用 MaterialTheme.colorScheme，颜色随主题切换
     val stateColor = if (state.weather != null) {
-        MiuixTheme.colorScheme.primary
+        MaterialTheme.colorScheme.primary
     } else {
-        MiuixTheme.colorScheme.outline
+        MaterialTheme.colorScheme.outline
     }
+    val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
     val zonedNow = now.atZone(ZoneId.systemDefault())
     val localTime = zonedNow.format(timeFormatter)
     val utcTime = now.atZone(ZoneOffset.UTC).format(timeFormatter)
@@ -194,27 +196,29 @@ private fun HomeHeaderMaterial(
             Text(
                 text = "$utcTime UTC",
                 fontSize = (LOCAL_TIME_FONT_SIZE * UTC_FONT_SIZE_SCALE).sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                color = secondaryTextColor,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 2.dp)
             )
             DailyQuoteScroller(
                 quote = state.dailyQuote,
-                contentColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                contentColor = secondaryTextColor,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp)
             )
         }
-        // 天气卡：位于时间卡正下方，占满宽度
+        // 天气卡：位于时间卡正下方，占满宽度，注入 Material 主题色
         WeatherCard(
             weather = state.weather,
             isLoading = state.weatherLoading,
             error = state.weatherError,
             nextSatellite = state.nextSatellite,
             onRefresh = onRefreshWeather,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            stateColor = stateColor,
+            secondaryTextColor = secondaryTextColor
         )
     }
 }

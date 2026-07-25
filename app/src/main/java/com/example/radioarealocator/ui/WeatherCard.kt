@@ -49,14 +49,11 @@ fun WeatherCard(
     error: String?,
     nextSatellite: SatelliteInfo?,
     onRefresh: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // 主题色由调用方注入：Miuix 调用方走默认值，Material 调用方传 MaterialTheme.colorScheme 对应字段
+    stateColor: Color = if (weather != null) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.outline,
+    secondaryTextColor: Color = MiuixTheme.colorScheme.onSurfaceSecondary,
 ) {
-    val stateColor = if (weather != null) {
-        MiuixTheme.colorScheme.primary
-    } else {
-        MiuixTheme.colorScheme.outline
-    }
-
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -68,12 +65,14 @@ fun WeatherCard(
             error != null && weather == null -> ErrorState(
                 error = error,
                 stateColor = stateColor,
+                secondaryTextColor = secondaryTextColor,
                 onRetry = onRefresh
             )
             weather != null -> WeatherContent(
                 weather = weather,
                 nextSatellite = nextSatellite,
                 stateColor = stateColor,
+                secondaryTextColor = secondaryTextColor,
                 isLoading = isLoading,
                 onRefresh = onRefresh
             )
@@ -90,6 +89,7 @@ private fun WeatherContent(
     weather: WeatherResult,
     nextSatellite: SatelliteInfo?,
     stateColor: Color,
+    secondaryTextColor: Color,
     isLoading: Boolean,
     onRefresh: () -> Unit
 ) {
@@ -111,7 +111,7 @@ private fun WeatherContent(
         Text(
             text = weather.now.text,
             style = TextStyle(fontSize = 14.sp),
-            color = MiuixTheme.colorScheme.onSurfaceSecondary
+            color = secondaryTextColor
         )
         Spacer(modifier = Modifier.weight(1f))
         IconButton(
@@ -146,12 +146,12 @@ private fun WeatherContent(
         Text(
             text = weather.cityName.ifEmpty { stringResource(R.string.weather_unknown_city) },
             style = TextStyle(fontSize = 12.sp),
-            color = MiuixTheme.colorScheme.onSurfaceSecondary
+            color = secondaryTextColor
         )
         Text(
             text = formatUpdateTime(weather.fetchTimeMillis),
             style = TextStyle(fontSize = 11.sp),
-            color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.7f)
+            color = secondaryTextColor.copy(alpha = 0.7f)
         )
     }
 
@@ -159,7 +159,8 @@ private fun WeatherContent(
         SatelliteForecastRow(
             satellite = nextSatellite,
             weather = weather,
-            stateColor = stateColor
+            stateColor = stateColor,
+            secondaryTextColor = secondaryTextColor
         )
     }
 }
@@ -168,7 +169,8 @@ private fun WeatherContent(
 private fun SatelliteForecastRow(
     satellite: SatelliteInfo,
     weather: WeatherResult,
-    stateColor: Color
+    stateColor: Color,
+    secondaryTextColor: Color
 ) {
     val aosInstant = satellite.aosTime
     val aosZone = aosInstant.atZone(ZoneId.systemDefault())
@@ -191,7 +193,7 @@ private fun SatelliteForecastRow(
         Text(
             text = stringResource(R.string.weather_next_pass_label),
             style = TextStyle(fontSize = 11.sp),
-            color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.8f)
+            color = secondaryTextColor.copy(alpha = 0.8f)
         )
         Text(
             text = satellite.name.take(8),
@@ -201,7 +203,7 @@ private fun SatelliteForecastRow(
         Text(
             text = aosZone.format(weatherDateFormat),
             style = TextStyle(fontSize = 11.sp),
-            color = MiuixTheme.colorScheme.onSurfaceSecondary
+            color = secondaryTextColor
         )
         Spacer(modifier = Modifier.weight(1f))
         Icon(
@@ -213,7 +215,7 @@ private fun SatelliteForecastRow(
         Text(
             text = "${matchedDay.nightTemp}~${matchedDay.dayTemp}°",
             style = TextStyle(fontSize = 11.sp),
-            color = MiuixTheme.colorScheme.onSurfaceSecondary
+            color = secondaryTextColor
         )
     }
 }
@@ -251,6 +253,7 @@ private fun LoadingState(stateColor: Color) {
 private fun ErrorState(
     error: String,
     stateColor: Color,
+    secondaryTextColor: Color,
     onRetry: () -> Unit
 ) {
     Text(
@@ -261,7 +264,7 @@ private fun ErrorState(
     Text(
         text = error,
         style = TextStyle(fontSize = 11.sp),
-        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+        color = secondaryTextColor,
         modifier = Modifier.padding(top = 2.dp)
     )
     TextButton(
