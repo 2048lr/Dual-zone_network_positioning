@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -175,11 +176,33 @@ class SettingsViewModel(
     // ── 更新检查与下载安装 ──────────────────────────────────────────
 
     /**
-     * 立即检查更新。检查中设置 [SettingsUiState.updateChecking]，
-     * 完成后填充 [SettingsUiState.latestVersionInfo] 和 [SettingsUiState.updateAvailable]。
+     * 自动检查节流间隔：6 小时。
+     *
+     * 未认证 GitHub API 限额 60 次/小时/IP，避免用户频繁进出应用消耗额度。
+     * 仅对自动检查路径（force = false）生效；设置页"立即检查"按钮强制检查。
      */
-    fun checkUpdateNow() {
+    private val updateThrottleMs = 6L * 60 * 60 * 1000
+
+    private val updatePrefs by lazy {
+        radioApp.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    }
+
+    /**
+     * 检查更新。
+     *
+     * - [force] = true（默认）：跳过节流，立即请求。设置页"立即检查"按钮使用。
+     * - [force] = false：节流生效，距上次检查不足 [updateThrottleMs] 则跳过。自动检查路径使用。
+     *
+     * 检查中设置 [SettingsUiState.updateChecking]，完成后填充
+     * [SettingsUiState.latestVersionInfo] 和 [SettingsUiState.updateAvailable]。
+     */
+    fun checkUpdateNow(force: Boolean = true) {
         if (_uiState.value.updateChecking) return
+        if (!force) {
+            val last = updatePrefs.getLong("last_update_check_time", 0L)
+            if (last > 0 && System.currentTimeMillis() - last < updateThrottleMs) return
+        }
+        updatePrefs.edit { putLong("last_update_check_time", System.currentTimeMillis()) }
         _uiState.update { it.copy(updateChecking = true, updateError = false) }
         viewModelScope.launch {
             val info = withContext(kotlinx.coroutines.Dispatchers.IO) { checkNewVersion() }

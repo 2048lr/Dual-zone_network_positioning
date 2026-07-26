@@ -18,6 +18,7 @@ import com.example.radioarealocator.ui.UiMode
 import com.example.radioarealocator.ui.navigation3.Navigator
 import com.example.radioarealocator.ui.navigation3.Route
 import com.example.radioarealocator.ui.viewmodel.HomeViewModel
+import com.example.radioarealocator.ui.viewmodel.SettingsViewModel
 
 @Composable
 fun HomePager(
@@ -26,6 +27,7 @@ fun HomePager(
     isCurrentPage: Boolean = true
 ) {
     val homeViewModel = appViewModel<HomeViewModel>()
+    val settingsViewModel = appViewModel<SettingsViewModel>()
     val mainViewModel = LocalMainViewModel.current
     val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
@@ -58,6 +60,11 @@ fun HomePager(
     if (hasActivated) {
         LaunchedEffect(Unit) {
             homeViewModel.refresh()
+            // 启动时自动检查更新（节流：6 小时内只查一次）；
+            // 检查结果存入 SettingsViewModel.uiState，由 MainScreen 顶层 UpdateDialogs 渲染
+            if (uiState.checkUpdateEnabled) {
+                settingsViewModel.checkUpdateNow(force = false)
+            }
         }
     }
     LifecycleResumeEffect(permissionManager) {

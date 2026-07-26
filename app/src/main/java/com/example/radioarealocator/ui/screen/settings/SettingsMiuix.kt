@@ -340,6 +340,6 @@ fun SettingPagerMiuix(
                 }
             }
         }
-        UpdateDialogs(uiState = uiState, actions = actions)
+        // UpdateDialogs 已提升到 MainScreen 顶层渲染（启动自动检查与设置页共用）
     }
 }

@@ -79,6 +79,8 @@ import com.example.radioarealocator.ui.screen.permission.PermissionScreen
 import com.example.radioarealocator.ui.screen.reminder.ReminderListRouteScreen
 import com.example.radioarealocator.ui.screen.satellite.SatelliteManagementScreen
 import com.example.radioarealocator.ui.screen.settings.SettingPager
+import com.example.radioarealocator.ui.screen.settings.SettingsScreenActions
+import com.example.radioarealocator.ui.screen.settings.UpdateDialogs
 import com.example.radioarealocator.ui.theme.RadioAreaLocatorTheme
 import com.example.radioarealocator.ui.theme.LocalColorMode
 import com.example.radioarealocator.ui.theme.LocalEnableBlur
@@ -87,6 +89,7 @@ import com.example.radioarealocator.ui.theme.LocalEnableFloatingBottomBarBlur
 import com.example.radioarealocator.ui.util.rememberBlurBackdrop
 import com.example.radioarealocator.ui.viewmodel.MainActivityViewModel
 import com.example.radioarealocator.ui.viewmodel.MainPagerConfig
+import com.example.radioarealocator.ui.viewmodel.SettingsViewModel
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -234,6 +237,9 @@ fun MainScreen(
     val enableBlur = LocalEnableBlur.current
     val enableFloatingBottomBar = LocalEnableFloatingBottomBar.current
     val enableFloatingBottomBarBlur = LocalEnableFloatingBottomBarBlur.current
+    // 更新对话框提升到此渲染：启动自动检查与设置页手动检查共用同一弹窗
+    val settingsViewModel = appViewModel<SettingsViewModel>()
+    val settingsUiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { MainPagerConfig.PAGE_COUNT })
     val mainPagerState = rememberMainPagerState(pagerState)
     var userScrollEnabled by remember { mutableStateOf(true) }
@@ -344,6 +350,20 @@ fun MainScreen(
                 }
             }
         }
+
+        // 更新对话框：覆盖主页与设置页，启动自动检查 / 设置页手动检查共用
+        UpdateDialogs(
+            uiState = settingsUiState,
+            actions = SettingsScreenActions(
+                onSetCheckUpdate = settingsViewModel::setCheckUpdate,
+                onOpenTheme = { },
+                onSetUiModeIndex = { },
+                onOpenAbout = { },
+                onCheckUpdateNow = { settingsViewModel.checkUpdateNow(force = true) },
+                onDownloadAndInstall = settingsViewModel::downloadAndInstall,
+                onClearUpdateResult = settingsViewModel::clearUpdateResult,
+            ),
+        )
     }
 }
 

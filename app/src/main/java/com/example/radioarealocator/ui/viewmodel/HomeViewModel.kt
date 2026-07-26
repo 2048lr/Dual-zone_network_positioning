@@ -14,7 +14,6 @@ import com.example.radioarealocator.radioApp
 import com.example.radioarealocator.ui.screen.home.HomeUiState
 import com.example.radioarealocator.ui.screen.home.getAppVersion
 import com.example.radioarealocator.ui.util.LatestVersionInfo
-import com.example.radioarealocator.ui.util.checkNewVersion
 
 class HomeViewModel : ViewModel() {
 
@@ -25,10 +24,8 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             val baseState = withContext(Dispatchers.IO) { buildState() }
             _uiState.update { baseState }
-            if (baseState.checkUpdateEnabled) {
-                val latestVersionInfo = withContext(Dispatchers.IO) { checkNewVersion() }
-                _uiState.update { it.copy(latestVersionInfo = latestVersionInfo) }
-            }
+            // 更新检查统一由 SettingsViewModel.checkUpdateNow 处理（含节流），
+            // 此处不再调用 checkNewVersion 以免重复消耗 GitHub API 限额。
         }
     }
 
