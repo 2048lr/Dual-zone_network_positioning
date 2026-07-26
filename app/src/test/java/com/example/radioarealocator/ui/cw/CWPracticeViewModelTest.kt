@@ -46,7 +46,9 @@ class CWPracticeViewModelTest {
         (com.example.radioarealocator.radioApp as com.example.radioarealocator.RadioAreaLocatorApplication)
             .onCreate()
         viewModel = CWPracticeViewModel()
-        advanceUntilIdle()
+        // @Before 不是 runTest 块，this 不是 TestScope；
+        // 通过 dispatcher.scheduler 显式推进，避免 Unresolved reference
+        testDispatcher.scheduler.advanceUntilIdle()
     }
 
     @After
@@ -182,12 +184,12 @@ class CWPracticeViewModelTest {
     }
 
     @Test
-    fun `isPlaying starts false`() {
+    fun `isPlaying starts false`() = runTest {
         assertFalse(viewModel.isPlaying.first())
     }
 
     @Test
-    fun `isPaused starts false`() {
+    fun `isPaused starts false`() = runTest {
         assertFalse(viewModel.isPaused.first())
     }
 }

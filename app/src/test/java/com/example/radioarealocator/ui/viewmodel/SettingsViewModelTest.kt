@@ -61,7 +61,8 @@ class SettingsViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeRepo = FakeSettingsRepository()
         viewModel = SettingsViewModel(fakeRepo)
-        advanceUntilIdle()
+        // @Before 不是 runTest 块，通过 dispatcher.scheduler 显式推进
+        testDispatcher.scheduler.advanceUntilIdle()
     }
 
     @After

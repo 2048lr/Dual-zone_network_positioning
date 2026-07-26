@@ -39,7 +39,8 @@ class HomeViewModelTest {
         (com.example.radioarealocator.radioApp as com.example.radioarealocator.RadioAreaLocatorApplication)
             .onCreate()
         viewModel = HomeViewModel()
-        advanceUntilIdle()
+        // @Before 不是 runTest 块，通过 dispatcher.scheduler 显式推进
+        testDispatcher.scheduler.advanceUntilIdle()
     }
 
     @After
