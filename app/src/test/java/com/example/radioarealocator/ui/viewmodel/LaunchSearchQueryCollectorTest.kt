@@ -74,12 +74,13 @@ class LaunchSearchQueryCollectorTest {
         }
 
         queryFlow.value = "hello"
-        advanceTimeBy(100) // Not past debounce
-        advanceUntilIdle()
+        advanceTimeBy(100) // Not past debounce (150ms)
+        // 不调用 advanceUntilIdle()：它会继续推进虚拟时间到 debounce 触发点，
+        // 导致 "Too early" 断言失败。advanceTimeBy 已执行完 100ms 内就绪的任务。
 
         assertEquals(0, results.size) // Too early
 
-        advanceTimeBy(100) // Now past 150ms total
+        advanceTimeBy(50) // Now past 150ms total
         advanceUntilIdle()
 
         assertEquals(1, results.size)

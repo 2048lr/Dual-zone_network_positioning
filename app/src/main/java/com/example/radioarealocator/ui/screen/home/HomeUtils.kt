@@ -32,10 +32,10 @@ data class AppVersion(
 )
 
 fun getAppVersion(context: Context): AppVersion {
-    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)!!
+    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
     val versionCode = PackageInfoCompat.getLongVersionCode(packageInfo)
     return AppVersion(
-        versionName = packageInfo.versionName!!,
+        versionName = packageInfo.versionName ?: "",
         versionCode = versionCode
     )
 }
