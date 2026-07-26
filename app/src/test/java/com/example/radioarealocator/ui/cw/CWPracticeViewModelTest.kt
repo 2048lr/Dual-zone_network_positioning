@@ -1,7 +1,6 @@
 ﻿package com.example.radioarealocator.ui.cw
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import com.example.radioarealocator.RadioAreaLocatorApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -24,10 +23,13 @@ import org.robolectric.annotation.Config
  * [CWPracticeViewModel] 单元测试。
  *
  * 使用 Robolectric 提供 Android 环境（Context, DataStore, Room）。
+ * 通过 [Config.application] 让 Robolectric 创建并初始化 [RadioAreaLocatorApplication]，
+ * 其 [RadioAreaLocatorApplication.onCreate] 会赋值全局 `radioApp` 并完成 SecretManager 解密。
+ * 手动 `new RadioAreaLocatorApplication()` 缺少 attachBaseContext，会导致 Context 为 null。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
+@Config(application = RadioAreaLocatorApplication::class)
 class CWPracticeViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
@@ -36,18 +38,9 @@ class CWPracticeViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        // radioApp is set by RadioAreaLocatorApplication.onCreate()
-        // Robolectric provides the Application instance automatically
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        // Initialize the global reference used by ViewModels
-        com.example.radioarealocator.radioApp =
-            com.example.radioarealocator.RadioAreaLocatorApplication()
-        // Trigger onCreate to set the companion and init crypto
-        (com.example.radioarealocator.radioApp as com.example.radioarealocator.RadioAreaLocatorApplication)
-            .onCreate()
+        // Robolectric 已创建并初始化 RadioAreaLocatorApplication，radioApp 全局变量已就绪
         viewModel = CWPracticeViewModel()
-        // @Before 不是 runTest 块，this 不是 TestScope；
-        // 通过 dispatcher.scheduler 显式推进，避免 Unresolved reference
+        // @Before 不是 runTest 块，通过 dispatcher.scheduler 显式推进
         testDispatcher.scheduler.advanceUntilIdle()
     }
 

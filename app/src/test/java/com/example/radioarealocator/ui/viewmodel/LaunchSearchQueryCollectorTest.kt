@@ -24,7 +24,7 @@ class LaunchSearchQueryCollectorTest {
         val queryFlow = MutableStateFlow("")
         val results = mutableListOf<String>()
 
-        launchSearchQueryCollector(queryFlow) { query ->
+        val job = launchSearchQueryCollector(queryFlow) { query ->
             results.add(query)
         }
 
@@ -38,6 +38,8 @@ class LaunchSearchQueryCollectorTest {
 
         assertEquals(1, results.size)
         assertEquals("abc", results[0])
+        // collectLatest 是 long-running 收集器，需显式 cancel 否则 runTest 报 UncompletedCoroutinesError
+        job.cancel()
     }
 
     @Test
@@ -45,7 +47,7 @@ class LaunchSearchQueryCollectorTest {
         val queryFlow = MutableStateFlow("")
         val results = mutableListOf<String>()
 
-        launchSearchQueryCollector(queryFlow) { query ->
+        val job = launchSearchQueryCollector(queryFlow) { query ->
             results.add(query)
         }
 
@@ -59,6 +61,7 @@ class LaunchSearchQueryCollectorTest {
 
         // Only one emission because distinctUntilChanged
         assertEquals(1, results.size)
+        job.cancel()
     }
 
     @Test
@@ -66,7 +69,7 @@ class LaunchSearchQueryCollectorTest {
         val queryFlow = MutableStateFlow("")
         val results = mutableListOf<String>()
 
-        launchSearchQueryCollector(queryFlow) { query ->
+        val job = launchSearchQueryCollector(queryFlow) { query ->
             results.add(query)
         }
 
@@ -81,6 +84,7 @@ class LaunchSearchQueryCollectorTest {
 
         assertEquals(1, results.size)
         assertEquals("hello", results[0])
+        job.cancel()
     }
 
     @Test
@@ -88,7 +92,7 @@ class LaunchSearchQueryCollectorTest {
         val queryFlow = MutableStateFlow("initial")
         val results = mutableListOf<String>()
 
-        launchSearchQueryCollector(queryFlow) { query ->
+        val job = launchSearchQueryCollector(queryFlow) { query ->
             results.add(query)
         }
 
@@ -98,5 +102,6 @@ class LaunchSearchQueryCollectorTest {
 
         assertEquals(1, results.size)
         assertEquals("", results[0])
+        job.cancel()
     }
 }

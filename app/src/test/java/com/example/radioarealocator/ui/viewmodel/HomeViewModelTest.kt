@@ -2,6 +2,7 @@
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.example.radioarealocator.RadioAreaLocatorApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -21,10 +22,13 @@ import org.robolectric.annotation.Config
 
 /**
  * [HomeViewModel] 单元测试。
+ *
+ * 通过 [Config.application] 让 Robolectric 创建并初始化 [RadioAreaLocatorApplication]，
+ * 避免手动 new 导致 attachBaseContext 缺失。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
+@Config(application = RadioAreaLocatorApplication::class)
 class HomeViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
@@ -33,11 +37,7 @@ class HomeViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        // Initialize the global reference used by ViewModels
-        com.example.radioarealocator.radioApp =
-            com.example.radioarealocator.RadioAreaLocatorApplication()
-        (com.example.radioarealocator.radioApp as com.example.radioarealocator.RadioAreaLocatorApplication)
-            .onCreate()
+        // Robolectric 已创建并初始化 RadioAreaLocatorApplication，radioApp 全局变量已就绪
         viewModel = HomeViewModel()
         // @Before 不是 runTest 块，通过 dispatcher.scheduler 显式推进
         testDispatcher.scheduler.advanceUntilIdle()

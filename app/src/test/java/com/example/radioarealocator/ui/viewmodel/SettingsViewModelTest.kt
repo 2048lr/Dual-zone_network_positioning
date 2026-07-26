@@ -1,5 +1,6 @@
 ﻿package com.example.radioarealocator.ui.viewmodel
 
+import com.example.radioarealocator.RadioAreaLocatorApplication
 import com.example.radioarealocator.data.repository.SettingsRepository
 import com.example.radioarealocator.ui.UiMode
 import com.materialkolor.PaletteStyle
@@ -18,6 +19,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Fake [SettingsRepository] for unit tests.
@@ -50,6 +54,8 @@ class FakeSettingsRepository : SettingsRepository {
  * - 刷新操作重新加载仓库值
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(application = RadioAreaLocatorApplication::class)
 class SettingsViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
