@@ -77,7 +77,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `initial state reflects repository defaults`() = runTest {
+    fun `initial state reflects repository defaults`() = runTest(testDispatcher) {
         val state = viewModel.uiState.first()
         assertEquals(UiMode.DEFAULT_VALUE, state.uiMode)
         assertTrue(state.checkUpdate)
@@ -90,7 +90,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setCheckUpdate updates state and repository`() = runTest {
+    fun `setCheckUpdate updates state and repository`() = runTest(testDispatcher) {
         viewModel.setCheckUpdate(false)
         advanceUntilIdle()
 
@@ -100,7 +100,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setThemeMode in material mode stores value directly`() = runTest {
+    fun `setThemeMode in material mode stores value directly`() = runTest(testDispatcher) {
         fakeRepo.uiMode = "material"
         viewModel.refresh()
         advanceUntilIdle()
@@ -114,7 +114,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setThemeMode in miuix mode with monet adds offset`() = runTest {
+    fun `setThemeMode in miuix mode with monet adds offset`() = runTest(testDispatcher) {
         fakeRepo.uiMode = "miuix"
         fakeRepo.miuixMonet = true
         viewModel.refresh()
@@ -130,7 +130,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setThemeMode in miuix mode without monet stores value directly`() = runTest {
+    fun `setThemeMode in miuix mode without monet stores value directly`() = runTest(testDispatcher) {
         fakeRepo.uiMode = "miuix"
         fakeRepo.miuixMonet = false
         viewModel.refresh()
@@ -145,7 +145,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setMiuixMonet converts non-monet to monet mode`() = runTest {
+    fun `setMiuixMonet converts non-monet to monet mode`() = runTest(testDispatcher) {
         fakeRepo.uiMode = "miuix"
         fakeRepo.miuixMonet = false
         fakeRepo.themeMode = 2 // DARK
@@ -162,7 +162,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setMiuixMonet converts monet to non-monet mode`() = runTest {
+    fun `setMiuixMonet converts monet to non-monet mode`() = runTest(testDispatcher) {
         fakeRepo.uiMode = "miuix"
         fakeRepo.miuixMonet = true
         fakeRepo.themeMode = 5 // MONET_DARK
@@ -179,7 +179,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setUiMode from material to miuix converts theme`() = runTest {
+    fun `setUiMode from material to miuix converts theme`() = runTest(testDispatcher) {
         fakeRepo.uiMode = "material"
         fakeRepo.themeMode = 2 // DARK
         fakeRepo.miuixMonet = true
@@ -196,7 +196,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setUiMode from miuix to material converts monet to non-monet`() = runTest {
+    fun `setUiMode from miuix to material converts monet to non-monet`() = runTest(testDispatcher) {
         fakeRepo.uiMode = "miuix"
         fakeRepo.themeMode = 5 // MONET_DARK
         viewModel.refresh()
@@ -212,7 +212,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setPageScale updates state and repository`() = runTest {
+    fun `setPageScale updates state and repository`() = runTest(testDispatcher) {
         viewModel.setPageScale(1.5f)
         advanceUntilIdle()
 
@@ -222,7 +222,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setEnableBlur updates state and repository`() = runTest {
+    fun `setEnableBlur updates state and repository`() = runTest(testDispatcher) {
         viewModel.setEnableBlur(false)
         advanceUntilIdle()
 
@@ -232,7 +232,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setEnableFloatingBottomBar updates state and repository`() = runTest {
+    fun `setEnableFloatingBottomBar updates state and repository`() = runTest(testDispatcher) {
         viewModel.setEnableFloatingBottomBar(false)
         advanceUntilIdle()
 
@@ -242,7 +242,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setEnablePredictiveBack updates state and repository`() = runTest {
+    fun `setEnablePredictiveBack updates state and repository`() = runTest(testDispatcher) {
         viewModel.setEnablePredictiveBack(true)
         advanceUntilIdle()
 
@@ -252,7 +252,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `clearUpdateResult resets update state`() = runTest {
+    fun `clearUpdateResult resets update state`() = runTest(testDispatcher) {
         // Simulate having an update available by directly setting state
         viewModel.checkUpdateNow(force = true)
         advanceUntilIdle()
@@ -266,7 +266,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `refresh reloads all values from repository`() = runTest {
+    fun `refresh reloads all values from repository`() = runTest(testDispatcher) {
         fakeRepo.themeMode = 2
         fakeRepo.uiMode = "material"
         fakeRepo.pageScale = 0.8f
