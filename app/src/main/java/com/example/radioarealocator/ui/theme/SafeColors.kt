@@ -32,6 +32,20 @@ object SafeColors {
     /** 错误状态 - 深色模式容器背景色 */
     val errorContainerDark: Color = Color(0xFF310808)
 
+    // ==================== 信息指示色（蓝色系）====================
+
+    /** 信息状态 - 图标色（明亮蓝，Blue 400） */
+    val infoIcon: Color = Color(0xFF42A5F5)
+
+    /** 信息状态 - 容器背景色（浅蓝） */
+    val infoContainer: Color = Color(0xFFE3F2FD)
+
+    /** 信息状态 - 深色模式图标色 */
+    val infoIconDark: Color = Color(0xFF64B5F6)
+
+    /** 信息状态 - 深色模式容器背景色 */
+    val infoContainerDark: Color = Color(0xFF0D2740)
+
     // ==================== 文本色 ====================
 
     /** 主要文字色（浅色模式） */

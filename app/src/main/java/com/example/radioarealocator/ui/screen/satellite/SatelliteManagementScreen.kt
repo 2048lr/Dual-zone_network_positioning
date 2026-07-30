@@ -3,6 +3,7 @@ package com.example.radioarealocator.ui.screen.satellite
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -517,11 +518,7 @@ private fun SatelliteManagementItem(
             val now = if (nowMillis > 0) Instant.ofEpochMilli(nowMillis) else Instant.now()
             val remainingSeconds = Duration.between(now, satellite.losTime).seconds
             val remainingText = formatRemainingTime(remainingSeconds)
-            // 过境进度 = 已过时间 / 总过境时间，0..1
-            val totalSeconds = Duration.between(satellite.aosTime, satellite.losTime).seconds.coerceAtLeast(1L)
-            val elapsedSeconds = Duration.between(satellite.aosTime, now).seconds.coerceIn(0L, totalSeconds)
-            val progress = (elapsedSeconds.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
-            SatelliteTimeInfo.InPass(losTime, remainingText, progress)
+            SatelliteTimeInfo.InPass(losTime, remainingText)
         } else {
             val aosTime = satellite.aosTime.atZone(zone).format(formatter)
             SatelliteTimeInfo.Upcoming(aosTime)
@@ -644,9 +641,6 @@ private fun SatelliteManagementItem(
                             isActive = true
                         )
                     }
-                    // 在境进度条：直观显示过境推进
-                    Spacer(Modifier.height(6.dp))
-                    PassProgressBar(progress = timeInfo.progress)
                 }
                 is SatelliteTimeInfo.Upcoming -> {
                     TimeBadge(
@@ -665,7 +659,7 @@ private fun SatelliteManagementItem(
 private val satelliteTimeFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 
 private sealed class SatelliteTimeInfo {
-    data class InPass(val losTime: String, val remainingText: String, val progress: Float) : SatelliteTimeInfo()
+    data class InPass(val losTime: String, val remainingText: String) : SatelliteTimeInfo()
     data class Upcoming(val aosTime: String) : SatelliteTimeInfo()
 }
 
@@ -707,34 +701,14 @@ private fun TimeBadge(label: String, value: String, isActive: Boolean) {
     }
 }
 
-/**
- * 在境进度条：宽度随过境推进，颜色用 primary。
- */
-@Composable
-private fun PassProgressBar(progress: Float) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(3.dp)
-            .clip(RoundedCornerShape(2.dp))
-            .background(colorScheme.surfaceVariant)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(progress)
-                .height(3.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(colorScheme.primary)
-        )
-    }
-}
-
 // ---- Chips ----
 
 @Composable
 private fun SourceChip(source: String) {
+    val dark = isSystemInDarkTheme()
     val (bgColor, contentColor) = when (source) {
-        "CT" -> colorScheme.secondaryContainer to colorScheme.onSecondaryContainer
+        "CT" -> if (dark) SafeColors.infoContainerDark to SafeColors.infoIconDark
+        else SafeColors.infoContainer to SafeColors.infoIcon
         "SNOGS" -> colorScheme.tertiaryContainer to colorScheme.onTertiaryContainer
         "ALL" -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
         else -> colorScheme.surfaceVariant to colorScheme.onSurfaceVariantSummary
