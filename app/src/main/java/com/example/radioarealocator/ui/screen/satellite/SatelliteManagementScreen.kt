@@ -3,7 +3,6 @@ package com.example.radioarealocator.ui.screen.satellite
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -603,9 +602,6 @@ private fun SatelliteManagementItem(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                if (satellite.source.isNotEmpty()) {
-                    SourceChip(source = satellite.source)
-                }
                 if (effectiveStatus.isNotEmpty()) {
                     StatusChip(status = effectiveStatus, isStatusInherited = isStatusInherited)
                 }
@@ -702,19 +698,6 @@ private fun TimeBadge(label: String, value: String, isActive: Boolean) {
 }
 
 // ---- Chips ----
-
-@Composable
-private fun SourceChip(source: String) {
-    val dark = isSystemInDarkTheme()
-    val (bgColor, contentColor) = when (source) {
-        "CT" -> if (dark) SafeColors.infoContainerDark to SafeColors.infoIconDark
-        else SafeColors.infoContainer to SafeColors.infoIcon
-        "SNOGS" -> colorScheme.tertiaryContainer to colorScheme.onTertiaryContainer
-        "ALL" -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
-        else -> colorScheme.surfaceVariant to colorScheme.onSurfaceVariantSummary
-    }
-    Chip(text = source, bgColor = bgColor, contentColor = contentColor)
-}
 
 @Composable
 private fun StatusChip(status: String, isStatusInherited: Boolean = false) {

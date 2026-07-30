@@ -3,7 +3,6 @@ package com.example.radioarealocator.ui.screen.satellite
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,7 +79,6 @@ import com.example.radioarealocator.ui.isSatelliteSourceExpired
 import com.example.radioarealocator.ui.navigation3.LocalNavigator
 import com.example.radioarealocator.ui.navigation3.Route
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
-import com.example.radioarealocator.ui.theme.SafeColors
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
@@ -595,9 +593,6 @@ private fun SatelliteItemMaterial(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                if (satellite.source.isNotEmpty()) {
-                    SourceChipM(source = satellite.source)
-                }
                 if (effectiveStatus.isNotEmpty()) {
                     StatusChipM(status = effectiveStatus, isStatusInherited = isStatusInherited)
                 }
@@ -695,19 +690,6 @@ private fun TimeBadgeM(label: String, value: String, isActive: Boolean) {
 }
 
 // ---- Chips ----
-
-@Composable
-private fun SourceChipM(source: String) {
-    val dark = isSystemInDarkTheme()
-    val (bgColor, contentColor) = when (source) {
-        "CT" -> if (dark) SafeColors.infoContainerDark to SafeColors.infoIconDark
-        else SafeColors.infoContainer to SafeColors.infoIcon
-        "SNOGS" -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
-        "ALL" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    ChipM(text = source, bgColor = bgColor, contentColor = contentColor)
-}
 
 @Composable
 private fun StatusChipM(status: String, isStatusInherited: Boolean = false) {
