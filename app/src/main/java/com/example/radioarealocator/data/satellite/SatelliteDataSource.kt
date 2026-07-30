@@ -31,7 +31,7 @@ private suspend inline fun <R> runCatchingCancellable(block: suspend () -> R): R
  */
 data class SourcedTLE(
     val tle: TLE,
-    val source: String, // "SNOGS" / "AMSAT" / "ALL"
+    val source: String, // "CT" / "SNOGS" / "ALL"
     val status: String = "", // AMSAT 状态：Heard / Telemetry Only / Not Heard / Crew Active
     val rawLines: Array<String> = arrayOf("", "", "") // 原始三行 TLE，用于本地缓存序列化
 ) {
@@ -52,7 +52,8 @@ data class SourcedTLE(
 }
 
 /**
- * 卫星 TLE 数据源，同时从 SatNOGS 和 AMSAT 获取并合并去重。
+ * 卫星 TLE 数据源，同时从 SatNOGS 和 CelesTrak 获取并合并去重，
+ * 再附加 AMSAT 状态报告。
  */
 class SatelliteDataSource {
 
@@ -66,54 +67,69 @@ class SatelliteDataSource {
 
     /**
      * 获取业余卫星 TLE 列表。
-     * 同时从 SatNOGS 和 AMSAT 拉取，合并去重（按 NORAD 编号）。
-     * 同时出现在两个源的卫星标记为 ALL。
-     * 任一源失败时使用另一个源的结果。
      *
-     * @param source 数据来源过滤："ALL" 全部, "SNOGS" 仅 SatNOGS, "AMSAT" 仅 AMSAT
+     * 从 SatNOGS 与 CelesTrak 并行拉取 TLE，按 NORAD 编号合并去重；
+     * 同时出现在两个源的卫星标记为 ALL。随后附加 AMSAT 状态报告。
+     *
+     * 任一被请求的 TLE 源失败时容忍，使用另一个源的结果；
+     * 仅当所有被请求的 TLE 源都失败时才抛 IOException，避免返回空列表覆盖本地缓存。
+     * AMSAT 状态源失败不影响 TLE 结果。
+     *
+     * @param source 数据来源过滤："ALL" 全部（默认）, "CT" 仅 CelesTrak, "SNOGS" 仅 SatNOGS
      */
     suspend fun fetchAmateurTLEs(source: String = "ALL"): List<SourcedTLE> = withContext(Dispatchers.IO) {
         coroutineScope {
-            // 根据用户设置跳过不需要的数据源，减少等待时间
-            val needSatnogs = source != "AMSAT"
-            val needAmsat = source != "SNOGS"
+            // 根据用户设置跳过不需要的 TLE 数据源，减少等待时间
+            val needSatnogs = source != "CT"
+            val needCelesTrak = source != "SNOGS"
 
             val satnogsDeferred = if (needSatnogs) async { runCatchingCancellable { fetchSatnogsTLEs() } } else null
-            val amsatStatusDeferred = if (needAmsat) async { runCatchingCancellable { amsatStatusApi.fetchStatusSummaries() } } else null
+            val celesTrakDeferred = if (needCelesTrak) async { runCatchingCancellable { fetchCelesTrakTLEs() } } else null
+            // AMSAT 状态与 TLE 源正交：无论选哪个 TLE 源都附加状态标签
+            val amsatStatusDeferred = async { runCatchingCancellable { amsatStatusApi.fetchStatusSummaries() } }
 
             val satnogsResult = satnogsDeferred?.await()
-            val amsatStatusResult = amsatStatusDeferred?.await()
+            val celesTrakResult = celesTrakDeferred?.await()
+            val amsatStatusResult = amsatStatusDeferred.await()
 
-            // 只有请求了的源才参与失败判断：单一数据源失败时也应抛异常，
-            // 避免返回空列表覆盖本地缓存
-            val requestedResults = listOfNotNull(
+            // 只有请求了的 TLE 源才参与失败判断：单一数据源失败时也应抛异常，
+            // 避免返回空列表覆盖本地缓存。AMSAT 状态失败不在此判定内。
+            val requestedTleResults = listOfNotNull(
                 if (needSatnogs) satnogsResult else null,
-                if (needAmsat) amsatStatusResult else null
+                if (needCelesTrak) celesTrakResult else null
             )
-            if (requestedResults.isNotEmpty() && requestedResults.all { it.isFailure }) {
+            if (requestedTleResults.isNotEmpty() && requestedTleResults.all { it.isFailure }) {
                 throw IOException(
                     "TLE 下载失败：SatNOGS=${satnogsResult?.exceptionOrNull()?.message}, " +
-                        "AMSAT=${amsatStatusResult?.exceptionOrNull()?.message}"
+                        "CelesTrak=${celesTrakResult?.exceptionOrNull()?.message}"
                 )
             }
 
-            // 按 NORAD 编号合并，记录来源
+            // 按 NORAD 编号合并，记录来源；两源都有的卫星标记为 ALL
             val merged = LinkedHashMap<Int, SourcedTLE>()
             satnogsResult?.getOrNull()?.forEach { stle ->
                 merged[stle.tle.catnum] = stle
             }
+            celesTrakResult?.getOrNull()?.forEach { stle ->
+                val existing = merged[stle.tle.catnum]
+                merged[stle.tle.catnum] = if (existing != null && existing.source != stle.source) {
+                    existing.copy(source = "ALL")
+                } else {
+                    stle
+                }
+            }
 
             // 按用户选择的来源过滤
             val filtered = when (source) {
+                "CT" -> merged.values.filter { it.source == "CT" || it.source == "ALL" }
+                    .map { it.copy(source = "CT") }
                 "SNOGS" -> merged.values.filter { it.source == "SNOGS" || it.source == "ALL" }
                     .map { it.copy(source = "SNOGS") }
-                "AMSAT" -> merged.values.filter { it.source == "AMSAT" || it.source == "ALL" }
-                    .map { it.copy(source = "AMSAT") }
                 else -> merged.values.toList()
             }
 
             // 附加 AMSAT 状态（失败时不影响 TLE 结果）
-            val statusMap = amsatStatusResult?.getOrNull() ?: emptyMap()
+            val statusMap = amsatStatusResult.getOrNull() ?: emptyMap()
             filtered.map { sourcedTle ->
                 val amsatName = SatelliteCatalog.AMSAT_STATUS_NAME_BY_CATALOG_NUMBER[sourcedTle.tle.catnum]
                 val status = if (amsatName != null) statusMap[amsatName] ?: "" else ""
@@ -174,9 +190,58 @@ class SatelliteDataSource {
     }
 
     /**
-     * 解析标准三行文本格式 TLE，返回 (name, line1, line2) 三元组列表。
+     * 从 CelesTrak 批量获取业余卫星 TLE，然后过滤出 SatelliteCatalog 中关心的卫星。
+     *
+     * 使用 gp.php 3le 文本接口（GROUP=amateur&FORMAT=3le），返回标准三行 TLE：
+     * 第一行卫星名称，后两行为 TLE line1/line2，可直接喂给 predict4java 的 [TLE]。
+     * 与 SatNOGS 同样使用 HashSet 进行 O(1) 过滤，命中目标 NORAD 编号后才构造 [TLE]。
+     *
+     * NORAD 编号从 line1 第 3-7 列解析（标准 TLE 格式），避免依赖名称行匹配。
      */
-    private fun parseTextTLEs(text: String): List<Triple<String, String, String>> {
+    private fun fetchCelesTrakTLEs(): List<SourcedTLE> {
+        val request = Request.Builder()
+            .url(CELESTRAK_URL)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("CelesTrak 请求失败：${response.code}")
+            }
+            val body = response.body?.string() ?: throw IOException("CelesTrak 响应为空")
+            val catalogNumbers = SatelliteCatalog.catalogNumbers.toHashSet()
+            val tles = mutableListOf<SourcedTLE>()
+
+            val triples = parseThreeLineTLEs(body)
+            for ((tle0, tle1, tle2) in triples) {
+                // NORAD 编号位于 line1 的第 3-7 列（0-based 索引 2..6）
+                if (tle1.length < 7) continue
+                val noradCatId = tle1.substring(2, 7).trim().toIntOrNull() ?: continue
+                if (!catalogNumbers.contains(noradCatId)) continue
+
+                try {
+                    tles.add(
+                        SourcedTLE(
+                            tle = TLE(arrayOf(tle0, tle1, tle2)),
+                            source = "CT",
+                            rawLines = arrayOf(tle0, tle1, tle2)
+                        )
+                    )
+                } catch (_: IllegalArgumentException) {
+                    // 跳过解析失败的 TLE
+                }
+            }
+            if (tles.isEmpty()) {
+                return emptyList()
+            }
+            return tles
+        }
+    }
+
+    /**
+     * 解析标准三行文本格式 TLE，返回 (name, line1, line2) 三元组列表。
+     * 适用于 CelesTrak 3le 格式：每三行为一组，依次是名称行、line1、line2。
+     */
+    private fun parseThreeLineTLEs(text: String): List<Triple<String, String, String>> {
         val lines = text.lines()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
@@ -205,5 +270,7 @@ class SatelliteDataSource {
 
     companion object {
         private const val SATNOGS_URL = "https://db.satnogs.org/api/tle/"
+        private const val CELESTRAK_URL =
+            "https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=3le"
     }
 }
