@@ -8,7 +8,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import com.example.radioarealocator.data.network.HttpClientProvider
 import okhttp3.Request
-import org.json.JSONArray
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -84,15 +83,10 @@ class SatelliteDataSource {
             val needSatnogs = source != "CT"
             val needCelesTrak = source != "SNOGS"
 
-            // SatNOGS 元数据：并行拉取，用于过滤已再入/失效卫星，避免无意义 TLE 进入预测阶段
-            // 失败时降级为空集（不过滤），保证 TLE 仍可用
-            val satnogsMetaDeferred = if (needSatnogs) async { runCatchingCancellable { fetchSatnogsAliveNoradIds() } } else null
             val satnogsDeferred = if (needSatnogs) async { runCatchingCancellable { fetchSatnogsTLEs() } } else null
             val celesTrakDeferred = if (needCelesTrak) async { runCatchingCancellable { fetchCelesTrakTLEs() } } else null
             // AMSAT 状态与 TLE 源正交：无论选哪个 TLE 源都附加状态标签
             val amsatStatusDeferred = async { runCatchingCancellable { amsatStatusApi.fetchStatusSummaries() } }
-
-            val aliveNoradIds = satnogsMetaDeferred?.await()?.getOrNull() ?: emptySet()
 
             val satnogsResult = satnogsDeferred?.await()
             val celesTrakResult = celesTrakDeferred?.await()
@@ -112,12 +106,9 @@ class SatelliteDataSource {
             }
 
             // 按 NORAD 编号合并，记录来源；两源都有的卫星标记为 ALL
-            // SatNOGS 卫星在元数据表明仍 alive 时才纳入（已再入/失效的过滤掉，避免无意义预测）
             val merged = LinkedHashMap<Int, SourcedTLE>()
             satnogsResult?.getOrNull()?.forEach { stle ->
-                if (aliveNoradIds.isEmpty() || stle.tle.catnum in aliveNoradIds) {
-                    merged[stle.tle.catnum] = stle
-                }
+                merged[stle.tle.catnum] = stle
             }
             celesTrakResult?.getOrNull()?.forEach { stle ->
                 val existing = merged[stle.tle.catnum]
@@ -148,10 +139,12 @@ class SatelliteDataSource {
     }
 
     /**
-     * 从 SatNOGS 批量获取 TLE，返回全部业余卫星（不做 catalog 过滤）。
-     * 单次请求可拿到全部 TLE，避免逐颗查询的大量网络往返。
+     * 获取 SatNOGS 维护的卫星 TLE（参考 Look4Sat 实现）。
      *
-     * SatNOGS 返回全量 TLE（数千颗），全部解析返回；不在 SatelliteCatalog 中的
+     * 不直接请求 db.satnogs.org DB API（国内访问不稳定），而是请求 CelesTrak 整理好的
+     * `satnogs` 分组（3le 文本格式）。CelesTrak 已过滤失效/再入卫星，无需再做 alive 过滤。
+     *
+     * 实测约 649 颗，含 SatNOGS 跟踪的全部可观测卫星；不在 SatelliteCatalog 中的
      * 卫星 modes 为空列表（UI 显示"未知"），AMSAT 状态为空字符串。
      */
     private fun fetchSatnogsTLEs(): List<SourcedTLE> {
@@ -164,17 +157,13 @@ class SatelliteDataSource {
                 throw IOException("SatNOGS 请求失败：${response.code}")
             }
             val body = response.body?.string() ?: throw IOException("SatNOGS 响应为空")
-            val array = JSONArray(body)
+            val triples = parseThreeLineTLEs(body)
             val tles = mutableListOf<SourcedTLE>()
-            for (i in 0 until array.length()) {
-                val obj = array.optJSONObject(i) ?: continue
-                val noradCatId = obj.optInt("norad_cat_id", -1)
-                if (noradCatId < 0) continue
-
-                val tle1 = obj.optString("tle1", "")
-                val tle2 = obj.optString("tle2", "")
-                if (tle1.isBlank() || tle2.isBlank()) continue
-                val tle0 = obj.optString("tle0", "")
+            for ((tle0, tle1, tle2) in triples) {
+                // NORAD 编号位于 line1 的第 3-7 列（0-based 索引 2..6）
+                if (tle1.length < 7) continue
+                val noradCatId = tle1.substring(2, 7).trim().toIntOrNull() ?: continue
+                if (noradCatId <= 0) continue
 
                 try {
                     tles.add(
@@ -192,43 +181,6 @@ class SatelliteDataSource {
                 return emptyList()
             }
             return tles
-        }
-    }
-
-    /**
-     * 从 SatNOGS `/api/satellites/` 拉取卫星元数据，返回"仍存活"的 NORAD 编号集合。
-     * 用于过滤已再入大气层（status=re-entered）或失效（status=dead）的卫星，
-     * 避免无意义 TLE 进入 SGP4 预测阶段。
-     *
-     * 实测全量约 2700+ 条，其中 alive 约 60%。过滤后预测量减少约 40%。
-     * 解析失败或网络异常时返回空集合，调用方按"不过滤"降级处理。
-     */
-    private fun fetchSatnogsAliveNoradIds(): Set<Int> {
-        val request = Request.Builder()
-            .url(SATNOGS_SATELLITES_URL)
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IOException("SatNOGS 元数据请求失败：${response.code}")
-            }
-            val body = response.body?.string() ?: throw IOException("SatNOGS 元数据响应为空")
-            val array = JSONArray(body)
-            val aliveIds = HashSet<Int>(array.length())
-            for (i in 0 until array.length()) {
-                val obj = array.optJSONObject(i) ?: continue
-                val status = obj.optString("status", "")
-                // decayed 字段非空表示已再入大气层，不可见，TLE 无意义
-                val decayed = obj.optString("decayed", "")
-                // 仅保留 alive 状态且未 decayed 的卫星
-                if (status == "alive" && decayed.isBlank()) {
-                    val noradCatId = obj.optInt("norad_cat_id", -1)
-                    if (noradCatId > 0) {
-                        aliveIds.add(noradCatId)
-                    }
-                }
-            }
-            return aliveIds
         }
     }
 
@@ -310,8 +262,10 @@ class SatelliteDataSource {
     }
 
     companion object {
-        private const val SATNOGS_URL = "https://db.satnogs.org/api/tle/"
-        private const val SATNOGS_SATELLITES_URL = "https://db.satnogs.org/api/satellites/"
+        // SatNOGS 源改用 CelesTrak 整理的 satnogs 分组（3le 文本格式），
+        // 避免直接请求 db.satnogs.org（国内访问不稳定），CelesTrak 有 CDN 且已过滤失效卫星
+        private const val SATNOGS_URL =
+            "https://celestrak.org/NORAD/elements/gp.php?GROUP=satnogs&FORMAT=3le"
         private const val CELESTRAK_URL =
             "https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=3le"
     }
