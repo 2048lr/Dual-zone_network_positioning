@@ -53,7 +53,8 @@ data class SourcedTLE(
 
 /**
  * 卫星 TLE 数据源，同时从 SatNOGS 和 CelesTrak 获取并合并去重，
- * 再附加 AMSAT 状态报告。
+ * 再附加 AMSAT 状态报告。返回全部业余卫星（不做 catalog 过滤），
+ * 不在 SatelliteCatalog 中的卫星 modes 为空（UI 显示"未知"）。
  */
 class SatelliteDataSource {
 
@@ -66,7 +67,7 @@ class SatelliteDataSource {
     private val amsatStatusApi = AmsatStatusApiService()
 
     /**
-     * 获取业余卫星 TLE 列表。
+     * 获取业余卫星 TLE 列表（返回数据源提供的全部业余卫星，不做 catalog 过滤）。
      *
      * 从 SatNOGS 与 CelesTrak 并行拉取 TLE，按 NORAD 编号合并去重；
      * 同时出现在两个源的卫星标记为 ALL。随后附加 AMSAT 状态报告。
@@ -139,12 +140,11 @@ class SatelliteDataSource {
     }
 
     /**
-     * 从 SatNOGS 批量获取 TLE，然后过滤出 SatelliteCatalog 中关心的卫星。
+     * 从 SatNOGS 批量获取 TLE，返回全部业余卫星（不做 catalog 过滤）。
      * 单次请求可拿到全部 TLE，避免逐颗查询的大量网络往返。
      *
-     * 优化：SatNOGS 返回全量 TLE（数千颗），但只关心 catalog 中的几十颗。
-     * 使用 HashSet 进行 O(1) 过滤，并优先判断 norad_cat_id 是否命中目标集合，
-     * 命中后才解析 tle0/tle1/tle2，避免对无关记录做字符串读取与对象构造。
+     * SatNOGS 返回全量 TLE（数千颗），全部解析返回；不在 SatelliteCatalog 中的
+     * 卫星 modes 为空列表（UI 显示"未知"），AMSAT 状态为空字符串。
      */
     private fun fetchSatnogsTLEs(): List<SourcedTLE> {
         val request = Request.Builder()
@@ -157,13 +157,11 @@ class SatelliteDataSource {
             }
             val body = response.body?.string() ?: throw IOException("SatNOGS 响应为空")
             val array = JSONArray(body)
-            // 用 HashSet 加速 contains 查询；目标卫星数量少，构建成本可忽略
-            val catalogNumbers = SatelliteCatalog.catalogNumbers.toHashSet()
             val tles = mutableListOf<SourcedTLE>()
             for (i in 0 until array.length()) {
                 val obj = array.optJSONObject(i) ?: continue
                 val noradCatId = obj.optInt("norad_cat_id", -1)
-                if (noradCatId < 0 || !catalogNumbers.contains(noradCatId)) continue
+                if (noradCatId < 0) continue
 
                 val tle1 = obj.optString("tle1", "")
                 val tle2 = obj.optString("tle2", "")
@@ -190,11 +188,11 @@ class SatelliteDataSource {
     }
 
     /**
-     * 从 CelesTrak 批量获取业余卫星 TLE，然后过滤出 SatelliteCatalog 中关心的卫星。
+     * 从 CelesTrak 批量获取业余卫星 TLE，返回全部（不做 catalog 过滤）。
      *
      * 使用 gp.php 3le 文本接口（GROUP=amateur&FORMAT=3le），返回标准三行 TLE：
      * 第一行卫星名称，后两行为 TLE line1/line2，可直接喂给 predict4java 的 [TLE]。
-     * 与 SatNOGS 同样使用 HashSet 进行 O(1) 过滤，命中目标 NORAD 编号后才构造 [TLE]。
+     * 不在 SatelliteCatalog 中的卫星 modes 为空列表（UI 显示"未知"）。
      *
      * NORAD 编号从 line1 第 3-7 列解析（标准 TLE 格式），避免依赖名称行匹配。
      */
@@ -208,7 +206,6 @@ class SatelliteDataSource {
                 throw IOException("CelesTrak 请求失败：${response.code}")
             }
             val body = response.body?.string() ?: throw IOException("CelesTrak 响应为空")
-            val catalogNumbers = SatelliteCatalog.catalogNumbers.toHashSet()
             val tles = mutableListOf<SourcedTLE>()
 
             val triples = parseThreeLineTLEs(body)
@@ -216,7 +213,6 @@ class SatelliteDataSource {
                 // NORAD 编号位于 line1 的第 3-7 列（0-based 索引 2..6）
                 if (tle1.length < 7) continue
                 val noradCatId = tle1.substring(2, 7).trim().toIntOrNull() ?: continue
-                if (!catalogNumbers.contains(noradCatId)) continue
 
                 try {
                     tles.add(
