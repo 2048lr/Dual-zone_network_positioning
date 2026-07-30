@@ -32,26 +32,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
@@ -203,26 +194,20 @@ private fun SatelliteManagementContentMaterial(
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 数据源刷新卡
+        // 数据源刷新 + 统计 + 筛选入口合并为一张卡（减少卡片间距，列表起点上移）
         item {
-            SatelliteActionCardMaterial(
+            SatelliteOverviewCardMaterial(
                 isLoading = locationState.isLoading,
                 isSatelliteLoading = satelliteState.isSatelliteLoading,
                 lastLocationTime = locationState.lastLocationUpdateTime,
                 lastLocationCity = locationState.lastLocationCity,
                 lastSatelliteTime = satelliteState.lastSatelliteUpdateTime,
-                onGetLocation = onGetLocation,
-                onUpdateSource = onUpdateSource
-            )
-        }
-
-        // 统计 + 描述 + 筛选入口
-        item {
-            SatelliteHeaderCardMaterial(
                 totalCount = totalCount,
                 filteredCount = filteredSatellites.size,
                 favoriteCount = favoriteCount,
-                filter = filter
+                filter = filter,
+                onGetLocation = onGetLocation,
+                onUpdateSource = onUpdateSource
             )
         }
 
@@ -278,15 +263,19 @@ private fun SatelliteManagementContentMaterial(
     }
 }
 
-// ---- 数据源刷新卡 ----
+// ---- 概览卡（数据源刷新 + 统计 + 筛选入口合并）----
 
 @Composable
-private fun SatelliteActionCardMaterial(
+private fun SatelliteOverviewCardMaterial(
     isLoading: Boolean,
     isSatelliteLoading: Boolean,
     lastLocationTime: Instant?,
     lastLocationCity: String,
     lastSatelliteTime: Instant?,
+    totalCount: Int,
+    filteredCount: Int,
+    favoriteCount: Int,
+    filter: SatelliteFilter,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit
 ) {
@@ -305,6 +294,45 @@ private fun SatelliteActionCardMaterial(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // 描述 + 统计
+            Text(
+                text = stringResource(R.string.satellite_management_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ManagementStatMaterial(
+                    label = stringResource(R.string.satellite_count, totalCount),
+                    value = totalCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+                ManagementStatMaterial(
+                    label = stringResource(R.string.favorites_count),
+                    value = favoriteCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // 筛选计数 + 筛选按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (filter.isActive && totalCount > 0) {
+                    Text(
+                        text = stringResource(R.string.satellite_count_filtered, filteredCount, totalCount),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                SatelliteFilterButtonMaterial(filter = filter)
+            }
+
+            // 数据源刷新操作
             ActionRowMaterial(
                 buttonText = stringResource(R.string.sat_action_get_location),
                 isLoading = isLoading,
@@ -388,66 +416,6 @@ private fun ActionRowMaterial(
     }
 }
 
-// ---- 统计 + 描述 + 筛选入口 ----
-
-@Composable
-private fun SatelliteHeaderCardMaterial(
-    totalCount: Int,
-    filteredCount: Int,
-    favoriteCount: Int,
-    filter: SatelliteFilter
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = LocalCardAlpha.current)
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.satellite_management_desc),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ManagementStatMaterial(
-                    label = stringResource(R.string.satellite_count, totalCount),
-                    value = totalCount.toString(),
-                    modifier = Modifier.weight(1f)
-                )
-                ManagementStatMaterial(
-                    label = stringResource(R.string.favorites_count),
-                    value = favoriteCount.toString(),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (filter.isActive && totalCount > 0) {
-                    Text(
-                        text = stringResource(R.string.satellite_count_filtered, filteredCount, totalCount),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                SatelliteFilterButtonMaterial(filter = filter)
-            }
-        }
-    }
-}
-
 @Composable
 private fun ManagementStatMaterial(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -523,6 +491,9 @@ private fun SatelliteItemMaterial(
     statusSegments: List<SegmentStatus>?,
     onToggleFavorite: () -> Unit
 ) {
+    // 分段时间线默认折叠，点击卡片展开
+    var expanded by rememberSaveable(satellite.catalogNumber) { mutableStateOf(false) }
+
     val timeInfo = remember(satellite.aosTime, satellite.losTime, satellite.isCurrentlyVisible, nowMillis) {
         val formatter = satelliteTimeFormatterM
         val zone = ZoneId.systemDefault()
@@ -531,7 +502,11 @@ private fun SatelliteItemMaterial(
             val now = if (nowMillis > 0) Instant.ofEpochMilli(nowMillis) else Instant.now()
             val remainingSeconds = Duration.between(now, satellite.losTime).seconds
             val remainingText = formatRemainingTimeM(remainingSeconds)
-            SatelliteTimeInfoM.InPass(losTime, remainingText)
+            // 过境进度 = 已过时间 / 总过境时间，0..1
+            val totalSeconds = Duration.between(satellite.aosTime, satellite.losTime).seconds.coerceAtLeast(1L)
+            val elapsedSeconds = Duration.between(satellite.aosTime, now).seconds.coerceIn(0L, totalSeconds)
+            val progress = (elapsedSeconds.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
+            SatelliteTimeInfoM.InPass(losTime, remainingText, progress)
         } else {
             val aosTime = satellite.aosTime.atZone(zone).format(formatter)
             SatelliteTimeInfoM.Upcoming(aosTime)
@@ -566,7 +541,11 @@ private fun SatelliteItemMaterial(
                 } else {
                     Modifier
                 }
-            ),
+            )
+            .clickable(onClick = {
+                // 点击切换展开/折叠，分段时间线默认隐藏，降低卡片高度
+                expanded = !expanded
+            }),
         colors = CardDefaults.cardColors(
             containerColor = cardContainerColor.copy(alpha = LocalCardAlpha.current),
             contentColor = cardContentColor
@@ -575,42 +554,20 @@ private fun SatelliteItemMaterial(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggleFavorite)
                 .padding(16.dp)
         ) {
+            // 第一行：名 + 仰角 + 收藏按钮（删除重复星标和状态点）
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (satellite.isCurrentlyVisible) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.outline
-                            )
-                    )
-                    Text(
-                        text = satellite.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = cardContentColor
-                    )
-                    if (isFavorite) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = satellite.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = cardContentColor
+                )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -653,10 +610,14 @@ private fun SatelliteItemMaterial(
                 }
             }
 
-            SatelliteStatusSegmentsM(statusSegments)
+            // BJT 分段状态时间线：默认折叠，点击卡片展开
+            if (expanded) {
+                SatelliteStatusSegmentsM(statusSegments)
+            }
 
             Spacer(Modifier.height(10.dp))
 
+            // 时间徽章 + 在境进度条
             when (timeInfo) {
                 is SatelliteTimeInfoM.InPass -> {
                     Row(
@@ -674,28 +635,15 @@ private fun SatelliteItemMaterial(
                             isActive = true
                         )
                     }
+                    // 在境进度条：直观显示过境推进
+                    Spacer(Modifier.height(6.dp))
+                    PassProgressBarM(progress = timeInfo.progress)
                 }
                 is SatelliteTimeInfoM.Upcoming -> {
                     TimeBadgeM(
                         label = stringResource(R.string.aos_time),
                         value = timeInfo.aosTime,
                         isActive = false
-                    )
-                }
-            }
-
-            if (isFavorite) {
-                Spacer(Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.tertiary)
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.favorited),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onTertiary
                     )
                 }
             }
@@ -708,7 +656,7 @@ private fun SatelliteItemMaterial(
 private val satelliteTimeFormatterM = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 
 private sealed class SatelliteTimeInfoM {
-    data class InPass(val losTime: String, val remainingText: String) : SatelliteTimeInfoM()
+    data class InPass(val losTime: String, val remainingText: String, val progress: Float) : SatelliteTimeInfoM()
     data class Upcoming(val aosTime: String) : SatelliteTimeInfoM()
 }
 
@@ -747,6 +695,28 @@ private fun TimeBadgeM(label: String, value: String, isActive: Boolean) {
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
             color = contentColor
+        )
+    }
+}
+
+/**
+ * 在境进度条：宽度随过境推进，颜色用 primary。
+ */
+@Composable
+private fun PassProgressBarM(progress: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(3.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progress)
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.primary)
         )
     }
 }

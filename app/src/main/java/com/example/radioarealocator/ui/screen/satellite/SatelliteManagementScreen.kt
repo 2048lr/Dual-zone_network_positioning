@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -77,7 +76,6 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -221,26 +219,20 @@ private fun SatelliteManagementContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         overscrollEffect = null,
     ) {
-        // 数据源刷新卡
+        // 数据源刷新 + 统计 + 筛选入口合并为一张卡（减少卡片间距，列表起点上移）
         item {
-            SatelliteActionCard(
+            SatelliteOverviewCard(
                 isLoading = locationState.isLoading,
                 isSatelliteLoading = satelliteState.isSatelliteLoading,
                 lastLocationTime = locationState.lastLocationUpdateTime,
                 lastLocationCity = locationState.lastLocationCity,
                 lastSatelliteTime = satelliteState.lastSatelliteUpdateTime,
-                onGetLocation = onGetLocation,
-                onUpdateSource = onUpdateSource
-            )
-        }
-
-        // 统计 + 描述 + 筛选入口
-        item {
-            SatelliteHeaderCard(
                 totalCount = totalCount,
                 filteredCount = filteredSatellites.size,
                 favoriteCount = favoriteCount,
-                filter = filter
+                filter = filter,
+                onGetLocation = onGetLocation,
+                onUpdateSource = onUpdateSource
             )
         }
 
@@ -293,15 +285,19 @@ private fun SatelliteManagementContent(
     }
 }
 
-// ---- 数据源刷新卡 ----
+// ---- 概览卡（数据源刷新 + 统计 + 筛选入口合并）----
 
 @Composable
-private fun SatelliteActionCard(
+private fun SatelliteOverviewCard(
     isLoading: Boolean,
     isSatelliteLoading: Boolean,
     lastLocationTime: Instant?,
     lastLocationCity: String,
     lastSatelliteTime: Instant?,
+    totalCount: Int,
+    filteredCount: Int,
+    favoriteCount: Int,
+    filter: com.example.radioarealocator.ui.SatelliteFilter,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit
 ) {
@@ -320,7 +316,45 @@ private fun SatelliteActionCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 获取定位
+            // 描述 + 统计
+            Text(
+                text = stringResource(R.string.satellite_management_desc),
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ManagementStat(
+                    label = stringResource(R.string.satellite_count, totalCount),
+                    value = totalCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+                ManagementStat(
+                    label = stringResource(R.string.favorites_count),
+                    value = favoriteCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // 筛选计数 + 筛选按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (filter.isActive && totalCount > 0) {
+                    Text(
+                        text = stringResource(R.string.satellite_count_filtered, filteredCount, totalCount),
+                        fontSize = 12.sp,
+                        color = colorScheme.onSurfaceVariantSummary
+                    )
+                }
+                SatelliteFilterButton(filter = filter)
+            }
+
+            // 数据源刷新操作
             ActionRow(
                 buttonText = stringResource(R.string.sat_action_get_location),
                 isLoading = isLoading,
@@ -333,7 +367,6 @@ private fun SatelliteActionCard(
                 },
                 secondaryText = lastLocationCity.ifBlank { stringResource(R.string.sat_no_city) }
             )
-            // 更新卫星源
             ActionRow(
                 buttonText = stringResource(R.string.sat_action_update_source),
                 isLoading = isSatelliteLoading,
@@ -407,67 +440,6 @@ private fun ActionRow(
     }
 }
 
-// ---- 统计 + 描述 + 筛选入口 ----
-
-@Composable
-private fun SatelliteHeaderCard(
-    totalCount: Int,
-    filteredCount: Int,
-    favoriteCount: Int,
-    filter: com.example.radioarealocator.ui.SatelliteFilter
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.defaultColors(
-            color = colorScheme.surface.copy(alpha = LocalCardAlpha.current)
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.satellite_management_desc),
-                fontSize = 14.sp,
-                color = colorScheme.onSurfaceVariantSummary
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ManagementStat(
-                    label = stringResource(R.string.satellite_count, totalCount),
-                    value = totalCount.toString(),
-                    modifier = Modifier.weight(1f)
-                )
-                ManagementStat(
-                    label = stringResource(R.string.favorites_count),
-                    value = favoriteCount.toString(),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            // 筛选计数 + 筛选按钮
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (filter.isActive && totalCount > 0) {
-                    Text(
-                        text = stringResource(R.string.satellite_count_filtered, filteredCount, totalCount),
-                        fontSize = 12.sp,
-                        color = colorScheme.onSurfaceVariantSummary
-                    )
-                }
-                SatelliteFilterButton(filter = filter)
-            }
-        }
-    }
-}
-
 @Composable
 private fun ManagementStat(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -534,6 +506,9 @@ private fun SatelliteManagementItem(
     statusSegments: List<SegmentStatus>?,
     onToggleFavorite: () -> Unit
 ) {
+    // 分段时间线默认折叠，点击卡片展开
+    var expanded by rememberSaveable(satellite.catalogNumber) { mutableStateOf(false) }
+
     val timeInfo = remember(satellite.aosTime, satellite.losTime, satellite.isCurrentlyVisible, nowMillis) {
         val formatter = satelliteTimeFormatter
         val zone = ZoneId.systemDefault()
@@ -542,7 +517,11 @@ private fun SatelliteManagementItem(
             val now = if (nowMillis > 0) Instant.ofEpochMilli(nowMillis) else Instant.now()
             val remainingSeconds = Duration.between(now, satellite.losTime).seconds
             val remainingText = formatRemainingTime(remainingSeconds)
-            SatelliteTimeInfo.InPass(losTime, remainingText)
+            // 过境进度 = 已过时间 / 总过境时间，0..1
+            val totalSeconds = Duration.between(satellite.aosTime, satellite.losTime).seconds.coerceAtLeast(1L)
+            val elapsedSeconds = Duration.between(satellite.aosTime, now).seconds.coerceIn(0L, totalSeconds)
+            val progress = (elapsedSeconds.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
+            SatelliteTimeInfo.InPass(losTime, remainingText, progress)
         } else {
             val aosTime = satellite.aosTime.atZone(zone).format(formatter)
             SatelliteTimeInfo.Upcoming(aosTime)
@@ -573,7 +552,10 @@ private fun SatelliteManagementItem(
                     Modifier
                 }
             )
-            .clickable(onClick = onToggleFavorite),
+            .clickable(onClick = {
+                // 点击切换展开/折叠，分段时间线默认隐藏，降低卡片高度
+                expanded = !expanded
+            }),
         colors = CardDefaults.defaultColors(
             color = cardContainerColor.copy(alpha = LocalCardAlpha.current),
             contentColor = cardContentColor
@@ -584,40 +566,18 @@ private fun SatelliteManagementItem(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // 第一行：状态点 + 名 + 收藏星 + 仰角 + 收藏按钮
+            // 第一行：名 + 仰角 + 收藏按钮（删除重复星标和状态点）
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (satellite.isCurrentlyVisible) colorScheme.primary
-                                else colorScheme.onSurfaceVariantSummary
-                            )
-                    )
-                    Text(
-                        text = satellite.name,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = cardContentColor
-                    )
-                    if (isFavorite) {
-                        Icon(
-                            imageVector = Icons.Rounded.Star,
-                            contentDescription = null,
-                            tint = colorScheme.onTertiaryContainer,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = satellite.name,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = cardContentColor
+                )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -659,12 +619,14 @@ private fun SatelliteManagementItem(
                 }
             }
 
-            // BJT 分段状态时间线
-            SatelliteStatusSegments(statusSegments)
+            // BJT 分段状态时间线：默认折叠，点击卡片展开
+            if (expanded) {
+                SatelliteStatusSegments(statusSegments)
+            }
 
             Spacer(Modifier.height(10.dp))
 
-            // 时间徽章
+            // 时间徽章 + 在境进度条
             when (timeInfo) {
                 is SatelliteTimeInfo.InPass -> {
                     Row(
@@ -682,29 +644,15 @@ private fun SatelliteManagementItem(
                             isActive = true
                         )
                     }
+                    // 在境进度条：直观显示过境推进
+                    Spacer(Modifier.height(6.dp))
+                    PassProgressBar(progress = timeInfo.progress)
                 }
                 is SatelliteTimeInfo.Upcoming -> {
                     TimeBadge(
                         label = stringResource(R.string.aos_time),
                         value = timeInfo.aosTime,
                         isActive = false
-                    )
-                }
-            }
-
-            // 收藏徽章
-            if (isFavorite) {
-                Spacer(Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(colorScheme.onTertiaryContainer)
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.favorited),
-                        fontSize = 11.sp,
-                        color = colorScheme.tertiaryContainer
                     )
                 }
             }
@@ -717,7 +665,7 @@ private fun SatelliteManagementItem(
 private val satelliteTimeFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 
 private sealed class SatelliteTimeInfo {
-    data class InPass(val losTime: String, val remainingText: String) : SatelliteTimeInfo()
+    data class InPass(val losTime: String, val remainingText: String, val progress: Float) : SatelliteTimeInfo()
     data class Upcoming(val aosTime: String) : SatelliteTimeInfo()
 }
 
@@ -755,6 +703,28 @@ private fun TimeBadge(label: String, value: String, isActive: Boolean) {
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             color = contentColor
+        )
+    }
+}
+
+/**
+ * 在境进度条：宽度随过境推进，颜色用 primary。
+ */
+@Composable
+private fun PassProgressBar(progress: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(3.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(colorScheme.surfaceVariant)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progress)
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(colorScheme.primary)
         )
     }
 }
