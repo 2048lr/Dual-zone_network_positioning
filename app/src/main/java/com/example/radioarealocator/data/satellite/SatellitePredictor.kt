@@ -72,10 +72,12 @@ class SatellitePredictor {
         /**
          * 单批并行预测的卫星数量上限。
          * 过大会一次性派发过多协程、增加调度开销；
-         * 过小则并行度不足。业余卫星总数约 20~30 颗，分批意义不大，
-         * 但为应对未来数据源扩展（如全量 CelesTrak）保留分批能力。
+         * 过小则并行度不足。
+         * 升级到 128：在多核设备（CI runner 4 核、现代手机 8 核）上能充分压榨 CPU，
+         * 显著缩短数百颗卫星的 SGP4 总耗时；32 对应早期 ~30 颗业余卫星时代，
+         * 现已接入 SatNOGS 全量后明显偏小。
          */
-        private const val CHUNK_SIZE = 32
+        private const val CHUNK_SIZE = 128
     }
 
     private fun predictSinglePass(
