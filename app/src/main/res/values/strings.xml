@@ -141,6 +141,13 @@
     <string name="filter_reset" translatable="false">重置筛选</string>
     <string name="filter_title" translatable="false">筛选卫星</string>
     <string name="filter_done" translatable="false">完成</string>
+    <string name="filter_search_hint" translatable="false">搜索卫星名称或编号</string>
+    <string name="filter_source_section" translatable="false">按数据来源</string>
+    <string name="source_ct" translatable="false">CelesTrak</string>
+    <string name="source_snogs" translatable="false">SatNOGS</string>
+    <string name="filter_status_section" translatable="false">按状态</string>
+    <string name="filter_mode_unknown" translatable="false">未知</string>
+    <string name="filter_apply" translatable="false">应用筛选</string>
     <string name="satellite_management" translatable="false">卫星管理</string>
     <string name="satellite_management_desc" translatable="false">点击卫星可添加或取消特别关注。关注的卫星在即将过境和在境时会以高亮显示。</string>
     <string name="favorites_count" translatable="false">已关注</string>

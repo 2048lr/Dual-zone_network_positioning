@@ -44,6 +44,11 @@ sealed interface Route : NavKey, Parcelable {
     @Serializable
     data object SatelliteManagement : Route
 
+    /** 卫星筛选：按名称/来源/模式/状态筛选卫星列表 */
+    @Parcelize
+    @Serializable
+    data object SatelliteFilter : Route
+
     /** 提醒列表：查看与管理过境提醒 */
     @Parcelize
     @Serializable

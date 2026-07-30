@@ -86,6 +86,7 @@ import com.example.radioarealocator.ui.LocalMainViewModel
 import com.example.radioarealocator.ui.applyFilter
 import com.example.radioarealocator.ui.isSatelliteSourceExpired
 import com.example.radioarealocator.ui.navigation3.LocalNavigator
+import com.example.radioarealocator.ui.navigation3.Route
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
 import kotlinx.coroutines.delay
 import java.time.Duration
@@ -132,7 +133,6 @@ fun SatelliteManagementMaterial() {
             favorites = favorites,
             statusTracker = mainViewModel.statusTracker,
             onToggleFavorite = mainViewModel::toggleFavorite,
-            onFilterChange = mainViewModel::updateSatelliteFilter,
             onGetLocation = mainViewModel::refreshLocationOnly,
             onUpdateSource = mainViewModel::refreshSatelliteSourceOnly,
             contentPadding = innerPadding,
@@ -149,7 +149,6 @@ private fun SatelliteManagementContentMaterial(
     favorites: Set<Int>,
     statusTracker: SatelliteStatusTracker,
     onToggleFavorite: (Int) -> Unit,
-    onFilterChange: (SatelliteFilter) -> Unit,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit,
     contentPadding: PaddingValues,
@@ -223,8 +222,7 @@ private fun SatelliteManagementContentMaterial(
                 totalCount = totalCount,
                 filteredCount = filteredSatellites.size,
                 favoriteCount = favoriteCount,
-                filter = filter,
-                onFilterChange = onFilterChange
+                filter = filter
             )
         }
 
@@ -397,8 +395,7 @@ private fun SatelliteHeaderCardMaterial(
     totalCount: Int,
     filteredCount: Int,
     favoriteCount: Int,
-    filter: SatelliteFilter,
-    onFilterChange: (SatelliteFilter) -> Unit
+    filter: SatelliteFilter
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -445,7 +442,7 @@ private fun SatelliteHeaderCardMaterial(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                SatelliteFilterButtonMaterial(filter = filter, onFilterChange = onFilterChange)
+                SatelliteFilterButtonMaterial(filter = filter)
             }
         }
     }
@@ -468,233 +465,50 @@ private fun ManagementStatMaterial(label: String, value: String, modifier: Modif
     }
 }
 
-// ---- 筛选弹窗 ----
+// ---- 筛选入口 ----
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SatelliteFilterButtonMaterial(
-    filter: SatelliteFilter,
-    onFilterChange: (SatelliteFilter) -> Unit
+    filter: SatelliteFilter
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-
-    Box {
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .border(
-                    width = 1.dp,
-                    color = if (filter.isActive) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.outline,
-                    shape = RoundedCornerShape(10.dp)
-                )
-                .clickable { expanded = true }
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.FilterList,
-                contentDescription = null,
-                tint = if (filter.isActive) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = stringResource(R.string.filter_title),
-                style = MaterialTheme.typography.labelMedium,
+    val navigator = LocalNavigator.current
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .border(
+                width = 1.dp,
                 color = if (filter.isActive) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.outline,
+                shape = RoundedCornerShape(10.dp)
             )
-            if (filter.isActive) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                )
-            }
-        }
-
-        if (expanded) {
-            SatelliteFilterDialogMaterial(
-                filter = filter,
-                onFilterChange = onFilterChange,
-                onDismiss = { expanded = false }
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SatelliteFilterDialogMaterial(
-    filter: SatelliteFilter,
-    onFilterChange: (SatelliteFilter) -> Unit,
-    onDismiss: () -> Unit
-) {
-    BasicAlertDialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 560.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // 标题区
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = stringResource(R.string.filter_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (filter.isActive) {
-                        TextButton(onClick = { onFilterChange(SatelliteFilter()) }) {
-                            Text(
-                                text = stringResource(R.string.filter_reset),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                }
-                HorizontalDivider()
-
-                // 内容区
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = 8.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.filter_mode_section),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
-                    )
-                    FILTER_MODE_OPTIONS_M.forEach { mode ->
-                        val selected = mode.value in filter.modes
-                        FilterCheckRowMaterial(
-                            label = mode.label,
-                            checked = selected,
-                            onToggle = {
-                                val newModes = if (selected) filter.modes - mode.value
-                                else filter.modes + mode.value
-                                onFilterChange(filter.copy(modes = newModes))
-                            }
-                        )
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    FilterSwitchRowMaterial(
-                        label = stringResource(R.string.filter_only_in_pass),
-                        checked = filter.onlyInPass,
-                        onToggle = {
-                            onFilterChange(filter.copy(onlyInPass = !filter.onlyInPass, onlyUpcoming = false))
-                        }
-                    )
-                    FilterSwitchRowMaterial(
-                        label = stringResource(R.string.filter_only_upcoming),
-                        checked = filter.onlyUpcoming,
-                        onToggle = {
-                            onFilterChange(filter.copy(onlyUpcoming = !filter.onlyUpcoming, onlyInPass = false))
-                        }
-                    )
-                    FilterSwitchRowMaterial(
-                        label = stringResource(R.string.filter_only_amsat),
-                        checked = filter.onlyAmsat,
-                        onToggle = { onFilterChange(filter.copy(onlyAmsat = !filter.onlyAmsat)) }
-                    )
-                    FilterSwitchRowMaterial(
-                        label = stringResource(R.string.filter_only_favorites),
-                        checked = filter.onlyFavorites,
-                        onToggle = { onFilterChange(filter.copy(onlyFavorites = !filter.onlyFavorites)) }
-                    )
-                }
-
-                // 底部按钮区
-                HorizontalDivider()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(onClick = onDismiss) {
-                        Text(stringResource(R.string.filter_done))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilterCheckRowMaterial(label: String, checked: Boolean, onToggle: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .clickable { navigator.push(Route.SatelliteFilter) }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        Icon(
+            imageVector = Icons.Filled.FilterList,
+            contentDescription = null,
+            tint = if (filter.isActive) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium
+            text = stringResource(R.string.filter_title),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (filter.isActive) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Checkbox(
-            checked = checked,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(
-                checkedColor = MaterialTheme.colorScheme.primary
+        if (filter.isActive) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
             )
-        )
+        }
     }
 }
-
-@Composable
-private fun FilterSwitchRowMaterial(label: String, checked: Boolean, onToggle: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Switch(
-            checked = checked,
-            onCheckedChange = { onToggle() },
-            colors = SwitchDefaults.colors(
-                checkedTrackColor = MaterialTheme.colorScheme.primary
-            )
-        )
-    }
-}
-
-private data class FilterModeOptionM(val value: String, val label: String)
-
-private val FILTER_MODE_OPTIONS_M = listOf(
-    FilterModeOptionM("FM", "FM"),
-    FilterModeOptionM("SSTV", "SSTV"),
-    FilterModeOptionM("DSTAR", "D-Star"),
-    FilterModeOptionM("CW", "CW"),
-    FilterModeOptionM("USB", "USB"),
-    FilterModeOptionM("LSB", "LSB")
-)
 
 // ---- 卫星列表项 ----
 

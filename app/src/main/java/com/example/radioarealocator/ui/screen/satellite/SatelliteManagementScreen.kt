@@ -59,6 +59,7 @@ import com.example.radioarealocator.ui.LocalMainViewModel
 import com.example.radioarealocator.ui.applyFilter
 import com.example.radioarealocator.ui.isSatelliteSourceExpired
 import com.example.radioarealocator.ui.navigation3.LocalNavigator
+import com.example.radioarealocator.ui.navigation3.Route
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
 import com.example.radioarealocator.ui.theme.LocalEnableBlur
 import com.example.radioarealocator.ui.theme.SafeColors
@@ -148,7 +149,6 @@ fun SatelliteManagementMiuix() {
             favorites = favorites,
             statusTracker = mainViewModel.statusTracker,
             onToggleFavorite = mainViewModel::toggleFavorite,
-            onFilterChange = mainViewModel::updateSatelliteFilter,
             onGetLocation = mainViewModel::refreshLocationOnly,
             onUpdateSource = mainViewModel::refreshSatelliteSourceOnly,
             contentPadding = innerPadding
@@ -164,7 +164,6 @@ private fun SatelliteManagementContent(
     favorites: Set<Int>,
     statusTracker: SatelliteStatusTracker,
     onToggleFavorite: (Int) -> Unit,
-    onFilterChange: (com.example.radioarealocator.ui.SatelliteFilter) -> Unit,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit,
     contentPadding: PaddingValues
@@ -241,8 +240,7 @@ private fun SatelliteManagementContent(
                 totalCount = totalCount,
                 filteredCount = filteredSatellites.size,
                 favoriteCount = favoriteCount,
-                filter = filter,
-                onFilterChange = onFilterChange
+                filter = filter
             )
         }
 
@@ -416,8 +414,7 @@ private fun SatelliteHeaderCard(
     totalCount: Int,
     filteredCount: Int,
     favoriteCount: Int,
-    filter: com.example.radioarealocator.ui.SatelliteFilter,
-    onFilterChange: (com.example.radioarealocator.ui.SatelliteFilter) -> Unit
+    filter: com.example.radioarealocator.ui.SatelliteFilter
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -465,7 +462,7 @@ private fun SatelliteHeaderCard(
                         color = colorScheme.onSurfaceVariantSummary
                     )
                 }
-                SatelliteFilterButton(filter = filter, onFilterChange = onFilterChange)
+                SatelliteFilterButton(filter = filter)
             }
         }
     }
@@ -488,19 +485,17 @@ private fun ManagementStat(label: String, value: String, modifier: Modifier = Mo
     }
 }
 
-// ---- 筛选弹窗 ----
+// ---- 筛选入口 ----
 
 @Composable
 private fun SatelliteFilterButton(
-    filter: com.example.radioarealocator.ui.SatelliteFilter,
-    onFilterChange: (com.example.radioarealocator.ui.SatelliteFilter) -> Unit
+    filter: com.example.radioarealocator.ui.SatelliteFilter
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-
+    val navigator = LocalNavigator.current
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
-            .clickable { expanded = true }
+            .clickable { navigator.push(Route.SatelliteFilter) }
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -524,190 +519,7 @@ private fun SatelliteFilterButton(
             )
         }
     }
-
-    if (expanded) {
-        SatelliteFilterDialog(
-            filter = filter,
-            onFilterChange = onFilterChange,
-            onDismiss = { expanded = false }
-        )
-    }
 }
-
-@Composable
-private fun SatelliteFilterDialog(
-    filter: com.example.radioarealocator.ui.SatelliteFilter,
-    onFilterChange: (com.example.radioarealocator.ui.SatelliteFilter) -> Unit,
-    onDismiss: () -> Unit
-) {
-    top.yukonga.miuix.kmp.window.WindowDialog(
-        show = true,
-        title = stringResource(R.string.filter_title),
-        onDismissRequest = onDismiss,
-        content = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // 重置按钮
-                if (filter.isActive) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(
-                            onClick = { onFilterChange(com.example.radioarealocator.ui.SatelliteFilter()) },
-                            text = stringResource(R.string.filter_reset)
-                        )
-                    }
-                }
-
-                // 模式多选区
-                Text(
-                    text = stringResource(R.string.filter_mode_section),
-                    fontSize = 13.sp,
-                    color = colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(vertical = 6.dp)
-                )
-                FILTER_MODE_OPTIONS.forEach { mode ->
-                    val selected = mode.value in filter.modes
-                    FilterSelectableRow(
-                        label = mode.label,
-                        selected = selected,
-                        onClick = {
-                            val newModes = if (selected) filter.modes - mode.value
-                            else filter.modes + mode.value
-                            onFilterChange(filter.copy(modes = newModes))
-                        }
-                    )
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                // 开关筛选区
-                FilterSwitchRow(
-                    label = stringResource(R.string.filter_only_in_pass),
-                    checked = filter.onlyInPass,
-                    onClick = {
-                        onFilterChange(filter.copy(onlyInPass = !filter.onlyInPass, onlyUpcoming = false))
-                    }
-                )
-                FilterSwitchRow(
-                    label = stringResource(R.string.filter_only_upcoming),
-                    checked = filter.onlyUpcoming,
-                    onClick = {
-                        onFilterChange(filter.copy(onlyUpcoming = !filter.onlyUpcoming, onlyInPass = false))
-                    }
-                )
-                FilterSwitchRow(
-                    label = stringResource(R.string.filter_only_amsat),
-                    checked = filter.onlyAmsat,
-                    onClick = { onFilterChange(filter.copy(onlyAmsat = !filter.onlyAmsat)) }
-                )
-                FilterSwitchRow(
-                    label = stringResource(R.string.filter_only_favorites),
-                    checked = filter.onlyFavorites,
-                    onClick = { onFilterChange(filter.copy(onlyFavorites = !filter.onlyFavorites)) }
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                // 完成按钮
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Button(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColorsPrimary()
-                    ) {
-                        Text(stringResource(R.string.filter_done))
-                    }
-                }
-            }
-        }
-    )
-}
-
-@Composable
-private fun FilterSelectableRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            color = colorScheme.onSurface
-        )
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(if (selected) colorScheme.primary else Color.Transparent)
-                .then(
-                    if (selected) Modifier
-                    else Modifier.background(colorScheme.onSurfaceVariantSummary.copy(alpha = 0.3f))
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (selected) {
-                Text(
-                    text = "✓",
-                    fontSize = 13.sp,
-                    color = colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilterSwitchRow(label: String, checked: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            color = colorScheme.onSurface
-        )
-        Box(
-            modifier = Modifier
-                .size(width = 40.dp, height = 22.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(if (checked) colorScheme.primary else colorScheme.onSurfaceVariantSummary.copy(alpha = 0.3f)),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(start = 2.dp)
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(Color.White)
-                    .then(if (checked) Modifier.offset(x = 18.dp) else Modifier)
-            )
-        }
-    }
-}
-
-private data class FilterModeOption(val value: String, val label: String)
-
-private val FILTER_MODE_OPTIONS = listOf(
-    FilterModeOption("FM", "FM"),
-    FilterModeOption("SSTV", "SSTV"),
-    FilterModeOption("DSTAR", "D-Star"),
-    FilterModeOption("CW", "CW"),
-    FilterModeOption("USB", "USB"),
-    FilterModeOption("LSB", "LSB")
-)
 
 // ---- 卫星列表项 ----
 

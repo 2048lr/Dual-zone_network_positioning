@@ -77,6 +77,7 @@ import com.example.radioarealocator.ui.screen.home.HomePager
 import com.example.radioarealocator.ui.screen.location.LocationDetailScreen
 import com.example.radioarealocator.ui.screen.permission.PermissionScreen
 import com.example.radioarealocator.ui.screen.reminder.ReminderListRouteScreen
+import com.example.radioarealocator.ui.screen.satellite.SatelliteFilterScreen
 import com.example.radioarealocator.ui.screen.satellite.SatelliteManagementScreen
 import com.example.radioarealocator.ui.screen.settings.SettingPager
 import com.example.radioarealocator.ui.screen.settings.SettingsScreenActions
@@ -184,6 +185,7 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.Settings> { WithApplicationViewModelStoreOwner { mainScreenEntry() } }
                                 entry<Route.CWPractice> { WithApplicationViewModelStoreOwner { CWPracticeRouteScreen() } }
                                 entry<Route.SatelliteManagement> { WithApplicationViewModelStoreOwner { SatelliteManagementScreen() } }
+                                entry<Route.SatelliteFilter> { WithApplicationViewModelStoreOwner { SatelliteFilterScreen() } }
                                 entry<Route.ReminderList> { WithApplicationViewModelStoreOwner { ReminderListRouteScreen() } }
                                 entry<Route.LocationDetail> { WithApplicationViewModelStoreOwner { LocationDetailScreen() } }
                             }
