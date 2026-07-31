@@ -20,7 +20,6 @@ import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.SatelliteAlt
 import androidx.compose.material.icons.rounded.Update
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -162,45 +161,6 @@ fun SettingPagerMiuix(
                                 )
                             },
                             onClick = actions.onOpenTheme
-                        )
-                    }
-
-                    // 业务设置：卫星数据源
-                    Card(
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .fillMaxWidth(),
-                    ) {
-                        OverlayDropdownPreference(
-                            title = stringResource(id = R.string.satellite_source),
-                            summary = stringResource(id = R.string.satellite_source_desc),
-                            items = listOf(
-                                stringResource(id = R.string.source_all),
-                                stringResource(id = R.string.source_celestrak),
-                                stringResource(id = R.string.source_satnogs)
-                            ),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.SatelliteAlt,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.satellite_source),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            selectedIndex = when (businessState.satelliteSource) {
-                                "CT" -> 1
-                                "SNOGS" -> 2
-                                else -> 0
-                            },
-                            onSelectedIndexChange = { index ->
-                                actions.onSetSatelliteSource(
-                                    when (index) {
-                                        1 -> "CT"
-                                        2 -> "SNOGS"
-                                        else -> "ALL"
-                                    }
-                                )
-                            }
                         )
                     }
 

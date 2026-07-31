@@ -3,7 +3,6 @@ package com.example.radioarealocator.data
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -11,7 +10,6 @@ import org.junit.runner.RunWith
 /**
  * [SettingsStore] 集成测试。
  *
- * 验证 Bug #7 修复：satelliteSource 设置项在进程重启（或 Store 重建）后能正确恢复。
  * 使用真实 SharedPreferences，覆盖读写一致性与默认值回归。
  */
 @RunWith(AndroidJUnit4::class)
@@ -27,57 +25,47 @@ class SettingsStoreIntegrationTest {
     }
 
     @Test
-    fun satelliteSource_defaultsToAll_whenNeverSet() {
+    fun lastLocation_defaultsToZero_whenNeverSet() {
         val store = SettingsStore(context)
-        assertEquals("ALL", store.satelliteSource)
+        assertEquals(0.0, store.lastLatitude, 0.0)
+        assertEquals(0.0, store.lastLongitude, 0.0)
+        assert(!store.hasLastLocation())
     }
 
     @Test
-    fun satelliteSource_persistsAcrossStoreInstances() {
+    fun lastLocation_persistsAcrossStoreInstances() {
         // 模拟进程重启：先写入，再新建 Store 读取
-        SettingsStore(context).satelliteSource = "CT"
+        SettingsStore(context).lastLatitude = 39.9042
+        SettingsStore(context).lastLongitude = 116.4074
         val restored = SettingsStore(context)
-        assertEquals("CT", restored.satelliteSource)
+        assertEquals(39.9042, restored.lastLatitude, 0.0001)
+        assertEquals(116.4074, restored.lastLongitude, 0.0001)
+        assert(restored.hasLastLocation())
     }
 
     @Test
-    fun satelliteSource_overwriteAndRestore() {
-        val first = SettingsStore(context)
-        first.satelliteSource = "SNOGS"
-        first.satelliteSource = "CT"
-        assertEquals("CT", SettingsStore(context).satelliteSource)
-    }
-
-    @Test
-    fun backgroundUri_defaultsToNull_whenNeverSet() {
+    fun dailyQuoteEpochDay_defaultsToMinusOne_whenNeverSet() {
         val store = SettingsStore(context)
-        assertNull(store.backgroundUri)
+        assertEquals(-1L, store.dailyQuoteEpochDay)
     }
 
     @Test
-    fun backgroundUri_persistsAcrossStoreInstances() {
-        SettingsStore(context).backgroundUri = "content://media/external/images/1"
+    fun dailyQuoteEpochDay_persistsAcrossStoreInstances() {
+        SettingsStore(context).dailyQuoteEpochDay = 20000L
         val restored = SettingsStore(context)
-        assertEquals("content://media/external/images/1", restored.backgroundUri)
+        assertEquals(20000L, restored.dailyQuoteEpochDay)
     }
 
     @Test
-    fun backgroundUri_clearWithNull() {
+    fun amsatStatusEnabled_defaultsToTrue_whenNeverSet() {
         val store = SettingsStore(context)
-        store.backgroundUri = "content://media/external/images/2"
-        store.backgroundUri = null
-        assertNull(SettingsStore(context).backgroundUri)
+        assertEquals(true, store.amsatStatusEnabled)
     }
 
     @Test
-    fun satelliteSource_andBackgroundUri_areIndependent() {
-        val store = SettingsStore(context)
-        store.satelliteSource = "SNOGS"
-        store.backgroundUri = "content://x/1"
-        // 修改一个不应影响另一个
-        store.satelliteSource = "CT"
+    fun amsatStatusEnabled_persistsAcrossStoreInstances() {
+        SettingsStore(context).amsatStatusEnabled = false
         val restored = SettingsStore(context)
-        assertEquals("CT", restored.satelliteSource)
-        assertEquals("content://x/1", restored.backgroundUri)
+        assertEquals(false, restored.amsatStatusEnabled)
     }
 }

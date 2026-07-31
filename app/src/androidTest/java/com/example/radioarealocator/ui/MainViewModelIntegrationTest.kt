@@ -3,7 +3,6 @@ package com.example.radioarealocator.ui
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.radioarealocator.RadioAreaLocatorApplication
-import com.example.radioarealocator.data.SettingsStore
 import com.example.radioarealocator.data.satellite.FavoriteSatellitesStore
 import com.example.radioarealocator.radioApp
 import org.junit.Assert.assertEquals
@@ -15,8 +14,8 @@ import org.junit.runner.RunWith
 /**
  * [MainViewModel] 与持久化层的集成测试。
  *
- * 验证 Bug #7 修复：ViewModel 销毁重建后，satelliteSource 与 favorites 能从
- * [SettingsStore] / [FavoriteSatellitesStore] 正确恢复。
+ * 验证 Bug #7 修复：ViewModel 销毁重建后，favorites 能从
+ * [FavoriteSatellitesStore] 正确恢复。
  *
  * 注意：本测试不触发网络/定位请求，仅验证状态恢复路径。
  */
@@ -33,34 +32,6 @@ class MainViewModelIntegrationTest {
             .edit().clear().commit()
         context.getSharedPreferences("radio_area_favorites", android.content.Context.MODE_PRIVATE)
             .edit().clear().commit()
-    }
-
-    @Test
-    fun satelliteSource_restoredFromSettingsStore_onViewModelRecreation() {
-        // 第一次 ViewModel 实例：设置 satelliteSource
-        val first = MainViewModel()
-        first.setSatelliteSource("CT")
-        assertEquals("CT", first.satelliteSource.value)
-
-        // 模拟进程重启：新建 ViewModel 应从 SettingsStore 恢复
-        val restored = MainViewModel()
-        assertEquals("CT", restored.satelliteSource.value)
-    }
-
-    @Test
-    fun satelliteSource_defaultAll_whenNeverSet() {
-        val vm = MainViewModel()
-        assertEquals("ALL", vm.satelliteSource.value)
-    }
-
-    @Test
-    fun satelliteSource_switchAndRestore() {
-        val first = MainViewModel()
-        first.setSatelliteSource("SNOGS")
-        first.setSatelliteSource("CT")
-
-        val restored = MainViewModel()
-        assertEquals("CT", restored.satelliteSource.value)
     }
 
     @Test
@@ -84,16 +55,6 @@ class MainViewModelIntegrationTest {
 
         val restored = MainViewModel()
         assertTrue("toggle 关闭后应恢复为空", restored.favoriteSatellites.value.isEmpty())
-    }
-
-    @Test
-    fun setSatelliteSource_writesToSettingsStore_directly() {
-        // ViewModel 应通过 SettingsStore 持久化，可直接验证 Store
-        val vm = MainViewModel()
-        vm.setSatelliteSource("SNOGS")
-
-        val store = SettingsStore(context)
-        assertEquals("SNOGS", store.satelliteSource)
     }
 
     @Test

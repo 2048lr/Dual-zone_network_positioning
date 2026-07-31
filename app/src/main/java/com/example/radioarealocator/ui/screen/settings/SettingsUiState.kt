@@ -32,12 +32,11 @@ data class SettingsUiState(
 )
 
 /**
- * 业务设置聚合：卫星源、提醒设置、提醒列表。
+ * 业务设置聚合：提醒设置、提醒列表。
  * 从 [com.example.radioarealocator.ui.MainViewModel] 收集。
  */
 @Immutable
 data class SettingsBusinessState(
-    val satelliteSource: String = "ALL",
     val reminderSettings: ReminderSettings = ReminderSettings(),
     val reminderItems: List<ReminderItem> = emptyList(),
 )
@@ -49,7 +48,6 @@ data class SettingsScreenActions(
     val onSetUiModeIndex: (Int) -> Unit,
     val onOpenAbout: () -> Unit,
     // 业务相关回调
-    val onSetSatelliteSource: (String) -> Unit = {},
     val onUpdateReminderSettings: (ReminderSettings) -> Unit = {},
     val onOpenReminderList: () -> Unit = {},
     // 更新相关回调

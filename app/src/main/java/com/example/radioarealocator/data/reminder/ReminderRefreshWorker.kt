@@ -60,7 +60,6 @@ class ReminderRefreshWorker(
 
             val latitude = settingsStore.lastLatitude
             val longitude = settingsStore.lastLongitude
-            val satelliteSource = settingsStore.satelliteSource
 
             // 获取 TLE 数据：优先使用缓存，超过 24 小时则重新下载
             val cacheStore = SatelliteCacheStore(applicationContext)
@@ -68,7 +67,7 @@ class ReminderRefreshWorker(
             val tles = if (cached == null || isCacheExpired(cached.updatedAt)) {
                 // 缓存过期或不存在，重新下载 TLE
                 val dataSource = SatelliteDataSource()
-                val fresh = dataSource.fetchAmateurTLEs(source = satelliteSource)
+                val fresh = dataSource.fetchAmateurTLEs()
                 cacheStore.save(fresh, Instant.now())
                 fresh
             } else {

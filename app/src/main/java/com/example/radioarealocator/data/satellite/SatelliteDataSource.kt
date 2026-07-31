@@ -71,46 +71,36 @@ class SatelliteDataSource {
      * 从 SatNOGS 与 CelesTrak 并行拉取 TLE，按 NORAD 编号合并去重；
      * 同时出现在两个源的卫星标记为 ALL。随后附加 AMSAT 状态报告。
      *
-     * 任一被请求的 TLE 源失败时容忍，使用另一个源的结果；
-     * 仅当所有被请求的 TLE 源都失败时才抛 IOException，避免返回空列表覆盖本地缓存。
+     * 任一 TLE 源失败时容忍，使用另一个源的结果；
+     * 仅当所有 TLE 源都失败时才抛 IOException，避免返回空列表覆盖本地缓存。
      * AMSAT 状态源失败不影响 TLE 结果。
-     *
-     * @param source 数据来源过滤："ALL" 全部（默认）, "CT" 仅 CelesTrak, "SNOGS" 仅 SatNOGS
      */
-    suspend fun fetchAmateurTLEs(source: String = "ALL"): List<SourcedTLE> = withContext(Dispatchers.IO) {
+    suspend fun fetchAmateurTLEs(): List<SourcedTLE> = withContext(Dispatchers.IO) {
         coroutineScope {
-            // 根据用户设置跳过不需要的 TLE 数据源，减少等待时间
-            val needSatnogs = source != "CT"
-            val needCelesTrak = source != "SNOGS"
-
-            val satnogsDeferred = if (needSatnogs) async { runCatchingCancellable { fetchSatnogsTLEs() } } else null
-            val celesTrakDeferred = if (needCelesTrak) async { runCatchingCancellable { fetchCelesTrakTLEs() } } else null
-            // AMSAT 状态与 TLE 源正交：无论选哪个 TLE 源都附加状态标签
+            val satnogsDeferred = async { runCatchingCancellable { fetchSatnogsTLEs() } }
+            val celesTrakDeferred = async { runCatchingCancellable { fetchCelesTrakTLEs() } }
+            // AMSAT 状态与 TLE 源正交，始终附加状态标签
             val amsatStatusDeferred = async { runCatchingCancellable { amsatStatusApi.fetchStatusSummaries() } }
 
-            val satnogsResult = satnogsDeferred?.await()
-            val celesTrakResult = celesTrakDeferred?.await()
+            val satnogsResult = satnogsDeferred.await()
+            val celesTrakResult = celesTrakDeferred.await()
             val amsatStatusResult = amsatStatusDeferred.await()
 
-            // 只有请求了的 TLE 源才参与失败判断：单一数据源失败时也应抛异常，
-            // 避免返回空列表覆盖本地缓存。AMSAT 状态失败不在此判定内。
-            val requestedTleResults = listOfNotNull(
-                if (needSatnogs) satnogsResult else null,
-                if (needCelesTrak) celesTrakResult else null
-            )
-            if (requestedTleResults.isNotEmpty() && requestedTleResults.all { it.isFailure }) {
+            // 两源都失败时抛异常，避免返回空列表覆盖本地缓存。AMSAT 状态失败不在此判定内。
+            val tleResults = listOf(satnogsResult, celesTrakResult)
+            if (tleResults.all { it.isFailure }) {
                 throw IOException(
-                    "TLE 下载失败：SatNOGS=${satnogsResult?.exceptionOrNull()?.message}, " +
-                        "CelesTrak=${celesTrakResult?.exceptionOrNull()?.message}"
+                    "TLE 下载失败：SatNOGS=${satnogsResult.exceptionOrNull()?.message}, " +
+                        "CelesTrak=${celesTrakResult.exceptionOrNull()?.message}"
                 )
             }
 
             // 按 NORAD 编号合并，记录来源；两源都有的卫星标记为 ALL
             val merged = LinkedHashMap<Int, SourcedTLE>()
-            satnogsResult?.getOrNull()?.forEach { stle ->
+            satnogsResult.getOrNull()?.forEach { stle ->
                 merged[stle.tle.catnum] = stle
             }
-            celesTrakResult?.getOrNull()?.forEach { stle ->
+            celesTrakResult.getOrNull()?.forEach { stle ->
                 val existing = merged[stle.tle.catnum]
                 merged[stle.tle.catnum] = if (existing != null && existing.source != stle.source) {
                     existing.copy(source = "ALL")
@@ -119,18 +109,9 @@ class SatelliteDataSource {
                 }
             }
 
-            // 按用户选择的来源过滤
-            val filtered = when (source) {
-                "CT" -> merged.values.filter { it.source == "CT" || it.source == "ALL" }
-                    .map { it.copy(source = "CT") }
-                "SNOGS" -> merged.values.filter { it.source == "SNOGS" || it.source == "ALL" }
-                    .map { it.copy(source = "SNOGS") }
-                else -> merged.values.toList()
-            }
-
             // 附加 AMSAT 状态（失败时不影响 TLE 结果）
             val statusMap = amsatStatusResult.getOrNull() ?: emptyMap()
-            filtered.map { sourcedTle ->
+            merged.values.toList().map { sourcedTle ->
                 val amsatName = SatelliteCatalog.AMSAT_STATUS_NAME_BY_CATALOG_NUMBER[sourcedTle.tle.catnum]
                 val status = if (amsatName != null) statusMap[amsatName] ?: "" else ""
                 sourcedTle.copy(status = status)

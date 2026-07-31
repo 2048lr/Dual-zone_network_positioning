@@ -146,15 +146,6 @@ class MainViewModel : ViewModel() {
     private val _cwAccuracy = mutableStateOf(0f)
     val cwAccuracy: State<Float> = _cwAccuracy
 
-    // 卫星数据来源设置："ALL" / "CT" / "SNOGS"，从本地恢复
-    private val _satelliteSource = mutableStateOf(settingsStore.satelliteSource)
-    val satelliteSource: State<String> = _satelliteSource
-
-    fun setSatelliteSource(source: String) {
-        _satelliteSource.value = source
-        settingsStore.satelliteSource = source
-    }
-
     /**
      * 卫星筛选状态。类型筛选为空集合时表示不按模式筛选。
      */
@@ -810,7 +801,7 @@ class MainViewModel : ViewModel() {
      * 缓存写入（JSON 序列化）放在 IO 调度器执行，避免阻塞主线程。
      */
     private suspend fun fetchAndCacheTLEs(): List<SourcedTLE> {
-        val tles = satelliteDataSource.fetchAmateurTLEs(source = _satelliteSource.value)
+        val tles = satelliteDataSource.fetchAmateurTLEs()
         val now = Instant.now()
         withContext(Dispatchers.IO) { satelliteCache.save(tles, now) }
         return tles
@@ -1213,7 +1204,6 @@ fun isSatelliteSourceExpired(lastUpdate: Instant?, now: Instant = Instant.now())
  * 卫星筛选条件。
  *
  * @param modes 工作模式多选筛选，空集合表示不按模式筛选。可选值：FM/SSTV/DSTAR/CW/USB/LSB/""(未知)
- * @param sources 数据来源多选筛选，空集合表示不按来源筛选。可选值：CT/SNOGS/ALL
  * @param nameQuery 名称搜索关键词，大小写不敏感匹配卫星名称或 NORAD 编号，空字符串表示不搜索
  * @param onlyUpcoming 仅显示即将入境（不含当前在境）
  * @param onlyInPass 仅显示当前在境
@@ -1222,7 +1212,6 @@ fun isSatelliteSourceExpired(lastUpdate: Instant?, now: Instant = Instant.now())
  */
 data class SatelliteFilter(
     val modes: Set<String> = emptySet(),
-    val sources: Set<String> = emptySet(),
     val nameQuery: String = "",
     val onlyUpcoming: Boolean = false,
     val onlyInPass: Boolean = false,
@@ -1233,7 +1222,7 @@ data class SatelliteFilter(
      * 当前筛选是否处于激活状态（任一条件被设置）。
      */
     val isActive: Boolean
-        get() = modes.isNotEmpty() || sources.isNotEmpty() || nameQuery.isNotBlank() ||
+        get() = modes.isNotEmpty() || nameQuery.isNotBlank() ||
             onlyUpcoming || onlyInPass || onlyAmsat || onlyFavorites
 }
 
@@ -1251,7 +1240,6 @@ fun List<SatelliteInfo>.applyFilter(
         val modeOk = filter.modes.isEmpty() || filter.modes.any { mode ->
             if (mode.isEmpty()) sat.modes.isEmpty() else mode in sat.modes
         }
-        val sourceOk = filter.sources.isEmpty() || filter.sources.any { it == sat.source }
         val nameOk = query.isBlank() ||
             sat.name.contains(query, ignoreCase = true) ||
             sat.catalogNumber.toString().contains(query)
@@ -1259,7 +1247,7 @@ fun List<SatelliteInfo>.applyFilter(
         val inPassOk = !filter.onlyInPass || sat.isCurrentlyVisible
         val amsatOk = !filter.onlyAmsat || sat.status.isNotBlank()
         val favoriteOk = !filter.onlyFavorites || sat.catalogNumber in favorites
-        modeOk && sourceOk && nameOk && upcomingOk && inPassOk && amsatOk && favoriteOk
+        modeOk && nameOk && upcomingOk && inPassOk && amsatOk && favoriteOk
     }
 }
 

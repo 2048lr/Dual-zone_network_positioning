@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.ContactPage
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.SatelliteAlt
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material3.Icon
@@ -134,37 +133,6 @@ fun SettingPagerMaterial(
                             }
                         )
                     }
-                }
-            )
-
-            // 业务设置：卫星数据源
-            SegmentedColumn(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                content = listOf {
-                    SegmentedDropdownItem(
-                        icon = Icons.Filled.SatelliteAlt,
-                        title = stringResource(id = R.string.satellite_source),
-                        summary = stringResource(id = R.string.satellite_source_desc),
-                        items = listOf(
-                            stringResource(id = R.string.source_all),
-                            stringResource(id = R.string.source_celestrak),
-                            stringResource(id = R.string.source_satnogs)
-                        ),
-                        selectedIndex = when (businessState.satelliteSource) {
-                            "CT" -> 1
-                            "SNOGS" -> 2
-                            else -> 0
-                        },
-                        onItemSelected = { index ->
-                            actions.onSetSatelliteSource(
-                                when (index) {
-                                    1 -> "CT"
-                                    2 -> "SNOGS"
-                                    else -> "ALL"
-                                }
-                            )
-                        }
-                    )
                 }
             )
 

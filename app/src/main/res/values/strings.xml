@@ -106,13 +106,8 @@
     <string name="maintainers" translatable="false">维护者</string>
     <string name="maintainer_role_lead" translatable="false">主要维护者</string>
     <string name="maintainer_role_contributor" translatable="false">贡献者</string>
-    <string name="satellite_source" translatable="false">卫星数据来源</string>
-    <string name="source_all" translatable="false">全部 (ALL)</string>
-    <string name="source_celestrak" translatable="false">CelesTrak 源</string>
-    <string name="source_satnogs" translatable="false">SatNOGS 源</string>
     <string name="back" translatable="false">返回</string>
     <string name="version_info" translatable="false">版本：%s</string>
-    <string name="satellite_source_desc" translatable="false">选择卫星数据的来源，不同来源的卫星目录略有差异</string>
     <string name="elevation" translatable="false">仰角</string>
     <string name="aos_azimuth" translatable="false">入境方位</string>
     <string name="mode" translatable="false">模式</string>
@@ -142,9 +137,6 @@
     <string name="filter_title" translatable="false">筛选卫星</string>
     <string name="filter_done" translatable="false">完成</string>
     <string name="filter_search_hint" translatable="false">搜索卫星名称或编号</string>
-    <string name="filter_source_section" translatable="false">按数据来源</string>
-    <string name="source_ct" translatable="false">CelesTrak</string>
-    <string name="source_snogs" translatable="false">SatNOGS</string>
     <string name="filter_status_section" translatable="false">按状态</string>
     <string name="filter_mode_unknown" translatable="false">未知</string>
     <string name="filter_apply" translatable="false">应用筛选</string>

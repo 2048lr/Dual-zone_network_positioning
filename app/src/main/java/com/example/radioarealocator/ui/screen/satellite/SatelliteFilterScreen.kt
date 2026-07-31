@@ -118,11 +118,6 @@ private fun SatelliteFilterMiuix() {
         "LSB" to "LSB",
         "" to unknownModeLabel
     )
-    val sourceOptions = listOf(
-        "CT" to stringResource(R.string.source_ct),
-        "SNOGS" to stringResource(R.string.source_snogs),
-        "ALL" to stringResource(R.string.source_all)
-    )
 
     MiuixScaffold(
         topBar = {
@@ -190,23 +185,6 @@ private fun SatelliteFilterMiuix() {
                             modifier = Modifier.fillMaxWidth(),
                             label = stringResource(R.string.filter_search_hint),
                             singleLine = true
-                        )
-                    }
-                }
-            }
-
-            // 数据来源
-            item {
-                MiuixFilterSectionCard(title = stringResource(R.string.filter_source_section)) {
-                    sourceOptions.forEach { (value, label) ->
-                        val selected = value in filter.sources
-                        MiuixFilterSelectableRow(
-                            label = label,
-                            selected = selected,
-                            onClick = {
-                                val newSources = if (selected) filter.sources - value else filter.sources + value
-                                onFilterChange(filter.copy(sources = newSources))
-                            }
                         )
                     }
                 }
@@ -383,11 +361,6 @@ private fun SatelliteFilterMaterial() {
         "LSB" to "LSB",
         "" to unknownModeLabel
     )
-    val sourceOptions = listOf(
-        "CT" to stringResource(R.string.source_ct),
-        "SNOGS" to stringResource(R.string.source_snogs),
-        "ALL" to stringResource(R.string.source_all)
-    )
 
     Scaffold(
         topBar = {
@@ -436,23 +409,6 @@ private fun SatelliteFilterMaterial() {
                         singleLine = true,
                         placeholder = { Text(stringResource(R.string.filter_search_hint)) }
                     )
-                }
-            }
-
-            // 数据来源
-            item {
-                MaterialFilterSectionCard(title = stringResource(R.string.filter_source_section)) {
-                    sourceOptions.forEach { (value, label) ->
-                        val selected = value in filter.sources
-                        FilterCheckRowMaterial(
-                            label = label,
-                            checked = selected,
-                            onToggle = {
-                                val newSources = if (selected) filter.sources - value else filter.sources + value
-                                onFilterChange(filter.copy(sources = newSources))
-                            }
-                        )
-                    }
                 }
             }
 

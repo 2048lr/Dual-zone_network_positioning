@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 
 /**
- * 应用设置持久化存储。保存卫星源、最后位置、每日一言获取日期等业务设置。
+ * 应用设置持久化存储。保存最后位置、每日一言获取日期等业务设置。
  *
  * 注：主题相关设置（colorMode、keyColor、paletteStyle、colorSpec、uiMode 等）由
  * [com.example.radioarealocator.data.repository.SettingsRepositoryImpl] 统一管理，
@@ -14,15 +14,6 @@ class SettingsStore(context: Context) {
 
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-    /**
-     * 卫星 TLE 数据来源："ALL" / "CT" / "SNOGS"。默认 ALL。
-     */
-    var satelliteSource: String
-        get() = prefs.getString(KEY_SATELLITE_SOURCE, "ALL") ?: "ALL"
-        set(value) {
-            prefs.edit().putString(KEY_SATELLITE_SOURCE, value).apply()
-        }
 
     /**
      * 是否启用 AMSAT 状态数据源（www.amsat.org/status）。默认 true。
@@ -72,7 +63,6 @@ class SettingsStore(context: Context) {
 
     companion object {
         private const val PREFS_NAME = "radio_area_settings"
-        private const val KEY_SATELLITE_SOURCE = "satellite_source"
         private const val KEY_LAST_LAT = "last_lat"
         private const val KEY_LAST_LON = "last_lon"
         private const val KEY_DAILY_QUOTE_EPOCH_DAY = "daily_quote_epoch_day"
