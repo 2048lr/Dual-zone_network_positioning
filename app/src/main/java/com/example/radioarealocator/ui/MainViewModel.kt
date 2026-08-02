@@ -22,6 +22,7 @@ import com.example.radioarealocator.data.satellite.SatelliteCacheStore
 import com.example.radioarealocator.data.satellite.SatelliteCatalog
 import com.example.radioarealocator.data.satellite.SatelliteDataSource
 import com.example.radioarealocator.data.satellite.SatelliteInfo
+import com.example.radioarealocator.data.satellite.SatellitePredictCacheStore
 import com.example.radioarealocator.data.satellite.SatellitePredictor
 import com.example.radioarealocator.data.satellite.SatelliteStatusTracker
 import com.example.radioarealocator.data.satellite.SegmentStatus
@@ -81,6 +82,7 @@ class MainViewModel : ViewModel() {
     val statusTracker = SatelliteStatusTracker(amsatStatusApi, amsatPageScraper, viewModelScope)
     private val settingsStore = SettingsStore(app)
     private val satelliteCache = SatelliteCacheStore(app)
+    private val predictCache = SatellitePredictCacheStore(app)
     private val favoriteStore = FavoriteSatellitesStore(app)
     private val reminderStore = ReminderStore(app)
     private val weatherApiService = WeatherApiService()
@@ -457,22 +459,49 @@ class MainViewModel : ViewModel() {
         if (initialized) return
         initialized = true
 
-        // 先从本地缓存恢复 TLE 与时间戳（IO 密集型，避免在主线程解析 JSON）
-        val cached = withContext(Dispatchers.IO) { satelliteCache.load() }
-        if (cached != null) {
+        // 并行从本地缓存恢复 TLE 与预测结果（IO 密集型，避免在主线程解析 JSON）
+        val cachedTle = withContext(Dispatchers.IO) { satelliteCache.load() }
+        val cachedPredict = withContext(Dispatchers.IO) { predictCache.load() }
+
+        if (cachedTle != null) {
             _satelliteState.value = _satelliteState.value.copy(
-                    cachedTles = cached.tles,
-                    lastSatelliteUpdateTime = cached.updatedAt
-                )
-                // 缓存存在但有定位时立即预测一次
-                val current = _locationState.value.result
-            if (current != null) {
-                triggerPrediction(current.latitude, current.longitude)
-            }
+                cachedTles = cachedTle.tles,
+                lastSatelliteUpdateTime = cachedTle.updatedAt
+            )
         }
 
-        // 缓存为空或已过期：后台拉取新数据
-        if (cached == null || isSatelliteSourceExpired(cached.updatedAt)) {
+        // 优先用预测缓存即时回填：坐标接近 + 2h 内有效 → 直接显示，跳过 SGP4
+        val current = _locationState.value.result
+        if (current != null && cachedPredict != null &&
+            cachedPredict.matchesLocation(current.latitude, current.longitude) &&
+            cachedPredict.isFresh()
+        ) {
+            // 回填时剔除已过期过境（LOS < now），保留新鲜数据
+            val now = Instant.now()
+            val fresh = cachedPredict.satellites.filter { it.losTime.isAfter(now) }
+            if (fresh.isNotEmpty()) {
+                _satelliteState.value = _satelliteState.value.copy(
+                    isSatelliteLoading = false,
+                    satellites = fresh,
+                    satelliteError = null
+                )
+                // 同步内存缓存，使短周期去重也生效
+                cachedPredictionSatellites = fresh
+                cachedPredictionLat = cachedPredict.latitude
+                cachedPredictionLon = cachedPredict.longitude
+                cachedPredictionTime = cachedPredict.predictedAt
+                // 后台异步重新预测纠偏（拉最新 TLE 后覆盖），不阻塞 UI
+                triggerPrediction(current.latitude, current.longitude)
+            } else if (cachedTle != null) {
+                triggerPrediction(current.latitude, current.longitude)
+            }
+        } else if (current != null && cachedTle != null) {
+            // 有定位 + 有 TLE 但无可用预测缓存：正常预测
+            triggerPrediction(current.latitude, current.longitude)
+        }
+
+        // TLE 缓存为空或已过期：后台拉取新数据
+        if (cachedTle == null || isSatelliteSourceExpired(cachedTle.updatedAt)) {
             refreshSatelliteSourceOnly()
         }
 
@@ -872,17 +901,22 @@ class MainViewModel : ViewModel() {
                 )
             }
             // 更新预测缓存
+            val predictedAt = Instant.now()
             cachedPredictionSatellites = satellites
             cachedPredictionLat = latitude
             cachedPredictionLon = longitude
-            cachedPredictionTime = Instant.now()
+            cachedPredictionTime = predictedAt
+            // 持久化预测结果：进程重启后可即时回填，避免重复 SGP4
+            withContext(Dispatchers.IO) {
+                predictCache.save(satellites, latitude, longitude, predictedAt)
+            }
 
             _satelliteState.value = _satelliteState.value.copy(
                 isSatelliteLoading = false,
                 satellites = satellites,
                 cachedTles = tles,
                 satelliteError = null,
-                lastSatelliteUpdateTime = Instant.now()
+                lastSatelliteUpdateTime = predictedAt
             )
             // 预测完成后刷新所有收藏卫星的提醒项
             refreshRemindersFromPrediction(satellites)
