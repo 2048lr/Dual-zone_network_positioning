@@ -355,17 +355,25 @@ private fun SatelliteOverviewCard(
             // 筛选计数 + 筛选按钮
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (filter.isActive && totalCount > 0) {
+                // 筛选按钮：始终固定在左侧
+                SatelliteFilterButton(filter = filter)
+
+                // 计数文字：激活时从按钮右侧淡入，不改变按钮位置
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = filter.isActive && totalCount > 0,
+                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandHorizontally(),
+                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkHorizontally()
+                ) {
                     Text(
                         text = stringResource(R.string.satellite_count_filtered, filteredCount, totalCount),
                         fontSize = 12.sp,
-                        color = colorScheme.onSurfaceVariantSummary
+                        color = colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.padding(start = 12.dp)
                     )
                 }
-                SatelliteFilterButton(filter = filter)
             }
 
             // 数据源刷新操作
