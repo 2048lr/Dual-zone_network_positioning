@@ -88,4 +88,14 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object AprsSymbolPicker : Route
+
+    /** FT8 数字模式主入口 */
+    @Parcelize
+    @Serializable
+    data object Ft8Main : Route
+
+    /** FT8 设置 */
+    @Parcelize
+    @Serializable
+    data object Ft8Settings : Route
 }

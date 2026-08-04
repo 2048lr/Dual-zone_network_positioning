@@ -31,6 +31,11 @@ class PermissionManager(context: Context) {
     fun locationRuntimePermission(): String = Manifest.permission.ACCESS_FINE_LOCATION
 
     /**
+     * 麦克风运行时权限（FT8 解码等可选功能）。
+     */
+    fun microphoneRuntimePermission(): String = Manifest.permission.RECORD_AUDIO
+
+    /**
      * 通知运行时权限（Android 13+）。
      */
     fun notificationRuntimePermission(): String = Manifest.permission.POST_NOTIFICATIONS
@@ -81,6 +86,7 @@ class PermissionManager(context: Context) {
         } else {
             true
         },
+        microphone = hasPermission(Manifest.permission.RECORD_AUDIO),
     )
 
     private fun hasPermission(permission: String): Boolean =

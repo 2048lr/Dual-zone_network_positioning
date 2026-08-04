@@ -106,8 +106,13 @@
     <string name="maintainers" translatable="false">维护者</string>
     <string name="maintainer_role_lead" translatable="false">主要维护者</string>
     <string name="maintainer_role_contributor" translatable="false">贡献者</string>
+    <string name="satellite_source" translatable="false">卫星数据来源</string>
+    <string name="source_all" translatable="false">全部 (ALL)</string>
+    <string name="source_celestrak" translatable="false">CelesTrak 源</string>
+    <string name="source_satnogs" translatable="false">SatNOGS 源</string>
     <string name="back" translatable="false">返回</string>
     <string name="version_info" translatable="false">版本：%s</string>
+    <string name="satellite_source_desc" translatable="false">选择卫星数据的来源，不同来源的卫星目录略有差异</string>
     <string name="elevation" translatable="false">仰角</string>
     <string name="aos_azimuth" translatable="false">入境方位</string>
     <string name="mode" translatable="false">模式</string>
@@ -270,4 +275,20 @@
     <!-- APRS模块 -->
     <string name="aprs" translatable="false">APRS</string>
     <string name="aprs_desc" translatable="false">业余无线电自动位置报告系统</string>
+
+    <!-- FT8模块 -->
+    <string name="ft8" translatable="false">FT8</string>
+    <string name="ft8_desc" translatable="false">FT8数字模式通联</string>
+    <string name="ft8_encode" translatable="false">编码消息</string>
+    <string name="ft8_band" translatable="false">波段选择</string>
+    <string name="ft8_message_compose" translatable="false">消息编辑</string>
+    <string name="ft8_encoded" translatable="false">已编码</string>
+    <string name="ft8_settings" translatable="false">FT8 设置</string>
+    <string name="ft8_tx_enabled" translatable="false">允许发射</string>
+    <string name="ft8_tx_desc" translatable="false">启用后可在 FT8 模式下发送消息</string>
+    <string name="ft8_info" translatable="false">FT8 编码信息</string>
+    <string name="ft8_info_desc" translatable="false">FT8 采用 8-FSK 调制, 每周期 15 秒发送 79 个音调。音频采样率 12000 Hz, 音调间隔 6.25 Hz。编码使用 (174,87) LDPC 纠错码。基于 FT8CN (BG7YOZ/N0BOY) 协议实现。</string>
+    <string name="encoding" translatable="false">编码中…</string>
+    <string name="callsign" translatable="false">呼号</string>
+    <string name="maidenhead_grid" translatable="false">网格定位</string>
 </resources>

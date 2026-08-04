@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -104,6 +105,9 @@ fun PermissionScreen() {
         onExactAlarm = {
             settingsLauncher.launch(manager.exactAlarmSettingsIntent())
         },
+        onMicrophone = {
+            permissionLauncher.launch(manager.microphoneRuntimePermission())
+        },
     )
     val onBack = dropUnlessResumed { navigator.pop() }
 
@@ -117,6 +121,7 @@ private data class PermissionActions(
     val onLocation: () -> Unit,
     val onNotification: () -> Unit,
     val onExactAlarm: () -> Unit,
+    val onMicrophone: () -> Unit,
 )
 
 @Composable
@@ -213,6 +218,13 @@ private fun PermissionScreenMiuix(
                         required = false,
                         Icons.Default.Alarm,
                         actions.onExactAlarm,
+                    )
+                    PermissionRowMiuix(
+                        stringResource(R.string.permission_microphone),
+                        state.microphone,
+                        required = false,
+                        Icons.Default.Mic,
+                        actions.onMicrophone,
                     )
                 }
             }
@@ -350,6 +362,13 @@ private fun PermissionScreenMaterial(
                             required = false,
                             Icons.Default.Alarm,
                             actions.onExactAlarm,
+                        )
+                        PermissionRowMaterial(
+                            stringResource(R.string.permission_microphone),
+                            state.microphone,
+                            required = false,
+                            Icons.Default.Mic,
+                            actions.onMicrophone,
                         )
                     }
                 }
