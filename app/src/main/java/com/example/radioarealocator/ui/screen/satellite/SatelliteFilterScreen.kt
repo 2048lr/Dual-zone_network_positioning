@@ -46,7 +46,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -156,25 +155,23 @@ private fun SatelliteFilterMiuix() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             overscrollEffect = null,
         ) {
-            // 顶部重置行：固定高度容器 + 透明度过渡，
-            // 避免高度突变触发 overScrollVertical 回弹导致下方内容横向位移。
+            // 顶部重置行：始终占位，用 AnimatedVisibility 控制显隐，
+            // 避免条件 item 增减导致下方列表整体跳动。
             item {
-                val resetAlpha by androidx.compose.animation.core.animateFloatAsState(
-                    targetValue = if (filter.isActive) 1f else 0f,
-                    label = "reset_alpha"
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(36.dp),
-                    contentAlignment = Alignment.CenterEnd
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = filter.isActive,
+                    enter = androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.fadeOut()
                 ) {
-                    MiuixTextButton(
-                        text = stringResource(R.string.filter_reset),
-                        onClick = { onFilterChange(SatelliteFilter()) },
-                        enabled = filter.isActive,
-                        modifier = Modifier.alpha(resetAlpha)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        MiuixTextButton(
+                            text = stringResource(R.string.filter_reset),
+                            onClick = { onFilterChange(SatelliteFilter()) }
+                        )
+                    }
                 }
             }
 
