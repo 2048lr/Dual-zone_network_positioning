@@ -10,12 +10,16 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.time.Instant
-import java.time.ZoneOffset
 import java.util.Date
-import java.util.TimeZone
 
 /**
  * 基于 predict4java 计算卫星过境信息。
+ *
+ * 性能优化要点：
+ * 1. 不再调用 [PassPredictor.nextSatPass]（库内部默认搜到 7 天上限），
+ *    改用 [PassPredictor.getSatPos] 按步长采样仰角，搜索范围严格限制在 [hoursAhead] 内。
+ * 2. 剔除 GEO / 高轨卫星（周期过长），避免对永不可见过境的卫星做无效扫描。
+ * 3. 全量并发派发（不再分批串行 await），让 Default 线程池自行调度。
  */
 class SatellitePredictor {
 
@@ -39,24 +43,20 @@ class SatellitePredictor {
         if (sourcedTles.isEmpty()) return@withContext emptyList()
 
         val groundStation = GroundStationPosition(latitude, longitude, altitude)
-        // 使用 UTC 时区确保与卫星轨道计算的一致性
         val utcNow = Instant.now()
         val now = Date.from(utcNow)
-        val searchEnd = Date.from(utcNow.plusSeconds(hoursAhead * 60L * 60L))
+        val searchEndMs = utcNow.toEpochMilli() + hoursAhead * 60L * 60L * 1000L
 
-        // 并行预测每颗卫星的过境：每颗卫星的 SGP4/SDP4 计算是独立的，
-        // 使用 async + awaitAll 充分利用多核 CPU，相比串行 mapNotNull 显著降低总耗时。
-        // 对超大列表分批处理，避免同时派发过多协程导致调度压力。
+        // 全量并发：每颗卫星的 SGP4/SDP4 计算独立，一次性派发让 Default 线程池自行调度。
+        // 相比分批 awaitAll，避免批间串行等待，在多核设备上并行度更高。
         val passes = coroutineScope {
             sourcedTles
-                .chunked(CHUNK_SIZE)
-                .flatMap { batch ->
-                    batch.map { sourcedTle ->
-                        async(Dispatchers.Default) {
-                            predictSinglePass(sourcedTle, groundStation, now, searchEnd)
-                        }
-                    }.awaitAll()
+                .map { sourcedTle ->
+                    async(Dispatchers.Default) {
+                        predictSinglePass(sourcedTle, groundStation, now, searchEndMs)
+                    }
                 }
+                .awaitAll()
                 .filterNotNull()
         }
 
@@ -70,55 +70,66 @@ class SatellitePredictor {
 
     private companion object {
         /**
-         * 单批并行预测的卫星数量上限。
-         * 过大会一次性派发过多协程、增加调度开销；
-         * 过小则并行度不足。
-         * 升级到 128：在多核设备（CI runner 4 核、现代手机 8 核）上能充分压榨 CPU，
-         * 显著缩短数百颗卫星的 SGP4 总耗时；32 对应早期 ~30 颗业余卫星时代，
-         * 现已接入 SatNOGS 全量后明显偏小。
+         * 仰角采样步长（分钟）。用于粗扫描过境窗口。
+         * LEO 卫星过境持续 10-20 分钟，5 分钟步长足以捕捉所有过境的 AOS/LOS 大致位置，
+         * 随后用二分法精化到秒级。步长过大可能漏掉极短过境，过小则增加采样次数。
          */
-        private const val CHUNK_SIZE = 128
+        private const val SAMPLE_STEP_MINUTES = 5L
+
+        /**
+         * GEO / 高轨卫星周期阈值（分钟）。
+         * 周期 > 此值的卫星（近 GEO，~1436 分钟）要么对地面站永远可见、要么永不过境，
+         * nextSatPass 对它们会扫满内置 7 天上限才返回 null，跳过可显著降低无效计算。
+         */
+        private const val GEO_PERIOD_THRESHOLD_MINUTES = 1200.0
+
+        /**
+         * 二分法精化 AOS/LOS 的时间精度（毫秒）。10 秒精度足以满足 UI 显示与提醒调度。
+         */
+        private const val BISECTION_PRECISION_MS = 10_000L
     }
 
     private fun predictSinglePass(
         sourcedTle: SourcedTLE,
         groundStation: GroundStationPosition,
         now: Date,
-        searchEnd: Date
+        searchEndMs: Long
     ): SatelliteInfo? {
         return try {
             val tle = sourcedTle.tle
             // 不在 catalog 中的卫星返回空 modes 列表（UI 显示"未知"）
             val modes = SatelliteCatalog.MODES_BY_CATALOG_NUMBER[tle.catnum].orEmpty()
 
+            // 预过滤：剔除 GEO / 高轨卫星，避免对永不可见过境的卫星做无效 SGP4 扫描
+            val meanMotion = tle.meanMotion // 转/天
+            if (meanMotion > 0) {
+                val periodMinutes = 1440.0 / meanMotion
+                if (periodMinutes > GEO_PERIOD_THRESHOLD_MINUTES) return null
+            }
+
             val predictor = PassPredictor(tle, groundStation)
+            val nowMs = now.time
 
             // 判断当前是否在境内（仰角 > 0），仅作为元数据，不影响下次过境计算
             val currentPos = predictor.getSatPos(now)
             val isCurrentlyVisible = currentPos != null && currentPos.elevation > 0
 
-            // 始终取"下次过境"（AOS > now），确保 AOS 在未来，
-            // 这样 UI 列表与提醒项都不会因为在境卫星被过滤而丢失下次过境。
-            // nextSatPass(now, false) 在当前在境时会跳过本次过境、返回下一次。
-            val nextPass = predictor.nextSatPass(now, false)
-            if (nextPass == null || nextPass.startTime == null || nextPass.endTime == null) return null
-            // 防御：若实现差异导致返回的 startTime 仍 < now，则跳过避免提醒无法调度
-            if (nextPass.startTime.before(now)) return null
-
-            // 只取预测窗口内的过境
-            if (nextPass.startTime.after(searchEnd)) return null
-
-            val aosInstant = nextPass.startTime.toInstant()
+            // 自实现过境搜索：按步长采样仰角，严格限制在 searchEnd 内，
+            // 避免库内 nextSatPass 扫到 7 天上限。
+            val pass = findNextPass(predictor, nowMs, searchEndMs) ?: return null
+            val aosMs = pass.aosMs
+            val losMs = pass.losMs
+            if (aosMs >= searchEndMs) return null
 
             SatelliteInfo(
                 name = tle.name.trim().ifEmpty { tle.catnum.toString() },
                 catalogNumber = tle.catnum,
                 modes = modes,
-                aosTime = aosInstant,
-                losTime = nextPass.endTime.toInstant(),
-                maxElevation = nextPass.maxEl,
-                aosAzimuth = nextPass.aosAzimuth,
-                losAzimuth = nextPass.losAzimuth,
+                aosTime = Instant.ofEpochMilli(aosMs),
+                losTime = Instant.ofEpochMilli(losMs),
+                maxElevation = pass.maxElevation,
+                aosAzimuth = pass.aosAzimuth,
+                losAzimuth = pass.losAzimuth,
                 isCurrentlyVisible = isCurrentlyVisible,
                 source = sourcedTle.source,
                 status = sourcedTle.status
@@ -138,4 +149,178 @@ class SatellitePredictor {
             null
         }
     }
+
+    /**
+     * 按固定步长采样仰角，寻找 [fromMs, toMs] 内的下次过境（仰角从 ≤0 穿越到 >0）。
+     * 命中后用二分法精化 AOS/LOS 到秒级，并取过境窗口内的最大仰角。
+     *
+     * 当前已在境内时，取本次过境的剩余 LOS 作为结果（AOS 回退到 fromMs），
+     * 确保 UI 列表与提醒项不会丢失在境卫星。
+     */
+    private fun findNextPass(
+        predictor: PassPredictor,
+        fromMs: Long,
+        toMs: Long
+    ): PassResult? {
+        val stepMs = SAMPLE_STEP_MINUTES * 60L * 1000L
+        var prevEl = elevationAt(predictor, fromMs)
+
+        // 当前已在境内：记录本次过境，继续扫描 LOS
+        if (prevEl > 0) {
+            var losMs = -1L
+            var t = fromMs + stepMs
+            var maxEl = prevEl
+            var maxElMs = fromMs
+            while (t <= toMs) {
+                val el = elevationAt(predictor, t)
+                if (el > maxEl) {
+                    maxEl = el
+                    maxElMs = t
+                }
+                if (el <= 0) {
+                    losMs = refineZeroCrossing(predictor, t - stepMs, t, crossingUp = false)
+                    break
+                }
+                t += stepMs
+            }
+            if (losMs < 0) return null // 整个窗口内都在境内（异常情况），跳过
+            val maxElInfo = maxElevationAzimuthAt(predictor, maxElMs, fromMs, losMs)
+            return PassResult(
+                aosMs = fromMs,
+                losMs = losMs,
+                maxElevation = maxElInfo.first,
+                aosAzimuth = azimuthAt(predictor, fromMs),
+                losAzimuth = azimuthAt(predictor, losMs)
+            )
+        }
+
+        // 正常搜索：仰角从 ≤0 穿越到 >0 = AOS
+        var t = fromMs + stepMs
+        while (t <= toMs) {
+            val el = elevationAt(predictor, t)
+            if (prevEl <= 0 && el > 0) {
+                // 命中 AOS：精化 AOS，然后向前找 LOS
+                val aosMs = refineZeroCrossing(predictor, t - stepMs, t, crossingUp = true)
+                val losResult = findLosAfter(predictor, aosMs, toMs, stepMs)
+                if (losResult == null) return null // 窗口结束前未出境
+                val (losMs, maxEl, maxElMs) = losResult
+                val maxElAz = if (maxElMs == aosMs) {
+                    azimuthAt(predictor, aosMs) to maxEl
+                } else {
+                    maxElevationAzimuthAt(predictor, maxElMs, aosMs, losMs)
+                }
+                return PassResult(
+                    aosMs = aosMs,
+                    losMs = losMs,
+                    maxElevation = maxElAz.first,
+                    aosAzimuth = azimuthAt(predictor, aosMs),
+                    losAzimuth = azimuthAt(predictor, losMs)
+                )
+            }
+            prevEl = el
+            t += stepMs
+        }
+        return null
+    }
+
+    /**
+     * 在 [aosMs] 之后寻找 LOS（仰角从 >0 穿越到 ≤0），同时记录窗口内最大仰角。
+     */
+    private fun findLosAfter(
+        predictor: PassPredictor,
+        aosMs: Long,
+        toMs: Long,
+        stepMs: Long
+    ): Triple<Long, Double, Long>? {
+        var t = aosMs + stepMs
+        var prevEl = elevationAt(predictor, t - stepMs)
+        var maxEl = prevEl
+        var maxElMs = aosMs
+        while (t <= toMs) {
+            val el = elevationAt(predictor, t)
+            if (el > maxEl) {
+                maxEl = el
+                maxElMs = t
+            }
+            if (prevEl > 0 && el <= 0) {
+                val losMs = refineZeroCrossing(predictor, t - stepMs, t, crossingUp = false)
+                return Triple(losMs, maxEl, maxElMs)
+            }
+            prevEl = el
+            t += stepMs
+        }
+        return null
+    }
+
+    /**
+     * 二分法精化仰角过零点（AOS 为上升过零，LOS 为下降过零）到 [BISECTION_PRECISION_MS] 精度。
+     */
+    private fun refineZeroCrossing(
+        predictor: PassPredictor,
+        loMs: Long,
+        hiMs: Long,
+        crossingUp: Boolean
+    ): Long {
+        var lo = loMs
+        var hi = hiMs
+        while (hi - lo > BISECTION_PRECISION_MS) {
+            val mid = (lo + hi) / 2
+            val el = elevationAt(predictor, mid)
+            if (crossingUp) {
+                // AOS: lo 处 ≤0，hi 处 >0，mid >0 时收缩 hi
+                if (el > 0) hi = mid else lo = mid
+            } else {
+                // LOS: lo 处 >0，hi 处 ≤0，mid ≤0 时收缩 hi
+                if (el <= 0) hi = mid else lo = mid
+            }
+        }
+        return if (crossingUp) hi else lo
+    }
+
+    /**
+     * 在 [aosMs, losMs] 窗口内以更细步长搜索最大仰角及其方位角。
+     * 粗扫描已给出大致 maxElMs，这里在其邻域精化。
+     */
+    private fun maxElevationAzimuthAt(
+        predictor: PassPredictor,
+        maxElMs: Long,
+        aosMs: Long,
+        losMs: Long
+    ): Pair<Double, Int> {
+        // 在 maxElMs ± stepMs 邻域内以 1 分钟步长精化最大仰角
+        val fineStepMs = 60L * 1000L
+        val searchStart = maxOf(maxElMs - 5L * 60L * 1000L, aosMs)
+        val searchEnd = minOf(maxElMs + 5L * 60L * 1000L, losMs)
+        var bestEl = elevationAt(predictor, maxElMs)
+        var bestMs = maxElMs
+        var t = searchStart
+        while (t <= searchEnd) {
+            val el = elevationAt(predictor, t)
+            if (el > bestEl) {
+                bestEl = el
+                bestMs = t
+            }
+            t += fineStepMs
+        }
+        val pos = predictor.getSatPos(Date(bestMs))
+        return bestEl to ((pos?.azimuth ?: 0).toInt())
+    }
+
+    private fun elevationAt(predictor: PassPredictor, timeMs: Long): Double {
+        val pos = predictor.getSatPos(Date(timeMs)) ?: return -1.0
+        return pos.elevation
+    }
+
+    private fun azimuthAt(predictor: PassPredictor, timeMs: Long): Int {
+        val pos = predictor.getSatPos(Date(timeMs)) ?: return 0
+        return pos.azimuth.toInt()
+    }
+
+    private data class PassResult(
+        val aosMs: Long,
+        val losMs: Long,
+        val maxElevation: Double,
+        val aosAzimuth: Int,
+        val losAzimuth: Int
+    )
 }
