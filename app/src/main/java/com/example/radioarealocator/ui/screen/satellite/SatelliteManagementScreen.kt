@@ -40,8 +40,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -158,20 +156,10 @@ fun SatelliteManagementMiuix() {
         )
 
         if (showFilterDialog) {
-            Dialog(
-                onDismissRequest = { showFilterDialog = false },
-                properties = DialogProperties(
-                    usePlatformDefaultWidth = false,
-                    decorFitsSystemWindows = false
-                )
-            ) {
-                top.yukonga.miuix.kmp.basic.Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = colorScheme.background
-                ) {
-                    SatelliteFilterDialogContent(onDismiss = { showFilterDialog = false })
-                }
-            }
+            SatelliteFilterDialogMiuix(
+                show = showFilterDialog,
+                onDismissRequest = { showFilterDialog = false }
+            )
         }
     }
 }
