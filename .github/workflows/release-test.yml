@@ -1,0 +1,232 @@
+name: Release Build Test
+
+# ─────────────────────────────────────────────────────────────
+# Release 构建测试工作流（不发布、不更新版本号）
+#
+# 用途：手动触发，用与生产一致的 release 构建流程产出 APK，
+#       仅供测试 release 构建后的应用性能与 bug。
+#
+# 与 release.yml 的区别：
+#   - 仅 workflow_dispatch 手动触发
+#   - 不更新版本号、不提交 version bump
+#   - 不创建 GitHub Release
+#   - APK 作为 artifact 上传供下载测试
+#   - contents: read 最小权限
+#   - 测试构建可取消（cancel-in-progress: true）
+#
+# 主分支：miuix（与 release.yml 一致）
+# ─────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: '构建前运行单元测试（推荐开启）'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.caching=true -Dorg.gradle.configuration-cache=true"
+  GRADLE_VERSION: '9.4.1'
+
+jobs:
+  # 可选单元测试：作为构建前置关卡，失败则跳过构建
+  test:
+    name: Run Unit Tests
+    if: ${{ inputs.run_tests }}
+    uses: ./.github/workflows/test.yml
+    with:
+      fail-on-coverage: false
+    permissions:
+      contents: read
+
+  build:
+    name: Build Release APK (Test)
+    needs: test
+    # 测试被跳过或通过都继续构建；测试失败才跳过
+    if: ${{ always() && needs.test.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 分支校验：必须从 miuix 分支运行，与 release.yml 保持一致
+      - name: Verify branch is miuix
+        run: |
+          if [ "$GITHUB_REF_NAME" != "miuix" ]; then
+            echo "::error::Release test must be triggered from miuix branch, got: $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "✅ Manual trigger on miuix branch."
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: gradle
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+          cache-read-only: false
+
+      # 解码签名密钥：与生产 release 构建使用同一证书，确保签名一致
+      - name: Decode keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          mkdir -p signing
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\n\r ' | base64 -d > signing/release.keystore
+          if [ ! -s signing/release.keystore ]; then
+            echo "::error::Decoded keystore is empty. Check KEYSTORE_BASE64 secret."
+            exit 1
+          fi
+          echo "Decoded keystore size: $(stat -c%s signing/release.keystore) bytes"
+          if ! keytool -list -keystore signing/release.keystore -alias "$KEY_ALIAS" -storepass "$KEYSTORE_PASSWORD" > /dev/null 2>&1; then
+            echo "::error::Keystore verification failed. Check KEYSTORE_BASE64, KEY_ALIAS and KEYSTORE_PASSWORD."
+            exit 1
+          fi
+          echo "Keystore verified successfully."
+
+      # 构建 Release APK（与生产构建完全一致：R8 + 资源压缩 + release 签名）
+      - name: Build Release APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/signing/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -o pipefail
+          gradle assembleRelease \
+            --console=plain \
+            --continue \
+            --stacktrace \
+            --no-daemon 2>&1 | tee build.log
+
+      # 签名验证：确认 release 签名有效，输出指纹供对比
+      - name: Verify APK signature and output fingerprint
+        id: signature
+        run: |
+          APK_PATH=$(find app/build/outputs/apk -name "*.apk" -type f | head -1)
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "::error::Release APK not found in app/build/outputs/apk"
+            find app/build/outputs -name "*.apk" -type f || true
+            exit 1
+          fi
+          echo "Found APK: $APK_PATH"
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner 2>/dev/null | sort -V | tail -1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner not found in $ANDROID_HOME/build-tools"
+            exit 1
+          fi
+          echo "Using apksigner: $APKSIGNER"
+
+          echo "=== Verify APK signature ==="
+          "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
+
+          echo ""
+          echo "=== Signature fingerprint ==="
+          FINGERPRINT_SHA1=$(keytool -printcert -jarfile "$APK_PATH" | grep -E "SHA-?1:" | head -1 | awk '{print $NF}')
+          FINGERPRINT_SHA256=$(keytool -printcert -jarfile "$APK_PATH" | grep -E "SHA-?256:" | head -1 | awk '{print $NF}')
+          echo "SHA-1:   $FINGERPRINT_SHA1"
+          echo "SHA-256: $FINGERPRINT_SHA256"
+
+          if [ -z "$FINGERPRINT_SHA1" ] || [ -z "$FINGERPRINT_SHA256" ]; then
+            echo "::warning::Fingerprint extraction failed. Dumping raw keytool output for debugging:"
+            keytool -printcert -jarfile "$APK_PATH" || true
+          fi
+
+          mkdir -p signing-report
+          cat > signing-report/signature-fingerprint.txt <<EOF
+          RadioAreaLocator Release Build Test - Signature Fingerprint
+          ============================================================
+          Build Type:    Test (not published)
+          Build Date:    $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          Commit:        ${{ github.sha }}
+          Branch:        ${{ github.ref_name }}
+
+          SHA-1:         $FINGERPRINT_SHA1
+          SHA-256:       $FINGERPRINT_SHA256
+
+          Notes:
+          - This APK is for testing only and was not published to GitHub Release.
+          - Signature should match production release builds.
+          EOF
+          echo "fingerprint_sha1=$FINGERPRINT_SHA1" >> "$GITHUB_OUTPUT"
+          echo "fingerprint_sha256=$FINGERPRINT_SHA256" >> "$GITHUB_OUTPUT"
+
+      # 失败时上传构建报告，便于排查
+      - name: Upload build reports on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports-test-${{ github.sha }}
+          path: |
+            app/build/reports
+            app/build/outputs
+            build.log
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Rename APK
+        run: |
+          cp "${{ steps.signature.outputs.apk_path }}" \
+             RadioAreaLocator-release-test-${{ github.sha }}.apk
+
+      # APK 作为 artifact 上传，供下载安装测试（不发布到 Release）
+      - name: Upload Release APK (test artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk-test-${{ github.sha }}
+          path: RadioAreaLocator-release-test-${{ github.sha }}.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload signature report
+        uses: actions/upload-artifact@v4
+        with:
+          name: signature-report-test-${{ github.sha }}
+          path: signing-report/signature-fingerprint.txt
+          retention-days: 30
+          if-no-files-found: error
+
+      # 构建结果汇总到 Step Summary
+      - name: Publish build summary
+        if: always()
+        run: |
+          echo "## Release Build Test Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Trigger | ${{ github.event_name }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Test | ${{ needs.test.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Build | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| SHA-1 | \`${{ steps.signature.outputs.fingerprint_sha1 }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| SHA-256 | \`${{ steps.signature.outputs.fingerprint_sha256 }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> This is a test build. APK not published to Release." >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Build completed. Download APK from Artifacts." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ Build failed, check logs or download build-reports artifact." >> "$GITHUB_STEP_SUMMARY"
+          fi
