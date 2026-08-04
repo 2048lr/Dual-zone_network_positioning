@@ -3,13 +3,20 @@ package com.example.radioarealocator.ui.screen.ft8
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -38,9 +45,15 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun Ft8MainScreen(
@@ -64,37 +77,47 @@ fun Ft8MainScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(Modifier.height(32.dp))
+    val scrollBehavior = MiuixScrollBehavior()
 
-        // 顶栏：返回 + 标题 + 设置
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onNavigateBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = MiuixTheme.colorScheme.onBackground
-                )
-            }
-            Text(
-                "FT8",
-                style = MiuixTheme.textStyles.title2,
-                color = MiuixTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "FT8",
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = colorScheme.onBackground
+                        )
+                    }
+                },
+                actions = {
+                    Text(
+                        "设置",
+                        style = MiuixTheme.textStyles.body1,
+                        color = colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { onNavigate(Route.Ft8Settings) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                },
+                scrollBehavior = scrollBehavior
             )
-            IconButton(onClick = { onNavigate(Route.Ft8Settings) }) {
-                Text(
-                    "设置",
-                    style = MiuixTheme.textStyles.body1,
-                    color = MiuixTheme.colorScheme.primary
-                )
-            }
-        }
+        },
+        popupHost = { },
+        contentWindowInsets =
+            WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .overScrollVertical()
+                .scrollEndHaptic()
+                .padding(horizontal = 16.dp)
+                .padding(top = innerPadding.calculateTopPadding())
+        ) {
 
         // 呼号 + 网格显示
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -363,6 +386,7 @@ fun Ft8MainScreen(
         }
 
         Spacer(Modifier.height(32.dp))
+        }
     }
 }
 
@@ -371,7 +395,7 @@ private fun SectionTitle(text: String) {
     Text(
         text,
         style = MiuixTheme.textStyles.body1,
-        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+        color = colorScheme.onSurfaceSecondary,
         modifier = Modifier.padding(vertical = 8.dp)
     )
 }

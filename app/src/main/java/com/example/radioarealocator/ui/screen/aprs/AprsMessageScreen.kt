@@ -5,10 +5,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,8 +42,11 @@ import com.example.radioarealocator.ui.appViewModel
 import com.example.radioarealocator.ui.viewmodel.AprsViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,77 +82,84 @@ fun AprsMessageScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(start = 16.dp, end = 16.dp, top = 32.dp, bottom = 16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onNavigateBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = MiuixTheme.colorScheme.onBackground
-                )
-            }
-            Text(
-                text = if (selectedPartner.isNotEmpty()) "与 $selectedPartner 的对话" else "APRS 消息",
-                style = MiuixTheme.textStyles.title2,
-                color = MiuixTheme.colorScheme.onSurface
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = if (selectedPartner.isNotEmpty()) "与 $selectedPartner 的对话" else "APRS 消息",
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = colorScheme.onBackground
+                        )
+                    }
+                }
             )
-        }
+        },
+        popupHost = { },
+        contentWindowInsets =
+            WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp)
+                .padding(top = innerPadding.calculateTopPadding())
+                .imePadding()
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (selectedPartner.isEmpty() && conversationPartners.isNotEmpty()) {
-            LazyColumn {
-                items(conversationPartners) { partner ->
-                    Text(
-                        text = partner,
-                        style = MiuixTheme.textStyles.body1,
-                        color = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    )
+            if (selectedPartner.isEmpty() && conversationPartners.isNotEmpty()) {
+                LazyColumn {
+                    items(conversationPartners) { partner ->
+                        Text(
+                            text = partner,
+                            style = MiuixTheme.textStyles.body1,
+                            color = colorScheme.primary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            state = listState
-        ) {
-            items(messages) { message ->
-                AprsMessageBubble(message = message)
-                Spacer(modifier = Modifier.height(4.dp))
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                state = listState
+            ) {
+                items(messages) { message ->
+                    AprsMessageBubble(message = message)
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = messageText,
-                onValueChange = { messageText = it },
-                label = { Text("消息内容") },
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(
-                onClick = {
-                    if (messageText.isNotBlank() && selectedPartner.isNotEmpty()) {
-                        viewModel.sendMessage(selectedPartner, messageText.trim())
-                        messageText = ""
-                    }
-                },
-                content = { Text("发送") }
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    label = { Text("消息内容") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        if (messageText.isNotBlank() && selectedPartner.isNotEmpty()) {
+                            viewModel.sendMessage(selectedPartner, messageText.trim())
+                            messageText = ""
+                        }
+                    },
+                    content = { Text("发送") }
+                )
+            }
         }
     }
 }

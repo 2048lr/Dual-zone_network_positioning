@@ -1,18 +1,22 @@
 package com.example.radioarealocator.ui.screen.aprs
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -23,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,8 +34,11 @@ import com.example.radioarealocator.ui.appViewModel
 import com.example.radioarealocator.ui.viewmodel.AprsViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 /** APRS 符号（table + code + 名称），覆盖常见移动/固定/应急场景 */
 data class AprsSymbol(val table: Char, val code: Char, val name: String)
@@ -68,106 +74,108 @@ fun AprsSymbolPickerScreen(
     val viewModel = appViewModel<AprsViewModel>()
     val config by viewModel.settings.collectAsStateWithLifecycle()
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        Spacer(Modifier.height(32.dp))
-
-        // 顶栏
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onNavigateBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = MiuixTheme.colorScheme.onBackground
-                )
-            }
-            Text(
-                "选择 APRS 符号",
-                style = MiuixTheme.textStyles.title2,
-                color = MiuixTheme.colorScheme.onSurface
-            )
-        }
-
-        // 当前符号预览
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            ) {
-                Text(
-                    text = "当前: ",
-                    style = MiuixTheme.textStyles.body1,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "${config.symbolTable}${config.symbolCode}",
-                    style = MiuixTheme.textStyles.title1,
-                    color = MiuixTheme.colorScheme.primary
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = APRS_SYMBOLS.firstOrNull {
-                        it.table == config.symbolTable && it.code == config.symbolCode
-                    }?.name ?: "自定义",
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // 符号网格
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            items(APRS_SYMBOLS) { symbol ->
-                val isSelected = symbol.table == config.symbolTable &&
-                    symbol.code == config.symbolCode
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .then(
-                            if (isSelected) Modifier.border(
-                                2.dp,
-                                MiuixTheme.colorScheme.primary
-                            )
-                            else Modifier
-                        )
-                        .clickable {
-                            viewModel.updateSettings {
-                                it.copy(
-                                    symbolTable = symbol.table,
-                                    symbolCode = symbol.code
-                                )
-                            }
-                            onNavigateBack()
-                        }
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxSize().padding(8.dp)
-                    ) {
-                        Text(
-                            text = "${symbol.table}${symbol.code}",
-                            style = MiuixTheme.textStyles.title1,
-                            color = MiuixTheme.colorScheme.onSurface
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = symbol.name,
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                            textAlign = TextAlign.Center
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "选择 APRS 符号",
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = colorScheme.onBackground
                         )
                     }
                 }
+            )
+        },
+        popupHost = { },
+        contentWindowInsets =
+            WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)
+    ) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = innerPadding.calculateTopPadding())) {
+            // 当前符号预览
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Text(
+                        text = "当前: ",
+                        style = MiuixTheme.textStyles.body1,
+                        color = colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${config.symbolTable}${config.symbolCode}",
+                        style = MiuixTheme.textStyles.title1,
+                        color = colorScheme.primary
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = APRS_SYMBOLS.firstOrNull {
+                            it.table == config.symbolTable && it.code == config.symbolCode
+                        }?.name ?: "自定义",
+                        style = MiuixTheme.textStyles.body2,
+                        color = colorScheme.onSurfaceSecondary
+                    )
+                }
             }
+
+            Spacer(Modifier.height(16.dp))
+
+            // 符号网格
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                items(APRS_SYMBOLS) { symbol ->
+                    val isSelected = symbol.table == config.symbolTable &&
+                        symbol.code == config.symbolCode
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .then(
+                                if (isSelected) Modifier.border(
+                                    2.dp,
+                                    colorScheme.primary
+                                )
+                                else Modifier
+                            )
+                            .clickable {
+                                viewModel.updateSettings {
+                                    it.copy(
+                                        symbolTable = symbol.table,
+                                        symbolCode = symbol.code
+                                    )
+                                }
+                                onNavigateBack()
+                            }
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxSize().padding(8.dp)
+                        ) {
+                            Text(
+                                text = "${symbol.table}${symbol.code}",
+                                style = MiuixTheme.textStyles.title1,
+                                color = colorScheme.onSurface
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = symbol.name,
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = colorScheme.onSurfaceSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
         }
-        Spacer(Modifier.height(16.dp))
     }
 }

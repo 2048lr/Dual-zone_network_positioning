@@ -4,10 +4,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -25,8 +31,14 @@ import com.example.radioarealocator.ui.appViewModel
 import com.example.radioarealocator.ui.viewmodel.AprsViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,52 +52,64 @@ fun AprsStationListScreen(
     val stations by viewModel.stations.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(Modifier.height(32.dp))
+    val scrollBehavior = MiuixScrollBehavior()
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onNavigateBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = MiuixTheme.colorScheme.onBackground
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "APRS 站点",
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = colorScheme.onBackground
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior
+            )
+        },
+        popupHost = { },
+        contentWindowInsets =
+            WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+                .padding(top = innerPadding.calculateTopPadding())
+        ) {
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text = "连接状态: ${connectionState.name} | 站点数: ${stations.distinctBy { it.callsign.substringBefore("-") }.size}",
+                style = MiuixTheme.textStyles.body2,
+                color = colorScheme.onSurfaceSecondary
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            if (stations.isEmpty()) {
+                Text(
+                    text = "暂无站点数据。请确保已连接 APRS-IS 服务器。",
+                    style = MiuixTheme.textStyles.body1,
+                    color = colorScheme.onSurfaceSecondary
                 )
-            }
-            Text(
-                text = "APRS 站点",
-                style = MiuixTheme.textStyles.title2,
-                color = MiuixTheme.colorScheme.onSurface
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "连接状态: ${connectionState.name} | 站点数: ${stations.distinctBy { it.callsign.substringBefore("-") }.size}",
-            style = MiuixTheme.textStyles.body2,
-            color = MiuixTheme.colorScheme.onSurfaceSecondary
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        if (stations.isEmpty()) {
-            Text(
-                text = "暂无站点数据。请确保已连接 APRS-IS 服务器。",
-                style = MiuixTheme.textStyles.body1,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary
-            )
-        } else {
-            LazyColumn {
-                items(stations) { station ->
-                    AprsStationItem(
-                        station = station,
-                        onClick = { onNavigateToStation(station) }
-                    )
-                    Spacer(Modifier.height(8.dp))
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .overScrollVertical()
+                        .scrollEndHaptic()
+                ) {
+                    items(stations) { station ->
+                        AprsStationItem(
+                            station = station,
+                            onClick = { onNavigateToStation(station) }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
                 }
             }
         }
