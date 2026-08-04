@@ -1,5 +1,6 @@
 package com.example.radioarealocator.ui.screen.satellite
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,24 +8,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.add
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -33,27 +27,20 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.dropUnlessResumed
 import com.example.radioarealocator.R
 import com.example.radioarealocator.ui.LocalMainViewModel
 import com.example.radioarealocator.ui.LocalUiMode
@@ -61,52 +48,50 @@ import com.example.radioarealocator.ui.SatelliteFilter
 import com.example.radioarealocator.ui.UiMode
 import com.example.radioarealocator.ui.navigation3.LocalNavigator
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
-import com.example.radioarealocator.ui.theme.LocalEnableBlur
-import com.example.radioarealocator.ui.util.BlurredBar
-import com.example.radioarealocator.ui.util.rememberBlurBackdrop
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.CardDefaults as MiuixCardDefaults
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
 import top.yukonga.miuix.kmp.basic.IconButton as MiuixIconButton
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.Text as MiuixText
-import top.yukonga.miuix.kmp.basic.TextField as MiuixTextField
 import top.yukonga.miuix.kmp.basic.TextButton as MiuixTextButton
-import top.yukonga.miuix.kmp.basic.Button as MiuixButton
-import top.yukonga.miuix.kmp.basic.TopAppBar as MiuixTopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 /**
- * 卫星筛选子页面入口：按名称/来源/模式/状态筛选卫星列表。
+ * 卫星筛选内容组件（供弹窗或子页复用）。
+ * 修改即时写回 [com.example.radioarealocator.ui.MainViewModel]。
+ */
+@Composable
+fun SatelliteFilterDialogContent(
+    onDismiss: () -> Unit
+) {
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> SatelliteFilterContentMiuix(onDismiss = onDismiss)
+        UiMode.Material -> SatelliteFilterContentMaterial(onDismiss = onDismiss)
+    }
+}
+
+/**
+ * 卫星筛选子页面入口（保留独立页面能力）。
  * 由卫星管理页的筛选按钮导航进入，修改即时写回 [com.example.radioarealocator.ui.MainViewModel]，
  * 返回（pop）后管理页列表自动反映新筛选条件。
  */
 @Composable
 fun SatelliteFilterScreen() {
-    when (LocalUiMode.current) {
-        UiMode.Miuix -> SatelliteFilterMiuix()
-        UiMode.Material -> SatelliteFilterMaterial()
-    }
+    val navigator = LocalNavigator.current
+    SatelliteFilterDialogContent(onDismiss = { navigator.pop() })
 }
 
 // ---------------- Miuix 风格 ----------------
 
 @Composable
-private fun SatelliteFilterMiuix() {
-    val navigator = LocalNavigator.current
+private fun SatelliteFilterContentMiuix(
+    onDismiss: () -> Unit
+) {
     val mainViewModel = LocalMainViewModel.current
     val filter by mainViewModel.satelliteFilter
     val onFilterChange: (SatelliteFilter) -> Unit = mainViewModel::updateSatelliteFilter
-
-    val enableBlur = LocalEnableBlur.current
-    val backdrop = rememberBlurBackdrop(enableBlur)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else colorScheme.surface
-    val scrollBehavior = MiuixScrollBehavior()
 
     val unknownModeLabel = stringResource(R.string.filter_mode_unknown)
     val modeOptions = listOf(
@@ -119,118 +104,102 @@ private fun SatelliteFilterMiuix() {
         "" to unknownModeLabel
     )
 
-    MiuixScaffold(
-        topBar = {
-            BlurredBar(backdrop) {
-                MiuixTopAppBar(
-                    color = barColor,
-                    title = stringResource(R.string.filter_title),
-                    navigationIcon = {
-                        Box(modifier = Modifier.padding(start = 12.dp)) {
-                            MiuixIconButton(onClick = dropUnlessResumed { navigator.pop() }) {
-                                MiuixIcon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = null,
-                                    tint = colorScheme.onBackground
-                                )
-                            }
-                        }
-                    },
-                    scrollBehavior = scrollBehavior
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .overScrollVertical()
+            .scrollEndHaptic(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        overscrollEffect = null,
+    ) {
+        // 标题行 + 关闭按钮
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MiuixText(
+                    text = stringResource(R.string.filter_title),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.onBackground
                 )
-            }
-        },
-        popupHost = { },
-        contentWindowInsets = WindowInsets.systemBars
-            .add(WindowInsets.displayCutout)
-            .only(WindowInsetsSides.Horizontal)
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .overScrollVertical()
-                .scrollEndHaptic(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            overscrollEffect = null,
-        ) {
-            // 顶部重置行：始终占位，用 AnimatedVisibility 控制显隐，
-            // 避免条件 item 增减导致下方列表整体跳动。
-            item {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = filter.isActive,
-                    enter = androidx.compose.animation.fadeIn(),
-                    exit = androidx.compose.animation.fadeOut()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        MiuixTextButton(
-                            text = stringResource(R.string.filter_reset),
-                            onClick = { onFilterChange(SatelliteFilter()) }
-                        )
-                    }
-                }
-            }
-
-            // 工作模式
-            item {
-                MiuixFilterSectionCard(title = stringResource(R.string.filter_mode_section)) {
-                    modeOptions.forEach { (value, label) ->
-                        val selected = value in filter.modes
-                        MiuixFilterSelectableRow(
-                            label = label,
-                            selected = selected,
-                            onClick = {
-                                val newModes = if (selected) filter.modes - value else filter.modes + value
-                                onFilterChange(filter.copy(modes = newModes))
-                            }
-                        )
-                    }
-                }
-            }
-
-            // 开关筛选
-            item {
-                MiuixFilterSectionCard(title = stringResource(R.string.filter_status_section)) {
-                    MiuixFilterSwitchRow(
-                        label = stringResource(R.string.filter_only_in_pass),
-                        checked = filter.onlyInPass,
-                        onClick = {
-                            onFilterChange(filter.copy(onlyInPass = !filter.onlyInPass, onlyUpcoming = false))
-                        }
-                    )
-                    MiuixFilterSwitchRow(
-                        label = stringResource(R.string.filter_only_upcoming),
-                        checked = filter.onlyUpcoming,
-                        onClick = {
-                            onFilterChange(filter.copy(onlyUpcoming = !filter.onlyUpcoming, onlyInPass = false))
-                        }
-                    )
-                    MiuixFilterSwitchRow(
-                        label = stringResource(R.string.filter_only_amsat),
-                        checked = filter.onlyAmsat,
-                        onClick = { onFilterChange(filter.copy(onlyAmsat = !filter.onlyAmsat)) }
-                    )
-                    MiuixFilterSwitchRow(
-                        label = stringResource(R.string.filter_only_favorites),
-                        checked = filter.onlyFavorites,
-                        onClick = { onFilterChange(filter.copy(onlyFavorites = !filter.onlyFavorites)) }
+                MiuixIconButton(onClick = onDismiss) {
+                    MiuixIcon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = null,
+                        tint = colorScheme.onBackground
                     )
                 }
             }
+        }
 
-            // 应用筛选
-            item {
-                MiuixButton(
-                    onClick = { navigator.pop() },
+        // 顶部重置行：始终占位，用 AnimatedVisibility 控制显隐，
+        // 避免条件 item 增减导致下方列表整体跳动。
+        item {
+            AnimatedVisibility(
+                visible = filter.isActive,
+                enter = androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.fadeOut()
+            ) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColorsPrimary()
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    MiuixText(text = stringResource(R.string.filter_apply))
+                    MiuixTextButton(
+                        text = stringResource(R.string.filter_reset),
+                        onClick = { onFilterChange(SatelliteFilter()) }
+                    )
                 }
+            }
+        }
+
+        // 工作模式
+        item {
+            MiuixFilterSectionCard(title = stringResource(R.string.filter_mode_section)) {
+                modeOptions.forEach { (value, label) ->
+                    val selected = value in filter.modes
+                    MiuixFilterSelectableRow(
+                        label = label,
+                        selected = selected,
+                        onClick = {
+                            val newModes = if (selected) filter.modes - value else filter.modes + value
+                            onFilterChange(filter.copy(modes = newModes))
+                        }
+                    )
+                }
+            }
+        }
+
+        // 开关筛选
+        item {
+            MiuixFilterSectionCard(title = stringResource(R.string.filter_status_section)) {
+                MiuixFilterSwitchRow(
+                    label = stringResource(R.string.filter_only_in_pass),
+                    checked = filter.onlyInPass,
+                    onClick = {
+                        onFilterChange(filter.copy(onlyInPass = !filter.onlyInPass, onlyUpcoming = false))
+                    }
+                )
+                MiuixFilterSwitchRow(
+                    label = stringResource(R.string.filter_only_upcoming),
+                    checked = filter.onlyUpcoming,
+                    onClick = {
+                        onFilterChange(filter.copy(onlyUpcoming = !filter.onlyUpcoming, onlyInPass = false))
+                    }
+                )
+                MiuixFilterSwitchRow(
+                    label = stringResource(R.string.filter_only_amsat),
+                    checked = filter.onlyAmsat,
+                    onClick = { onFilterChange(filter.copy(onlyAmsat = !filter.onlyAmsat)) }
+                )
+                MiuixFilterSwitchRow(
+                    label = stringResource(R.string.filter_only_favorites),
+                    checked = filter.onlyFavorites,
+                    onClick = { onFilterChange(filter.copy(onlyFavorites = !filter.onlyFavorites)) }
+                )
             }
         }
     }
@@ -328,13 +297,12 @@ private fun MiuixFilterSwitchRow(label: String, checked: Boolean, onClick: () ->
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SatelliteFilterMaterial() {
-    val navigator = LocalNavigator.current
+private fun SatelliteFilterContentMaterial(
+    onDismiss: () -> Unit
+) {
     val mainViewModel = LocalMainViewModel.current
     val filter by mainViewModel.satelliteFilter
     val onFilterChange: (SatelliteFilter) -> Unit = mainViewModel::updateSatelliteFilter
-
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     val unknownModeLabel = stringResource(R.string.filter_mode_unknown)
     val modeOptions = listOf(
@@ -347,97 +315,86 @@ private fun SatelliteFilterMaterial() {
         "" to unknownModeLabel
     )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.filter_title)) },
-                navigationIcon = {
-                    IconButton(onClick = dropUnlessResumed { navigator.pop() }) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // 标题行 + 关闭按钮 + 重置
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = null
                         )
                     }
-                },
-                actions = {
-                    if (filter.isActive) {
-                        TextButton(onClick = { onFilterChange(SatelliteFilter()) }) {
-                            Text(
-                                text = stringResource(R.string.filter_reset),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        },
-        contentWindowInsets = WindowInsets.systemBars
-            .add(WindowInsets.displayCutout)
-            .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
-                .padding(innerPadding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // 工作模式
-            item {
-                MaterialFilterSectionCard(title = stringResource(R.string.filter_mode_section)) {
-                    modeOptions.forEach { (value, label) ->
-                        val selected = value in filter.modes
-                        FilterCheckRowMaterial(
-                            label = label,
-                            checked = selected,
-                            onToggle = {
-                                val newModes = if (selected) filter.modes - value else filter.modes + value
-                                onFilterChange(filter.copy(modes = newModes))
-                            }
+                    Text(
+                        text = stringResource(R.string.filter_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                AnimatedVisibility(visible = filter.isActive) {
+                    TextButton(onClick = { onFilterChange(SatelliteFilter()) }) {
+                        Text(
+                            text = stringResource(R.string.filter_reset),
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             }
+        }
 
-            // 开关筛选
-            item {
-                MaterialFilterSectionCard(title = stringResource(R.string.filter_status_section)) {
-                    FilterSwitchRowMaterial(
-                        label = stringResource(R.string.filter_only_in_pass),
-                        checked = filter.onlyInPass,
+        // 工作模式
+        item {
+            MaterialFilterSectionCard(title = stringResource(R.string.filter_mode_section)) {
+                modeOptions.forEach { (value, label) ->
+                    val selected = value in filter.modes
+                    FilterCheckRowMaterial(
+                        label = label,
+                        checked = selected,
                         onToggle = {
-                            onFilterChange(filter.copy(onlyInPass = !filter.onlyInPass, onlyUpcoming = false))
+                            val newModes = if (selected) filter.modes - value else filter.modes + value
+                            onFilterChange(filter.copy(modes = newModes))
                         }
-                    )
-                    FilterSwitchRowMaterial(
-                        label = stringResource(R.string.filter_only_upcoming),
-                        checked = filter.onlyUpcoming,
-                        onToggle = {
-                            onFilterChange(filter.copy(onlyUpcoming = !filter.onlyUpcoming, onlyInPass = false))
-                        }
-                    )
-                    FilterSwitchRowMaterial(
-                        label = stringResource(R.string.filter_only_amsat),
-                        checked = filter.onlyAmsat,
-                        onToggle = { onFilterChange(filter.copy(onlyAmsat = !filter.onlyAmsat)) }
-                    )
-                    FilterSwitchRowMaterial(
-                        label = stringResource(R.string.filter_only_favorites),
-                        checked = filter.onlyFavorites,
-                        onToggle = { onFilterChange(filter.copy(onlyFavorites = !filter.onlyFavorites)) }
                     )
                 }
             }
+        }
 
-            // 应用筛选
-            item {
-                Button(
-                    onClick = { navigator.pop() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.filter_apply))
+        // 开关筛选
+        item {
+            MaterialFilterSectionCard(title = stringResource(R.string.filter_status_section)) {
+                FilterSwitchRowMaterial(
+                    label = stringResource(R.string.filter_only_in_pass),
+                    checked = filter.onlyInPass,
+                    onToggle = {
+                        onFilterChange(filter.copy(onlyInPass = !filter.onlyInPass, onlyUpcoming = false))
+                    }
+                )
+                FilterSwitchRowMaterial(
+                    label = stringResource(R.string.filter_only_upcoming),
+                    checked = filter.onlyUpcoming,
+                    onToggle = {
+                        onFilterChange(filter.copy(onlyUpcoming = !filter.onlyUpcoming, onlyInPass = false))
+                    }
+                )
+                FilterSwitchRowMaterial(
+                    label = stringResource(R.string.filter_only_amsat),
+                    checked = filter.onlyAmsat,
+                    onToggle = { onFilterChange(filter.copy(onlyAmsat = !filter.onlyAmsat)) }
+                )
+                FilterSwitchRowMaterial(
+                    label = stringResource(R.string.filter_only_favorites),
+                    checked = filter.onlyFavorites,
+                    onToggle = { onFilterChange(filter.copy(onlyFavorites = !filter.onlyFavorites)) }
                 }
             }
         }

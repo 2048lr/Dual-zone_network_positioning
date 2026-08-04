@@ -55,6 +55,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,7 +80,7 @@ import com.example.radioarealocator.ui.LocalMainViewModel
 import com.example.radioarealocator.ui.applyFilter
 import com.example.radioarealocator.ui.isSatelliteSourceExpired
 import com.example.radioarealocator.ui.navigation3.LocalNavigator
-import com.example.radioarealocator.ui.navigation3.Route
+
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
 import kotlinx.coroutines.delay
 import java.time.Duration
@@ -98,6 +100,7 @@ fun SatelliteManagementMaterial() {
     val satelliteState by mainViewModel.satelliteState
     val favorites by mainViewModel.favoriteSatellites
     val filter by mainViewModel.satelliteFilter
+    var showFilterDialog by rememberSaveable { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
@@ -128,11 +131,29 @@ fun SatelliteManagementMaterial() {
             onNameQueryChange = { query ->
                 mainViewModel.updateSatelliteFilter(filter.copy(nameQuery = query))
             },
+            onShowFilterDialog = { showFilterDialog = true },
             onGetLocation = mainViewModel::refreshLocationOnly,
             onUpdateSource = mainViewModel::refreshSatelliteSourceOnly,
             contentPadding = innerPadding,
             nestedScrollConnection = scrollBehavior.nestedScrollConnection
         )
+
+        if (showFilterDialog) {
+            Dialog(
+                onDismissRequest = { showFilterDialog = false },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false
+                )
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    SatelliteFilterDialogContent(onDismiss = { showFilterDialog = false })
+                }
+            }
+        }
     }
 }
 
@@ -145,6 +166,7 @@ private fun SatelliteManagementContentMaterial(
     statusTracker: SatelliteStatusTracker,
     onToggleFavorite: (Int) -> Unit,
     onNameQueryChange: (String) -> Unit,
+    onShowFilterDialog: () -> Unit,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit,
     contentPadding: PaddingValues,
@@ -212,6 +234,7 @@ private fun SatelliteManagementContentMaterial(
                 favoriteCount = favoriteCount,
                 filter = filter,
                 onNameQueryChange = onNameQueryChange,
+                onShowFilterDialog = onShowFilterDialog,
                 onGetLocation = onGetLocation,
                 onUpdateSource = onUpdateSource
             )
@@ -283,6 +306,7 @@ private fun SatelliteOverviewCardMaterial(
     favoriteCount: Int,
     filter: SatelliteFilter,
     onNameQueryChange: (String) -> Unit,
+    onShowFilterDialog: () -> Unit,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit
 ) {
@@ -339,7 +363,10 @@ private fun SatelliteOverviewCardMaterial(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 筛选按钮：始终固定在左侧
-                SatelliteFilterButtonMaterial(filter = filter)
+                SatelliteFilterButtonMaterial(
+                    filter = filter,
+                    onClick = onShowFilterDialog
+                )
 
                 // 计数文字：激活时从按钮右侧淡入，不改变按钮位置
                 androidx.compose.animation.AnimatedVisibility(
@@ -454,9 +481,9 @@ private fun ManagementStatMaterial(label: String, value: String, modifier: Modif
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SatelliteFilterButtonMaterial(
-    filter: SatelliteFilter
+    filter: SatelliteFilter,
+    onClick: () -> Unit
 ) {
-    val navigator = LocalNavigator.current
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
@@ -466,7 +493,7 @@ private fun SatelliteFilterButtonMaterial(
                 else MaterialTheme.colorScheme.outline,
                 shape = RoundedCornerShape(10.dp)
             )
-            .clickable { navigator.push(Route.SatelliteFilter) }
+            .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)

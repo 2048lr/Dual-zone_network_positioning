@@ -40,6 +40,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,7 +61,6 @@ import com.example.radioarealocator.ui.LocalMainViewModel
 import com.example.radioarealocator.ui.applyFilter
 import com.example.radioarealocator.ui.isSatelliteSourceExpired
 import com.example.radioarealocator.ui.navigation3.LocalNavigator
-import com.example.radioarealocator.ui.navigation3.Route
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
 import com.example.radioarealocator.ui.theme.LocalEnableBlur
 import com.example.radioarealocator.ui.theme.SafeColors
@@ -106,6 +107,7 @@ fun SatelliteManagementMiuix() {
     val satelliteState by mainViewModel.satelliteState
     val favorites by mainViewModel.favoriteSatellites
     val filter by mainViewModel.satelliteFilter
+    var showFilterDialog by rememberSaveable { mutableStateOf(false) }
 
     val enableBlur = LocalEnableBlur.current
     val backdrop = rememberBlurBackdrop(enableBlur)
@@ -149,10 +151,28 @@ fun SatelliteManagementMiuix() {
             onNameQueryChange = { query ->
                 mainViewModel.updateSatelliteFilter(filter.copy(nameQuery = query))
             },
+            onShowFilterDialog = { showFilterDialog = true },
             onGetLocation = mainViewModel::refreshLocationOnly,
             onUpdateSource = mainViewModel::refreshSatelliteSourceOnly,
             contentPadding = innerPadding
         )
+
+        if (showFilterDialog) {
+            Dialog(
+                onDismissRequest = { showFilterDialog = false },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false
+                )
+            ) {
+                top.yukonga.miuix.kmp.basic.Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = colorScheme.background
+                ) {
+                    SatelliteFilterDialogContent(onDismiss = { showFilterDialog = false })
+                }
+            }
+        }
     }
 }
 
@@ -165,6 +185,7 @@ private fun SatelliteManagementContent(
     statusTracker: SatelliteStatusTracker,
     onToggleFavorite: (Int) -> Unit,
     onNameQueryChange: (String) -> Unit,
+    onShowFilterDialog: () -> Unit,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit,
     contentPadding: PaddingValues
@@ -235,6 +256,7 @@ private fun SatelliteManagementContent(
                 favoriteCount = favoriteCount,
                 filter = filter,
                 onNameQueryChange = onNameQueryChange,
+                onShowFilterDialog = onShowFilterDialog,
                 onGetLocation = onGetLocation,
                 onUpdateSource = onUpdateSource
             )
@@ -303,6 +325,7 @@ private fun SatelliteOverviewCard(
     favoriteCount: Int,
     filter: com.example.radioarealocator.ui.SatelliteFilter,
     onNameQueryChange: (String) -> Unit,
+    onShowFilterDialog: () -> Unit,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit
 ) {
@@ -359,7 +382,10 @@ private fun SatelliteOverviewCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 筛选按钮：始终固定在左侧
-                SatelliteFilterButton(filter = filter)
+                SatelliteFilterButton(
+                    filter = filter,
+                    onClick = onShowFilterDialog
+                )
 
                 // 计数文字：激活时从按钮右侧淡入，不改变按钮位置
                 androidx.compose.animation.AnimatedVisibility(
@@ -473,13 +499,13 @@ private fun ManagementStat(label: String, value: String, modifier: Modifier = Mo
 
 @Composable
 private fun SatelliteFilterButton(
-    filter: com.example.radioarealocator.ui.SatelliteFilter
+    filter: com.example.radioarealocator.ui.SatelliteFilter,
+    onClick: () -> Unit
 ) {
-    val navigator = LocalNavigator.current
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
-            .clickable { navigator.push(Route.SatelliteFilter) }
+            .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
