@@ -124,6 +124,9 @@ fun SatelliteManagementMaterial() {
             favorites = favorites,
             statusTracker = mainViewModel.statusTracker,
             onToggleFavorite = mainViewModel::toggleFavorite,
+            onNameQueryChange = { query ->
+                mainViewModel.updateSatelliteFilter(filter.copy(nameQuery = query))
+            },
             onGetLocation = mainViewModel::refreshLocationOnly,
             onUpdateSource = mainViewModel::refreshSatelliteSourceOnly,
             contentPadding = innerPadding,
@@ -140,6 +143,7 @@ private fun SatelliteManagementContentMaterial(
     favorites: Set<Int>,
     statusTracker: SatelliteStatusTracker,
     onToggleFavorite: (Int) -> Unit,
+    onNameQueryChange: (String) -> Unit,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit,
     contentPadding: PaddingValues,
@@ -206,6 +210,7 @@ private fun SatelliteManagementContentMaterial(
                 filteredCount = filteredSatellites.size,
                 favoriteCount = favoriteCount,
                 filter = filter,
+                onNameQueryChange = onNameQueryChange,
                 onGetLocation = onGetLocation,
                 onUpdateSource = onUpdateSource
             )
@@ -276,6 +281,7 @@ private fun SatelliteOverviewCardMaterial(
     filteredCount: Int,
     favoriteCount: Int,
     filter: SatelliteFilter,
+    onNameQueryChange: (String) -> Unit,
     onGetLocation: () -> Unit,
     onUpdateSource: () -> Unit
 ) {
@@ -294,6 +300,15 @@ private fun SatelliteOverviewCardMaterial(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // 名称搜索框（移自筛选页，置于顶部最易触达位置）
+            OutlinedTextField(
+                value = filter.nameQuery,
+                onValueChange = onNameQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.filter_search_hint)) }
+            )
+
             // 描述 + 统计
             Text(
                 text = stringResource(R.string.satellite_management_desc),

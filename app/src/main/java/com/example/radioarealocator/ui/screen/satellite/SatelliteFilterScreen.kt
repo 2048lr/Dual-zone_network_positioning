@@ -155,9 +155,14 @@ private fun SatelliteFilterMiuix() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             overscrollEffect = null,
         ) {
-            // 顶部重置行
-            if (filter.isActive) {
-                item {
+            // 顶部重置行：始终占位，用 AnimatedVisibility 控制显隐，
+            // 避免条件 item 增减导致下方列表整体跳动。
+            item {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = filter.isActive,
+                    enter = androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.fadeOut()
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
@@ -165,26 +170,6 @@ private fun SatelliteFilterMiuix() {
                         MiuixTextButton(
                             text = stringResource(R.string.filter_reset),
                             onClick = { onFilterChange(SatelliteFilter()) }
-                        )
-                    }
-                }
-            }
-
-            // 名称搜索
-            item {
-                MiuixCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = MiuixCardDefaults.defaultColors(
-                        color = colorScheme.surface.copy(alpha = LocalCardAlpha.current)
-                    )
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                        MiuixTextField(
-                            value = filter.nameQuery,
-                            onValueChange = { onFilterChange(filter.copy(nameQuery = it)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = stringResource(R.string.filter_search_hint),
-                            singleLine = true
                         )
                     }
                 }
@@ -399,19 +384,6 @@ private fun SatelliteFilterMaterial() {
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 名称搜索
-            item {
-                MaterialFilterSectionCard(title = stringResource(R.string.filter_search_hint)) {
-                    OutlinedTextField(
-                        value = filter.nameQuery,
-                        onValueChange = { onFilterChange(filter.copy(nameQuery = it)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        placeholder = { Text(stringResource(R.string.filter_search_hint)) }
-                    )
-                }
-            }
-
             // 工作模式
             item {
                 MaterialFilterSectionCard(title = stringResource(R.string.filter_mode_section)) {
