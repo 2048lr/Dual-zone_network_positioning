@@ -86,6 +86,8 @@ import com.example.radioarealocator.ui.screen.aprs.AprsStationListScreen
 import com.example.radioarealocator.ui.screen.aprs.AprsMapScreen
 import com.example.radioarealocator.ui.screen.aprs.AprsMessageScreen
 import com.example.radioarealocator.ui.screen.aprs.AprsSymbolPickerScreen
+import com.example.radioarealocator.ui.screen.ft8.Ft8MainScreen
+import com.example.radioarealocator.ui.screen.ft8.Ft8SettingsScreen
 import com.example.radioarealocator.ui.screen.settings.SettingsScreenActions
 import com.example.radioarealocator.ui.screen.settings.UpdateDialogs
 import com.example.radioarealocator.ui.theme.RadioAreaLocatorTheme
@@ -200,6 +202,8 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.AprsMessages> { WithApplicationViewModelStoreOwner { AprsMessageScreen(onNavigateBack = { navigator.pop() }) } }
                                 entry<Route.AprsMap> { WithApplicationViewModelStoreOwner { AprsMapScreen(onNavigateBack = { navigator.pop() }) } }
                                 entry<Route.AprsSymbolPicker> { WithApplicationViewModelStoreOwner { AprsSymbolPickerScreen(onNavigateBack = { navigator.pop() }) } }
+                                entry<Route.Ft8Main> { WithApplicationViewModelStoreOwner { Ft8MainScreen(onNavigate = { navigator.push(it) }, onNavigateBack = { navigator.pop() }) } }
+                                entry<Route.Ft8Settings> { WithApplicationViewModelStoreOwner { Ft8SettingsScreen(onNavigateBack = { navigator.pop() }) } }
                             }
                         )
                     }

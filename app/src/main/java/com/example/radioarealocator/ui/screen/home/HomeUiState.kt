@@ -41,4 +41,5 @@ data class HomeActions(
     val onCWPracticeClick: () -> Unit = {},
     val onLocationDetailClick: () -> Unit = {},
     val onAprsClick: () -> Unit = {},
+    val onFt8Click: () -> Unit = {},
 )

@@ -137,6 +137,7 @@ fun HomePagerMiuix(
                         CwEntryCardMiuix(actions.onCWPracticeClick)
                         // APRS 入口
                         AprsEntryCardMiuix(actions.onAprsClick)
+                        Ft8EntryCardMiuix(actions.onFt8Click)
                     }
                     Spacer(Modifier.height(bottomInnerPadding))
                 }
@@ -474,6 +475,17 @@ private fun AprsEntryCardMiuix(onClick: () -> Unit) {
         BasicComponent(
             title = stringResource(R.string.aprs),
             summary = stringResource(R.string.aprs_desc),
+            onClick = onClick
+        )
+    }
+}
+
+@Composable
+private fun Ft8EntryCardMiuix(onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        BasicComponent(
+            title = stringResource(R.string.ft8),
+            summary = stringResource(R.string.ft8_desc),
             onClick = onClick
         )
     }
