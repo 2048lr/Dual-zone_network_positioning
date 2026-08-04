@@ -395,7 +395,7 @@ private fun SatelliteFilterContentMaterial(
                     label = stringResource(R.string.filter_only_favorites),
                     checked = filter.onlyFavorites,
                     onToggle = { onFilterChange(filter.copy(onlyFavorites = !filter.onlyFavorites)) }
-                }
+                )
             }
         }
     }

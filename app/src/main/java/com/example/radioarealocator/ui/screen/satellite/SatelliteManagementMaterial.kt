@@ -146,7 +146,7 @@ fun SatelliteManagementMaterial() {
                     decorFitsSystemWindows = false
                 )
             ) {
-                Surface(
+                androidx.compose.material3.Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
