@@ -101,7 +101,7 @@ class SatellitePredictor {
             val modes = SatelliteCatalog.MODES_BY_CATALOG_NUMBER[tle.catnum].orEmpty()
 
             // 预过滤：剔除 GEO / 高轨卫星，避免对永不可见过境的卫星做无效 SGP4 扫描
-            val meanMotion = tle.getMeanMotion() // 转/天
+            val meanMotion = tle.meanmo // 转/天
             if (meanMotion > 0.0) {
                 val periodMinutes = 1440.0 / meanMotion
                 if (periodMinutes > GEO_PERIOD_THRESHOLD_MINUTES) return null
