@@ -390,15 +390,7 @@ private fun ActionRowMaterial(
             enabled = enabled,
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp)
         ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
-                Text(buttonText)
-            }
+            Text(buttonText)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(

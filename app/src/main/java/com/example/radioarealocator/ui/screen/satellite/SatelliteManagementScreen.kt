@@ -70,11 +70,9 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
@@ -413,22 +411,7 @@ private fun ActionRow(
             enabled = enabled,
             colors = ButtonDefaults.buttonColorsPrimary()
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                // 文字始终占位保留按钮宽度，加载时透明，spinner 叠加居中
-                Text(
-                    buttonText,
-                    color = if (isLoading) Color.Transparent else colorScheme.onPrimary
-                )
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                            foregroundColor = colorScheme.onPrimary
-                        )
-                    )
-                }
-            }
+            Text(buttonText)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
