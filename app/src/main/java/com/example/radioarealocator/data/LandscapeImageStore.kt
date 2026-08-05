@@ -13,20 +13,10 @@ class LandscapeImageStore(context: Context) {
         if (!exists()) mkdirs()
     }
 
-    val apiImageFile: File get() = File(bgDir, API_IMAGE_NAME)
     val customImageFile: File get() = File(bgDir, CUSTOM_IMAGE_NAME)
 
     val effectiveImageFile: File?
         get() = customImageFile.takeIf { it.exists() && it.length() > 0 }
-            ?: apiImageFile.takeIf { it.exists() && it.length() > 0 }
-
-    fun saveApiImage(bytes: ByteArray) {
-        try {
-            apiImageFile.delete()
-            apiImageFile.writeBytes(bytes)
-        } catch (_: Exception) {
-        }
-    }
 
     fun saveCustomImage(sourceUri: Uri, context: Context): Boolean {
         return try {
@@ -75,7 +65,6 @@ class LandscapeImageStore(context: Context) {
 
     companion object {
         private const val BG_DIR_NAME = "bg_landscape"
-        private const val API_IMAGE_NAME = "api_image.jpg"
         private const val CUSTOM_IMAGE_NAME = "custom_image.jpg"
 
         private fun calculateInSampleSize(

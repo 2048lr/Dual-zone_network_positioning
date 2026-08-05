@@ -63,6 +63,10 @@ import androidx.compose.ui.unit.sp
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
 import com.example.radioarealocator.R
 import com.example.radioarealocator.ui.component.miuix.ScaleDialog
 import com.example.radioarealocator.ui.theme.LocalEnableBlur
@@ -104,10 +108,10 @@ fun ColorPaletteScreenMiuix(
     val currentColorMode = state.currentColorMode
     val isDark = currentColorMode.isDark || currentColorMode.isSystem && isSystemInDarkTheme()
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { actions.onSetCustomBackground(it) }
+    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            result.uriContent?.let { actions.onSetCustomBackground(it) }
+        }
     }
 
     Scaffold(
@@ -434,8 +438,42 @@ fun ColorPaletteScreenMiuix(
                                     tint = colorScheme.onBackground
                                 )
                             },
-                            onClick = { imagePickerLauncher.launch("image/*") },
+                            onClick = {
+                                cropLauncher.launch(
+                                    CropImageContractOptions(
+                                        uri = null,
+                                        cropImageOptions = CropImageOptions(
+                                            guidelines = CropImageView.Guidelines.ON,
+                                            fixAspectRatio = true,
+                                            aspectRatioX = 16,
+                                            aspectRatioY = 9,
+                                        )
+                                    )
+                                )
+                            },
                         )
+                    }
+
+                    if (uiState.customBackgroundUri.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .padding(top = 12.dp)
+                                .fillMaxWidth(),
+                        ) {
+                            ArrowPreference(
+                                title = stringResource(id = R.string.settings_clear_background),
+                                summary = stringResource(id = R.string.settings_clear_background_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.Wallpaper,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.settings_clear_background),
+                                        tint = colorScheme.onBackground
+                                    )
+                                },
+                                onClick = actions.onClearCustomBackground,
+                            )
+                        }
                     }
                 }
                 item {

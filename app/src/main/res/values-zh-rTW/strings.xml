@@ -18,4 +18,6 @@
     <string name="settings_custom_background">自訂時間卡片背景</string>
     <string name="settings_custom_background_summary">從相簿選擇圖片作為時間卡片的背景</string>
     <string name="settings_custom_background_set">已設定自訂圖片，點擊可更換</string>
+    <string name="settings_clear_background">清除背景圖片</string>
+    <string name="settings_clear_background_summary">移除自訂圖片，恢復一般卡片樣式</string>
     </resources>

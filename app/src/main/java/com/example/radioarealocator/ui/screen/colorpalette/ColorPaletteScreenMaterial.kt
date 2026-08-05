@@ -92,6 +92,10 @@ import androidx.compose.ui.unit.dp
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
 import com.example.radioarealocator.R
 import com.example.radioarealocator.ui.component.material.SegmentedColumn
 import com.example.radioarealocator.ui.component.material.SegmentedDropdownItem
@@ -114,10 +118,10 @@ fun ColorPaletteScreenMaterial(
     val colorSpec = state.currentColorSpec
     val haptic = LocalHapticFeedback.current
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { actions.onSetCustomBackground(it) }
+    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            result.uriContent?.let { actions.onSetCustomBackground(it) }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -347,7 +351,19 @@ fun ColorPaletteScreenMaterial(
                 content = listOf(
                     {
                         SegmentedListItem(
-                            onClick = { imagePickerLauncher.launch("image/*") },
+                            onClick = {
+                                cropLauncher.launch(
+                                    CropImageContractOptions(
+                                        uri = null,
+                                        cropImageOptions = CropImageOptions(
+                                            guidelines = CropImageView.Guidelines.ON,
+                                            fixAspectRatio = true,
+                                            aspectRatioX = 16,
+                                            aspectRatioY = 9,
+                                        )
+                                    )
+                                )
+                            },
                             headlineContent = {
                                 Text(
                                     stringResource(id = R.string.settings_custom_background)
@@ -372,6 +388,35 @@ fun ColorPaletteScreenMaterial(
                     }
                 )
             )
+
+            if (uiState.customBackgroundUri.isNotEmpty()) {
+                SegmentedColumn(
+                    modifier = Modifier.padding(top = 4.dp),
+                    content = listOf(
+                        {
+                            SegmentedListItem(
+                                onClick = actions.onClearCustomBackground,
+                                headlineContent = {
+                                    Text(
+                                        stringResource(id = R.string.settings_clear_background)
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(
+                                        stringResource(id = R.string.settings_clear_background_summary)
+                                    )
+                                },
+                                leadingContent = {
+                                    Icon(
+                                        imageVector = Icons.Rounded.AspectRatio,
+                                        contentDescription = stringResource(id = R.string.settings_clear_background)
+                                    )
+                                },
+                            )
+                        }
+                    )
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp + navBars.calculateBottomPadding() + captionBar.calculateBottomPadding()))
         }

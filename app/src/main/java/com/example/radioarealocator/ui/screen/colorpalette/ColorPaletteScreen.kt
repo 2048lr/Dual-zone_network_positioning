@@ -65,6 +65,10 @@ fun ColorPaletteScreen() {
                 viewModel.setCustomBackgroundUri(uri.toString())
             }
         },
+        onClearCustomBackground = {
+            imageStore.clearCustomImage()
+            viewModel.clearCustomBackgroundUri()
+        },
     )
 
     when (LocalUiMode.current) {

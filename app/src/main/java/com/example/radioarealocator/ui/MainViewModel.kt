@@ -7,7 +7,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.radioarealocator.data.HitokotoApiService
-import com.example.radioarealocator.data.LandscapeImageApiService
 import com.example.radioarealocator.data.LandscapeImageStore
 import com.example.radioarealocator.data.LocationResult
 import com.example.radioarealocator.data.SettingsStore
@@ -95,7 +94,6 @@ class MainViewModel : ViewModel() {
     private val reminderScheduler = ReminderScheduler(app)
     // 每日一言服务：从 https://v1.hitokoto.cn/ 获取，失败回退本地文案池
     private val hitokotoApi = HitokotoApiService()
-    private val landscapeImageApi = LandscapeImageApiService()
     private val landscapeImageStore = LandscapeImageStore(app)
 
     // ---- CW练习模块 ----
@@ -115,8 +113,6 @@ class MainViewModel : ViewModel() {
     private var segmentStatusFetchedAt: Instant? = null
     // 持续位置监听 Job：在首次成功定位后启动，自动跟踪设备位置变化
     private var locationUpdatesJob: Job? = null
-    // 时间卡片背景图拉取 Job：防止页面 resume 重复并发拉取
-    private var landscapeFetchJob: Job? = null
 
     // 卫星过境预测结果缓存：避免同一坐标在短时间内重复执行 CPU 密集的 SGP4 计算。
     // 缓存有效期 15 分钟（PREDICTION_CACHE_TTL），坐标偏移超过 0.001° 时视为新位置需重新预测。
@@ -337,26 +333,11 @@ class MainViewModel : ViewModel() {
 
     fun refreshLandscapeImage() {
         val effectiveFile = landscapeImageStore.effectiveImageFile
-        // 已有有效图片且非 API 图（自定义图优先），无需重新拉取
         if (effectiveFile != null && effectiveFile.exists()) {
             _timeCardBackgroundFile.value = effectiveFile
             extractAndUpdateMaskColor(effectiveFile)
-            return
-        }
-
-        // 没有有效图片，从 API 拉取（Job 守卫防止 resume 触发重复并发请求）
-        if (landscapeFetchJob?.isActive == true) return
-        landscapeFetchJob = viewModelScope.launch {
-            try {
-                val bytes = landscapeImageApi.fetchRandomLandscape()
-                if (bytes != null && bytes.isNotEmpty()) {
-                    landscapeImageStore.saveApiImage(bytes)
-                    val apiFile = landscapeImageStore.apiImageFile
-                    _timeCardBackgroundFile.value = apiFile
-                    extractAndUpdateMaskColor(apiFile)
-                }
-            } catch (_: Exception) {
-            }
+        } else {
+            _timeCardBackgroundFile.value = null
         }
     }
 
@@ -382,13 +363,7 @@ class MainViewModel : ViewModel() {
 
     fun clearCustomBackground() {
         landscapeImageStore.clearCustomImage()
-        val apiFile = landscapeImageStore.apiImageFile
-        if (apiFile.exists()) {
-            _timeCardBackgroundFile.value = apiFile
-            extractAndUpdateMaskColor(apiFile)
-        } else {
-            refreshLandscapeImage()
-        }
+        _timeCardBackgroundFile.value = null
     }
 
     companion object {

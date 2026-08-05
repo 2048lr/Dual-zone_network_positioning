@@ -29,4 +29,5 @@ data class ColorPaletteScreenActions(
     val onSetEnablePredictiveBack: (Boolean) -> Unit,
     val onSetPageScale: (Float) -> Unit,
     val onSetCustomBackground: (android.net.Uri) -> Unit = {},
+    val onClearCustomBackground: () -> Unit = {},
 )

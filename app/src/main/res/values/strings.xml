@@ -84,6 +84,8 @@
     <string name="settings_custom_background">Custom time card background</string>
     <string name="settings_custom_background_summary">Select an image from gallery as the time card background.</string>
     <string name="settings_custom_background_set">Custom image set. Tap to change.</string>
+    <string name="settings_clear_background">Clear background image</string>
+    <string name="settings_clear_background_summary">Remove custom image and restore normal card style.</string>
 
     <!-- User project business strings (Chinese-only, marked translatable=false) -->
     <string name="action_refresh" translatable="false">刷新定位</string>
