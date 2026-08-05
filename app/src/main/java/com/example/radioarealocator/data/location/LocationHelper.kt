@@ -190,6 +190,8 @@ class LocationHelper(private val context: Context) {
             // 暂存精度未达标的结果：超时前有更优结果则替换，超时则用此兜底
             var fallback: Location? = null
             val handler = android.os.Handler(Looper.getMainLooper())
+            // listener 在下面定义，这里用 lateinit 让 timeoutRunnable 可引用
+            lateinit var listener: LocationListener
             val timeoutRunnable = Runnable {
                 if (resumed.compareAndSet(false, true)) {
                     removeListener(listener)
@@ -202,7 +204,7 @@ class LocationHelper(private val context: Context) {
                 }
             }
 
-            val listener = object : LocationListener {
+            listener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
                     if (resumed.get()) return
                     // 精度达标或来自 GPS：立即返回（GPS accuracy 计算保守，即使超门槛也可信）
