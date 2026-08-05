@@ -32,6 +32,15 @@ import kotlin.coroutines.resumeWithException
  */
 class LocationHelper(private val context: Context) {
 
+    companion object {
+        /** 单次定位精度门槛：精度优于此值立即返回，否则继续等更优结果 */
+        private const val ACCURACY_THRESHOLD_METERS = 20f
+        /** lastKnown 缓存最大可接受精度：超过此值的缓存视为不可用 */
+        private const val CACHE_MAX_ACCURACY_METERS = 50f
+        /** 持续定位去重时间窗：此窗口内只保留精度最优的一次上报 */
+        private const val DEDUP_WINDOW_MS = 1500L
+    }
+
     private val locationManager by lazy {
         context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     }
@@ -93,9 +102,32 @@ class LocationHelper(private val context: Context) {
             return@callbackFlow
         }
 
+        // 去重状态：时间窗内暂存最优结果，窗口结束 emit 精度最高的那个
+        var pendingBest: Location? = null
+        var pendingEmitTime = 0L
+        val handler = android.os.Handler(Looper.getMainLooper())
+        val emitRunnable = Runnable {
+            pendingBest?.let { best ->
+                pendingBest = null
+                trySend(best)
+            }
+        }
+
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
-                trySend(location)
+                val now = android.os.SystemClock.elapsedRealtime()
+                val current = pendingBest
+                if (current == null) {
+                    // 窗口起点：暂存并安排窗口结束 emit
+                    pendingBest = location
+                    pendingEmitTime = now + DEDUP_WINDOW_MS
+                    handler.postDelayed(emitRunnable, DEDUP_WINDOW_MS)
+                } else {
+                    // 窗口内：保留精度更优的
+                    if (location.accuracy < current.accuracy) {
+                        pendingBest = location
+                    }
+                }
             }
 
             override fun onProviderEnabled(provider: String) {}
@@ -142,6 +174,7 @@ class LocationHelper(private val context: Context) {
         }
 
         awaitClose {
+            handler.removeCallbacks(emitRunnable)
             try {
                 locationManager.removeUpdates(listener)
             } catch (_: Exception) {
@@ -154,11 +187,39 @@ class LocationHelper(private val context: Context) {
         suspendCancellableCoroutine { continuation ->
             // 协程体与 listener 回调可能在不同线程执行，用 AtomicBoolean 防二次 resume
             val resumed = java.util.concurrent.atomic.AtomicBoolean(false)
+            // 暂存精度未达标的结果：超时前有更优结果则替换，超时则用此兜底
+            var fallback: Location? = null
+            val handler = android.os.Handler(Looper.getMainLooper())
+            val timeoutRunnable = Runnable {
+                if (resumed.compareAndSet(false, true)) {
+                    removeListener(listener)
+                    val result = fallback
+                    if (result != null) {
+                        continuation.resume(result)
+                    } else {
+                        continuation.resumeWithException(Exception("定位超时未获取到结果"))
+                    }
+                }
+            }
+
             val listener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
-                    if (!resumed.compareAndSet(false, true)) return
-                    removeListener(this)
-                    continuation.resume(location)
+                    if (resumed.get()) return
+                    // 精度达标或来自 GPS：立即返回（GPS accuracy 计算保守，即使超门槛也可信）
+                    if (location.accuracy <= ACCURACY_THRESHOLD_METERS ||
+                        location.provider == LocationManager.GPS_PROVIDER) {
+                        if (resumed.compareAndSet(false, true)) {
+                            removeListener(this)
+                            handler.removeCallbacks(timeoutRunnable)
+                            continuation.resume(location)
+                        }
+                    } else {
+                        // 精度未达标：暂存为兜底，继续等更优结果
+                        val cur = fallback
+                        if (cur == null || location.accuracy < cur.accuracy) {
+                            fallback = location
+                        }
+                    }
                 }
 
                 override fun onProviderEnabled(provider: String) {}
@@ -169,6 +230,7 @@ class LocationHelper(private val context: Context) {
             }
 
             continuation.invokeOnCancellation {
+                handler.removeCallbacks(timeoutRunnable)
                 removeListener(listener)
             }
 
@@ -193,7 +255,7 @@ class LocationHelper(private val context: Context) {
                     return@suspendCancellableCoroutine
                 }
 
-                // 多源 lastKnown 聚合：取时间戳最新的缓存，秒回避免触发真实定位
+                // lastKnown 精度筛选：仅接受精度优于阈值的缓存，按"时间×精度"综合排序取最优
                 val bestCached = providers
                     .mapNotNull { p ->
                         try {
@@ -204,16 +266,24 @@ class LocationHelper(private val context: Context) {
                             null
                         }
                     }
-                    .maxByOrNull { it.time }
+                    .filter { it.accuracy <= CACHE_MAX_ACCURACY_METERS }
+                    .maxByOrNull { if (it.accuracy > 0) it.time / it.accuracy.toLong() else it.time }
 
-                if (bestCached != null) {
+                if (bestCached != null && bestCached.accuracy <= ACCURACY_THRESHOLD_METERS) {
+                    // 缓存精度达标，秒回
                     if (resumed.compareAndSet(false, true)) {
                         continuation.resume(bestCached)
                     }
                     return@suspendCancellableCoroutine
                 }
 
-                // 无缓存：并行请求所有 provider（NETWORK 通常 1-2s 先出结果）
+                // 缓存精度不足或无缓存：启动真实定位 + 超时兜底
+                if (bestCached != null) {
+                    fallback = bestCached
+                }
+                // 超时后用 fallback 兜底（外层 withTimeout 10s，这里 9s 提前兜底）
+                handler.postDelayed(timeoutRunnable, 9_000L)
+
                 for (provider in providers) {
                     try {
                         locationManager.requestLocationUpdates(
@@ -231,6 +301,7 @@ class LocationHelper(private val context: Context) {
                 }
             } catch (e: SecurityException) {
                 if (resumed.compareAndSet(false, true)) {
+                    handler.removeCallbacks(timeoutRunnable)
                     removeListener(listener)
                     continuation.resumeWithException(e)
                 }
