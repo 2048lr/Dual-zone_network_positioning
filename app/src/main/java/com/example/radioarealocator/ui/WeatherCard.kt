@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,7 +28,6 @@ import com.example.radioarealocator.data.weather.mapWeatherIcon
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -78,8 +75,6 @@ fun WeatherCard(
                 nextSatellite = nextSatellite,
                 stateColor = stateColor,
                 secondaryTextColor = secondaryTextColor,
-                isLoading = isLoading,
-                onRefresh = onRefresh
             )
             else -> InitialState(
                 stateColor = stateColor,
@@ -95,8 +90,6 @@ private fun WeatherContent(
     nextSatellite: SatelliteInfo?,
     stateColor: Color,
     secondaryTextColor: Color,
-    isLoading: Boolean,
-    onRefresh: () -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -118,29 +111,6 @@ private fun WeatherContent(
             style = TextStyle(fontSize = 14.sp),
             color = secondaryTextColor
         )
-        Spacer(modifier = Modifier.weight(1f))
-        IconButton(
-            onClick = onRefresh,
-            enabled = !isLoading,
-            modifier = Modifier.size(28.dp)
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                        foregroundColor = stateColor
-                    )
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.weather_refresh),
-                    tint = stateColor,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
     }
 
     Row(

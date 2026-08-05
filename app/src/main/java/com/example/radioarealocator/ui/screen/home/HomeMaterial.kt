@@ -210,8 +210,8 @@ private fun HomeHeaderMaterial(
                     .fillMaxWidth()
                     .padding(top = 4.dp)
             )
-            // 时间内容与天气内容之间的分隔，保持原两卡间距视觉
-            Spacer(modifier = Modifier.height(12.dp))
+            // 时间内容与天气内容之间的分隔，与卡片内元素间距一致
+            Spacer(modifier = Modifier.height(6.dp))
             // 天气内容：禁用自带背景，复用本卡背景，注入 Material 主题色
             WeatherCard(
                 weather = state.weather,
