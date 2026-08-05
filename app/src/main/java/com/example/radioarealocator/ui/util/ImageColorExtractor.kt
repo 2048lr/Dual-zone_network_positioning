@@ -38,7 +38,5 @@ object ImageColorExtractor {
         return luminance > 0.82f
     }
 
-    companion object {
-        val DEFAULT_MASK_COLOR = 0xFF3A5F7F.toInt()
-    }
+    val DEFAULT_MASK_COLOR = 0xFF3A5F7F.toInt()
 }

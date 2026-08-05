@@ -24,7 +24,7 @@ class LandscapeImageApiService {
                 if (!response.isSuccessful) return@withContext null
                 val contentType = response.header("Content-Type", "")
                 val bodyBytes = response.body?.bytes() ?: return@withContext null
-                if (contentType.contains("image/", ignoreCase = true)) {
+                if (contentType?.contains("image/", ignoreCase = true) == true) {
                     bodyBytes
                 } else {
                     try {
