@@ -12,6 +12,7 @@ import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.example.radioarealocator.RadioAreaLocatorApplication
 import com.example.radioarealocator.data.LandscapeImageStore
+import com.example.radioarealocator.ui.LocalMainViewModel
 import com.example.radioarealocator.ui.LocalUiMode
 import com.example.radioarealocator.ui.UiMode
 import com.example.radioarealocator.ui.appViewModel
@@ -27,6 +28,7 @@ fun ColorPaletteScreen() {
     val viewModel = appViewModel<SettingsViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val imageStore = remember { LandscapeImageStore(context) }
+    val mainViewModel = LocalMainViewModel.current
     val currentPaletteStyle = try {
         PaletteStyle.valueOf(uiState.colorStyle)
     } catch (_: Exception) {
@@ -63,11 +65,13 @@ fun ColorPaletteScreen() {
         onSetCustomBackground = { uri ->
             if (imageStore.saveCustomImage(uri, context)) {
                 viewModel.setCustomBackgroundUri(uri.toString())
+                mainViewModel.refreshLandscapeImage()
             }
         },
         onClearCustomBackground = {
             imageStore.clearCustomImage()
             viewModel.clearCustomBackgroundUri()
+            mainViewModel.refreshLandscapeImage()
         },
     )
 

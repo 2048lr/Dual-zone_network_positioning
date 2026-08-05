@@ -1,9 +1,13 @@
 package com.example.radioarealocator.ui.screen.colorpalette
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.ui.platform.LocalContext
+import java.io.File
+import java.io.FileOutputStream
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -108,10 +112,19 @@ fun ColorPaletteScreenMiuix(
     val uiState = state.uiState
     val currentColorMode = state.currentColorMode
     val isDark = currentColorMode.isDark || currentColorMode.isSystem && isSystemInDarkTheme()
+    val context = LocalContext.current
 
     val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
-        if (result.isSuccessful) {
+        if (result != null && result.isSuccessful) {
             result.uriContent?.let { actions.onSetCustomBackground(it) }
+                ?: result.bitmap?.let { bitmap ->
+                    // 回退：uriContent 为空时用 bitmap 保存到临时文件
+                    val file = File(context.cacheDir, "crop_temp.jpg")
+                    FileOutputStream(file).use { fos ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+                    }
+                    actions.onSetCustomBackground(Uri.fromFile(file))
+                }
         }
     }
 

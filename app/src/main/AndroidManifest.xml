@@ -98,6 +98,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- 时间卡片背景裁剪 Activity，显式声明主题确保确认按钮可见 -->
+        <activity
+            android:name="com.canhub.cropper.CropImageActivity"
+            android:theme="@style/Theme.AppCompat.Light"
+            tools:replace="android:theme" />
+
         <!-- 禁用 WorkManager 自动初始化（androidx.startup），
              改为由 Application 实现 Configuration.Provider 接口按需初始化。
              首次调用 WorkManager.getInstance() 时自动用 Application 提供的 Configuration 初始化，
