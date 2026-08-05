@@ -3,9 +3,12 @@ package com.example.radioarealocator.ui
 import androidx.compose.runtime.State
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.radioarealocator.data.HitokotoApiService
+import com.example.radioarealocator.data.LandscapeImageApiService
+import com.example.radioarealocator.data.LandscapeImageStore
 import com.example.radioarealocator.data.LocationResult
 import com.example.radioarealocator.data.SettingsStore
 import com.example.radioarealocator.data.location.LocationHelper
@@ -43,6 +46,7 @@ import com.example.radioarealocator.data.cw.MorseCodeGenerator
 import com.example.radioarealocator.data.cw.MorseCodePlayer
 import com.example.radioarealocator.data.zone.ZoneResolver
 import com.example.radioarealocator.radioApp
+import com.example.radioarealocator.ui.util.ImageColorExtractor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -59,6 +63,7 @@ import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.io.File
 
 /**
  * 主 ViewModel：定位、卫星过境预测、天气、每日一言、CW 练习、日程提醒。
@@ -90,6 +95,8 @@ class MainViewModel : ViewModel() {
     private val reminderScheduler = ReminderScheduler(app)
     // 每日一言服务：从 https://v1.hitokoto.cn/ 获取，失败回退本地文案池
     private val hitokotoApi = HitokotoApiService()
+    private val landscapeImageApi = LandscapeImageApiService()
+    private val landscapeImageStore = LandscapeImageStore(app)
 
     // ---- CW练习模块 ----
     private val cwSettingsStore = CWSettingsStore(app)
@@ -108,6 +115,8 @@ class MainViewModel : ViewModel() {
     private var segmentStatusFetchedAt: Instant? = null
     // 持续位置监听 Job：在首次成功定位后启动，自动跟踪设备位置变化
     private var locationUpdatesJob: Job? = null
+    // 时间卡片背景图拉取 Job：防止页面 resume 重复并发拉取
+    private var landscapeFetchJob: Job? = null
 
     // 卫星过境预测结果缓存：避免同一坐标在短时间内重复执行 CPU 密集的 SGP4 计算。
     // 缓存有效期 15 分钟（PREDICTION_CACHE_TTL），坐标偏移超过 0.001° 时视为新位置需重新预测。
@@ -206,6 +215,12 @@ class MainViewModel : ViewModel() {
      */
     private val _weatherError = mutableStateOf<String?>(null)
     val weatherError: State<String?> = _weatherError
+
+    private val _timeCardBackgroundFile = mutableStateOf<File?>(landscapeImageStore.effectiveImageFile)
+    val timeCardBackgroundFile: State<File?> = _timeCardBackgroundFile
+
+    private val _timeCardMaskColor = mutableStateOf(Color(ImageColorExtractor.DEFAULT_MASK_COLOR))
+    val timeCardMaskColor: State<Color> = _timeCardMaskColor
 
     /**
      * 刷新天气数据。
@@ -317,6 +332,62 @@ class MainViewModel : ViewModel() {
             }
             // 失败时保留初始化时填入的本地兜底文案，不额外处理；
             // 不更新 dailyQuoteEpochDay，确保下次调用仍可重试
+        }
+    }
+
+    fun refreshLandscapeImage() {
+        val effectiveFile = landscapeImageStore.effectiveImageFile
+        // 已有有效图片且非 API 图（自定义图优先），无需重新拉取
+        if (effectiveFile != null && effectiveFile.exists()) {
+            _timeCardBackgroundFile.value = effectiveFile
+            extractAndUpdateMaskColor(effectiveFile)
+            return
+        }
+
+        // 没有有效图片，从 API 拉取（Job 守卫防止 resume 触发重复并发请求）
+        if (landscapeFetchJob?.isActive == true) return
+        landscapeFetchJob = viewModelScope.launch {
+            try {
+                val bytes = landscapeImageApi.fetchRandomLandscape()
+                if (bytes != null && bytes.isNotEmpty()) {
+                    landscapeImageStore.saveApiImage(bytes)
+                    val apiFile = landscapeImageStore.apiImageFile
+                    _timeCardBackgroundFile.value = apiFile
+                    extractAndUpdateMaskColor(apiFile)
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun extractAndUpdateMaskColor(imageFile: File) {
+        viewModelScope.launch {
+            try {
+                val bitmap = withContext(Dispatchers.IO) {
+                    val options = android.graphics.BitmapFactory.Options().apply {
+                        inSampleSize = 4
+                    }
+                    android.graphics.BitmapFactory.decodeFile(imageFile.absolutePath, options)
+                }
+                if (bitmap != null) {
+                    _timeCardMaskColor.value = withContext(Dispatchers.IO) {
+                        ImageColorExtractor.extractDominantColor(bitmap)
+                    }
+                    bitmap.recycle()
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun clearCustomBackground() {
+        landscapeImageStore.clearCustomImage()
+        val apiFile = landscapeImageStore.apiImageFile
+        if (apiFile.exists()) {
+            _timeCardBackgroundFile.value = apiFile
+            extractAndUpdateMaskColor(apiFile)
+        } else {
+            refreshLandscapeImage()
         }
     }
 
@@ -510,6 +581,9 @@ class MainViewModel : ViewModel() {
 
         // 拉取每日一言（hitokoto），失败回退本地文案
         refreshDailyQuote()
+
+        // 加载时间卡片背景图
+        refreshLandscapeImage()
 
         // 加载课程进度
         loadAllCourseProgress()

@@ -60,4 +60,8 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var pageScale: Float
         get() = prefs.getFloat("page_scale", 1.0f)
         set(value) = prefs.edit { putFloat("page_scale", value) }
+
+    override var customBackgroundUri: String
+        get() = prefs.getString("custom_bg_uri", "") ?: ""
+        set(value) = prefs.edit { putString("custom_bg_uri", value) }
 }

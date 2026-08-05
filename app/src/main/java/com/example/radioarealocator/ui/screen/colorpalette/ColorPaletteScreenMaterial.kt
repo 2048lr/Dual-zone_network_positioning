@@ -1,7 +1,10 @@
 package com.example.radioarealocator.ui.screen.colorpalette
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -92,6 +95,7 @@ import com.materialkolor.rememberDynamicColorScheme
 import com.example.radioarealocator.R
 import com.example.radioarealocator.ui.component.material.SegmentedColumn
 import com.example.radioarealocator.ui.component.material.SegmentedDropdownItem
+import com.example.radioarealocator.ui.component.material.SegmentedListItem
 import com.example.radioarealocator.ui.component.material.SegmentedSwitchItem
 import com.example.radioarealocator.ui.component.material.TonalCard
 import com.example.radioarealocator.ui.theme.ColorMode
@@ -109,6 +113,12 @@ fun ColorPaletteScreenMaterial(
     val colorStyle = state.currentPaletteStyle
     val colorSpec = state.currentColorSpec
     val haptic = LocalHapticFeedback.current
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { actions.onSetCustomBackground(it) }
+    }
 
     LaunchedEffect(Unit) {
         scrollBehavior.state.heightOffset = scrollBehavior.state.heightOffsetLimit
@@ -331,6 +341,37 @@ fun ColorPaletteScreenMaterial(
                     }
                 }
             }
+
+            SegmentedColumn(
+                modifier = Modifier.padding(top = 4.dp),
+                content = listOf(
+                    {
+                        SegmentedListItem(
+                            onClick = { imagePickerLauncher.launch("image/*") },
+                            headlineContent = {
+                                Text(
+                                    stringResource(id = R.string.settings_custom_background)
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    if (uiState.customBackgroundUri.isNotEmpty()) {
+                                        stringResource(id = R.string.settings_custom_background_set)
+                                    } else {
+                                        stringResource(id = R.string.settings_custom_background_summary)
+                                    }
+                                )
+                            },
+                            leadingContent = {
+                                Icon(
+                                    imageVector = Icons.Rounded.AspectRatio,
+                                    contentDescription = stringResource(id = R.string.settings_custom_background)
+                                )
+                            },
+                        )
+                    }
+                )
+            )
 
             Spacer(modifier = Modifier.height(16.dp + navBars.calculateBottomPadding() + captionBar.calculateBottomPadding()))
         }

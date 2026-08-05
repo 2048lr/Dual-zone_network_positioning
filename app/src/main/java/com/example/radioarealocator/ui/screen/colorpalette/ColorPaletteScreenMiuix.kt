@@ -1,7 +1,10 @@
 package com.example.radioarealocator.ui.screen.colorpalette
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -100,6 +103,12 @@ fun ColorPaletteScreenMiuix(
     val uiState = state.uiState
     val currentColorMode = state.currentColorMode
     val isDark = currentColorMode.isDark || currentColorMode.isSystem && isSystemInDarkTheme()
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { actions.onSetCustomBackground(it) }
+    }
 
     Scaffold(
         topBar = {
@@ -402,6 +411,30 @@ fun ColorPaletteScreenMiuix(
                             onVolumeChange = {
                                 actions.onSetPageScale(it)
                             }
+                        )
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .fillMaxWidth(),
+                    ) {
+                        ArrowPreference(
+                            title = stringResource(id = R.string.settings_custom_background),
+                            summary = if (uiState.customBackgroundUri.isNotEmpty()) {
+                                stringResource(id = R.string.settings_custom_background_set)
+                            } else {
+                                stringResource(id = R.string.settings_custom_background_summary)
+                            },
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Wallpaper,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_custom_background),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            onClick = { imagePickerLauncher.launch("image/*") },
                         )
                     }
                 }

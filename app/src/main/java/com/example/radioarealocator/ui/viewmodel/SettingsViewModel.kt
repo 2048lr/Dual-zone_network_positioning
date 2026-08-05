@@ -49,6 +49,7 @@ class SettingsViewModel(
             val colorStyle = repo.colorStyle
             val colorSpec = repo.colorSpec
             val uiMode = repo.uiMode
+            val customBackgroundUri = repo.customBackgroundUri
 
             _uiState.update {
                 it.copy(
@@ -64,6 +65,7 @@ class SettingsViewModel(
                     pageScale = pageScale,
                     colorStyle = colorStyle,
                     colorSpec = colorSpec,
+                    customBackgroundUri = customBackgroundUri,
                 )
             }
         }
@@ -171,6 +173,16 @@ class SettingsViewModel(
     fun setPageScale(scale: Float) {
         repo.pageScale = scale
         _uiState.update { it.copy(pageScale = scale) }
+    }
+
+    fun setCustomBackgroundUri(uri: String) {
+        repo.customBackgroundUri = uri
+        _uiState.update { it.copy(customBackgroundUri = uri) }
+    }
+
+    fun clearCustomBackgroundUri() {
+        repo.customBackgroundUri = ""
+        _uiState.update { it.copy(customBackgroundUri = "") }
     }
 
     // ── 更新检查与下载安装 ──────────────────────────────────────────

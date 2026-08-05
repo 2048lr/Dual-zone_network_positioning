@@ -2,6 +2,7 @@ package com.example.radioarealocator.ui.screen.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,13 +41,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.radioarealocator.R
 import com.example.radioarealocator.permission.PermissionState
 import com.example.radioarealocator.ui.WeatherCard
@@ -135,63 +140,104 @@ private fun HomeHeaderMaterial(
         }
     }
 
-    // 状态色与天气卡保持一致：有天气数据 → primary，无 → outline
-    // Material 主题使用 MaterialTheme.colorScheme，颜色随主题切换
-    val stateColor = if (state.weather != null) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.outline
-    }
-    val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
     val zonedNow = now.atZone(ZoneId.systemDefault())
     val localTime = zonedNow.format(timeFormatter)
     val utcTime = now.atZone(ZoneOffset.UTC).format(timeFormatter)
+
+    val hasBackground = state.timeCardBackgroundFile != null && state.timeCardBackgroundFile.exists()
+    val whiteText = Color.White
+    val whiteTextSecondary = Color.White.copy(alpha = 0.85f)
+    val whiteTextDim = Color.White.copy(alpha = 0.75f)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // 时间 + 天气合并卡：本地时间 → UTC → 天气 → 每日一言
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(stateColor.copy(alpha = 0.12f * LocalCardAlpha.current))
-                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // 本地时间
-            Text(
-                text = localTime,
-                fontSize = LOCAL_TIME_FONT_SIZE.sp,
-                color = stateColor
-            )
-            // UTC 时间
-            Text(
-                text = "$utcTime UTC",
-                fontSize = (LOCAL_TIME_FONT_SIZE * UTC_FONT_SIZE_SCALE).sp,
-                color = secondaryTextColor,
+            if (hasBackground) {
+                val file = state.timeCardBackgroundFile!!
+                AsyncImage(
+                    model = ImageRequest.Builder(
+                        androidx.compose.ui.platform.LocalContext.current
+                    ).data(file)
+                        .crossfade(true)
+                        .memoryCacheKey("timecard_${file.lastModified()}")
+                        .diskCacheKey("timecard_${file.lastModified()}")
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                0f to state.timeCardMaskColor,
+                                0.25f to state.timeCardMaskColor.copy(alpha = 0.85f),
+                                0.5f to state.timeCardMaskColor.copy(alpha = 0.35f),
+                                0.8f to Color.Transparent
+                            )
+                        )
+                )
+            }
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 2.dp)
-            )
-            // 天气内容：禁用自带背景，复用本卡背景，注入 Material 主题色
-            WeatherCard(
-                weather = state.weather,
-                isLoading = state.weatherLoading,
-                error = state.weatherError,
-                onRefresh = onRefreshWeather,
-                modifier = Modifier.fillMaxWidth(),
-                stateColor = stateColor,
-                secondaryTextColor = secondaryTextColor,
-                applyBackground = false
-            )
-            DailyQuoteScroller(
-                quote = state.dailyQuote,
-                contentColor = secondaryTextColor,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp)
-            )
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                val timeColor = if (hasBackground) {
+                    whiteText
+                } else {
+                    if (state.weather != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                }
+                val secondaryColor = if (hasBackground) whiteTextSecondary else MaterialTheme.colorScheme.onSurfaceVariant
+
+                // 本地时间
+                Text(
+                    text = localTime,
+                    fontSize = LOCAL_TIME_FONT_SIZE.sp,
+                    color = timeColor
+                )
+                // UTC 时间
+                Text(
+                    text = "$utcTime UTC",
+                    fontSize = (LOCAL_TIME_FONT_SIZE * UTC_FONT_SIZE_SCALE).sp,
+                    color = secondaryColor,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp)
+                )
+                // 天气内容：禁用自带背景，复用本卡背景，注入 Material 主题色
+                WeatherCard(
+                    weather = state.weather,
+                    isLoading = state.weatherLoading,
+                    error = state.weatherError,
+                    onRefresh = onRefreshWeather,
+                    modifier = Modifier.fillMaxWidth(),
+                    stateColor = if (hasBackground) whiteText else (if (state.weather != null) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    }),
+                    secondaryTextColor = if (hasBackground) whiteTextSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    applyBackground = false
+                )
+                DailyQuoteScroller(
+                    quote = state.dailyQuote,
+                    contentColor = if (hasBackground) whiteTextDim else secondaryColor,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
+                )
+            }
         }
     }
 }

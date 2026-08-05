@@ -1,14 +1,17 @@
 package com.example.radioarealocator.ui.screen.colorpalette
 
+import android.net.Uri
 import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.example.radioarealocator.RadioAreaLocatorApplication
+import com.example.radioarealocator.data.LandscapeImageStore
 import com.example.radioarealocator.ui.LocalUiMode
 import com.example.radioarealocator.ui.UiMode
 import com.example.radioarealocator.ui.appViewModel
@@ -23,6 +26,7 @@ fun ColorPaletteScreen() {
     val activity = LocalActivity.current
     val viewModel = appViewModel<SettingsViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val imageStore = remember { LandscapeImageStore(context) }
     val currentPaletteStyle = try {
         PaletteStyle.valueOf(uiState.colorStyle)
     } catch (_: Exception) {
@@ -56,6 +60,11 @@ fun ColorPaletteScreen() {
             activity?.recreate()
         },
         onSetPageScale = viewModel::setPageScale,
+        onSetCustomBackground = { uri ->
+            if (imageStore.saveCustomImage(uri, context)) {
+                viewModel.setCustomBackgroundUri(uri.toString())
+            }
+        },
     )
 
     when (LocalUiMode.current) {

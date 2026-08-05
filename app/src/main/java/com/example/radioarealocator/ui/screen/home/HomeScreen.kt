@@ -43,6 +43,8 @@ fun HomePager(
     val weatherError by mainViewModel.weatherError
     val dailyQuote by mainViewModel.dailyQuote
     val favoriteSatellites by mainViewModel.favoriteSatellites
+    val timeCardBackgroundFile by mainViewModel.timeCardBackgroundFile
+    val timeCardMaskColor by mainViewModel.timeCardMaskColor
 
     var hasActivated by remember { mutableStateOf(false) }
     if (isCurrentPage) hasActivated = true
@@ -53,6 +55,7 @@ fun HomePager(
             mainViewModel.initializeIfNeeded()
             mainViewModel.startWeatherAutoRefresh()
             mainViewModel.refreshDailyQuote()
+            mainViewModel.refreshLandscapeImage()
             mainViewModel.refreshLocation()
         }
     }
@@ -69,6 +72,7 @@ fun HomePager(
     }
     LifecycleResumeEffect(permissionManager) {
         permissionManager.refresh()
+        mainViewModel.refreshLandscapeImage()
         onPauseOrDispose { }
     }
 
@@ -101,6 +105,8 @@ fun HomePager(
         dailyQuote = dailyQuote,
         favorites = favoriteSatellites,
         nextSatellite = nextSatellite,
+        timeCardBackgroundFile = timeCardBackgroundFile,
+        timeCardMaskColor = timeCardMaskColor,
     )
 
     when (LocalUiMode.current) {

@@ -22,6 +22,7 @@ data class SettingsUiState(
     val enableFloatingBottomBar: Boolean = true,
     val enableFloatingBottomBarBlur: Boolean = true,
     val pageScale: Float = 1.0f,
+    val customBackgroundUri: String = "",
     // ── 更新检查与下载 ──
     val updateChecking: Boolean = false,
     val updateAvailable: Boolean = false,

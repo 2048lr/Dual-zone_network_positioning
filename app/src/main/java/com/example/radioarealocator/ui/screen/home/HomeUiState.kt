@@ -1,11 +1,13 @@
 package com.example.radioarealocator.ui.screen.home
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.Color
 import com.example.radioarealocator.data.satellite.SatelliteInfo
 import com.example.radioarealocator.data.weather.WeatherResult
 import com.example.radioarealocator.ui.LocationUiState
 import com.example.radioarealocator.ui.SatelliteUiState
 import com.example.radioarealocator.ui.util.LatestVersionInfo
+import java.io.File
 
 @Immutable
 data class HomeUiState(
@@ -28,6 +30,8 @@ data class HomeBusinessState(
     val dailyQuote: String,
     val favorites: Set<Int>,
     val nextSatellite: SatelliteInfo? = null,
+    val timeCardBackgroundFile: File? = null,
+    val timeCardMaskColor: Color = Color(0xFF3A5F7F.toInt()),
 )
 
 @Immutable
