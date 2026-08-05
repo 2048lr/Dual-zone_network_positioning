@@ -190,7 +190,7 @@ private fun HomeHeaderMiuix(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 时间卡
+        // 时间 + 天气合并卡：同一背景容器内依次渲染时间内容与天气内容
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -234,16 +234,19 @@ private fun HomeHeaderMiuix(
                     .fillMaxWidth()
                     .padding(top = 4.dp)
             )
+            // 时间内容与天气内容之间的分隔，保持原两卡间距视觉
+            Spacer(modifier = Modifier.height(12.dp))
+            // 天气内容：禁用自带背景，复用本卡背景
+            WeatherCard(
+                weather = state.weather,
+                isLoading = state.weatherLoading,
+                error = state.weatherError,
+                nextSatellite = state.nextSatellite,
+                onRefresh = onRefreshWeather,
+                modifier = Modifier.fillMaxWidth(),
+                applyBackground = false
+            )
         }
-        // 天气卡：位于时间卡正下方，占满宽度
-        WeatherCard(
-            weather = state.weather,
-            isLoading = state.weatherLoading,
-            error = state.weatherError,
-            nextSatellite = state.nextSatellite,
-            onRefresh = onRefreshWeather,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 

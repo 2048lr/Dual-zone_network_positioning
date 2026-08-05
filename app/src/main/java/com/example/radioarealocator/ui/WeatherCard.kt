@@ -53,13 +53,18 @@ fun WeatherCard(
     // 主题色由调用方注入：Miuix 调用方走默认值，Material 调用方传 MaterialTheme.colorScheme 对应字段
     stateColor: Color = if (weather != null) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.outline,
     secondaryTextColor: Color = MiuixTheme.colorScheme.onSurfaceSecondary,
+    // 是否绘制自带圆角背景；合并进其他卡片时传 false 仅渲染内容
+    applyBackground: Boolean = true,
 ) {
-    Column(
-        modifier = modifier
+    val finalModifier = if (applyBackground) {
+        modifier
             .clip(RoundedCornerShape(16.dp))
             .background(stateColor.copy(alpha = 0.12f * LocalCardAlpha.current))
             .padding(horizontal = 14.dp, vertical = 8.dp)
-    ) {
+    } else {
+        modifier
+    }
+    Column(modifier = finalModifier) {
         when {
             isLoading && weather == null -> LoadingState(stateColor = stateColor)
             error != null && weather == null -> ErrorState(
