@@ -28,6 +28,7 @@ import com.amap.api.maps.model.BitmapDescriptorFactory
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.MarkerOptions
 import com.example.radioarealocator.R
+import com.example.radioarealocator.data.location.CoordinateConverter
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -51,6 +52,9 @@ fun AMapCard(
     }
 
     val aMap = remember(mapView) { mapView.map }
+
+    // 高德地图 SDK 使用 GCJ02 坐标系，上游传入的是 WGS84，展示前转换（微秒级开销）
+    val (gcjLat, gcjLng) = CoordinateConverter.wgs84ToGcj02(latitude, longitude)
 
     val lastCoord = remember { object { var lat = Double.NaN; var lng = Double.NaN } }
 
@@ -99,7 +103,7 @@ fun AMapCard(
                         uiSettings.isRotateGesturesEnabled = true
                         uiSettings.isTiltGesturesEnabled = true
 
-                        val target = LatLng(latitude, longitude)
+                        val target = LatLng(gcjLat, gcjLng)
                         moveCamera(
                             CameraUpdateFactory.newLatLngZoom(target, DEFAULT_ZOOM)
                         )
@@ -111,14 +115,14 @@ fun AMapCard(
                                 .title(markerTitle)
                                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
                         )
-                        lastCoord.lat = latitude
-                        lastCoord.lng = longitude
+                        lastCoord.lat = gcjLat
+                        lastCoord.lng = gcjLng
                     }
                     mapView
                 },
                 update = {
-                    val target = LatLng(latitude, longitude)
-                    if (lastCoord.lat != latitude || lastCoord.lng != longitude) {
+                    if (lastCoord.lat != gcjLat || lastCoord.lng != gcjLng) {
+                        val target = LatLng(gcjLat, gcjLng)
                         aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(target, DEFAULT_ZOOM))
                         aMap.clear()
                         aMap.addMarker(
@@ -127,8 +131,8 @@ fun AMapCard(
                                 .title(markerTitle)
                                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
                         )
-                        lastCoord.lat = latitude
-                        lastCoord.lng = longitude
+                        lastCoord.lat = gcjLat
+                        lastCoord.lng = gcjLng
                     }
                 },
                 modifier = Modifier

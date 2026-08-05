@@ -33,6 +33,7 @@ import com.amap.api.maps.MapView
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.MarkerOptions
 import com.example.radioarealocator.data.aprs.AprsStation
+import com.example.radioarealocator.data.location.CoordinateConverter
 import com.example.radioarealocator.ui.appViewModel
 import com.example.radioarealocator.ui.viewmodel.AprsViewModel
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -116,9 +117,11 @@ fun AprsMapScreen(
                     // 增量添加 marker：只添加未显示的站点，不 clear，避免用户交互丢失
                     fun addMarkerFor(station: AprsStation, isMyStation: Boolean) {
                         if (station.callsign in addedCallsigns) return
+                        // APRS 站点坐标为 WGS84，高德地图需 GCJ02
+                        val (mLat, mLng) = CoordinateConverter.wgs84ToGcj02(station.latitude, station.longitude)
                         aMap.addMarker(
                             MarkerOptions()
-                                .position(LatLng(station.latitude, station.longitude))
+                                .position(LatLng(mLat, mLng))
                                 .title(if (isMyStation) "${station.callsign}（本站）" else station.callsign)
                                 .snippet(
                                     buildString {
@@ -143,9 +146,10 @@ fun AprsMapScreen(
                     // 仅首次设置地图中心，避免每次 stations 更新都强制移回本站
                     if (!hasInitialized.value && stations.isNotEmpty()) {
                         val center = myStation ?: stations.first()
+                        val (cLat, cLng) = CoordinateConverter.wgs84ToGcj02(center.latitude, center.longitude)
                         aMap.moveCamera(
                             CameraUpdateFactory.newLatLngZoom(
-                                LatLng(center.latitude, center.longitude), 12f
+                                LatLng(cLat, cLng), 12f
                             )
                         )
                         hasInitialized.value = true
