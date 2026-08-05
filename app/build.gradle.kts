@@ -353,7 +353,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     // Image cropping for custom time card background
-    implementation("com.canhub.cropper:android-image-cropper:4.4.3")
+    implementation("com.github.CanHub:Android-Image-Cropper:4.5.0")
 
     // 高德地图 SDK：3D地图（含缩放手势、Marker、控件）
     // 文档：https://lbs.amap.com/api/android-sdk/summary
