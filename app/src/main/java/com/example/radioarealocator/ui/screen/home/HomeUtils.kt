@@ -46,17 +46,12 @@ fun getAppVersion(context: Context): AppVersion {
 internal const val LOCAL_TIME_FONT_SIZE = 44
 /** UTC 时间字号相对本地时间的缩放比例 */
 internal const val UTC_FONT_SIZE_SCALE = 0.4f
-/** 日期普通部分字号（sp） */
-internal const val DATE_FONT_SIZE = 14
-/** 日期中"日"数字放大字号（sp） */
-internal const val DATE_DAY_FONT_SIZE = 20
 /** 每日一言水平滚动速度（px/秒） */
 internal const val QUOTE_SCROLL_SPEED_PX_PER_SEC = 12f
 /** 每日一言滚到端点后暂停时长（毫秒） */
 internal const val QUOTE_PAUSE_MS = 2000L
 
 internal val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
-internal val weekdayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("E")
 
 /**
  * 每日一言水平滚动组件（来自 main 分支 MainScreen.kt）。

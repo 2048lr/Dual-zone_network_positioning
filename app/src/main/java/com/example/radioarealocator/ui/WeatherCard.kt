@@ -22,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.radioarealocator.R
-import com.example.radioarealocator.data.satellite.SatelliteInfo
 import com.example.radioarealocator.data.weather.WeatherResult
 import com.example.radioarealocator.data.weather.mapWeatherIcon
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
@@ -32,19 +31,12 @@ import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
-private val weatherDateFormat = DateTimeFormatter.ofPattern("MM-dd HH:mm")
-private val weatherDateOnlyFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
 @Composable
 fun WeatherCard(
     weather: WeatherResult?,
     isLoading: Boolean,
     error: String?,
-    nextSatellite: SatelliteInfo?,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     // 主题色由调用方注入：Miuix 调用方走默认值，Material 调用方传 MaterialTheme.colorScheme 对应字段
@@ -72,7 +64,6 @@ fun WeatherCard(
             )
             weather != null -> WeatherContent(
                 weather = weather,
-                nextSatellite = nextSatellite,
                 stateColor = stateColor,
                 secondaryTextColor = secondaryTextColor,
             )
@@ -87,7 +78,6 @@ fun WeatherCard(
 @Composable
 private fun WeatherContent(
     weather: WeatherResult,
-    nextSatellite: SatelliteInfo?,
     stateColor: Color,
     secondaryTextColor: Color,
 ) {
@@ -109,87 +99,6 @@ private fun WeatherContent(
         Text(
             text = weather.now.text,
             style = TextStyle(fontSize = 14.sp),
-            color = secondaryTextColor
-        )
-    }
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(top = 2.dp)
-    ) {
-        Text(
-            text = weather.cityName.ifEmpty { stringResource(R.string.weather_unknown_city) },
-            style = TextStyle(fontSize = 12.sp),
-            color = secondaryTextColor
-        )
-        Text(
-            text = formatUpdateTime(weather.fetchTimeMillis),
-            style = TextStyle(fontSize = 11.sp),
-            color = secondaryTextColor.copy(alpha = 0.7f)
-        )
-    }
-
-    if (nextSatellite != null && weather.daily.isNotEmpty()) {
-        SatelliteForecastRow(
-            satellite = nextSatellite,
-            weather = weather,
-            stateColor = stateColor,
-            secondaryTextColor = secondaryTextColor
-        )
-    }
-}
-
-@Composable
-private fun SatelliteForecastRow(
-    satellite: SatelliteInfo,
-    weather: WeatherResult,
-    stateColor: Color,
-    secondaryTextColor: Color
-) {
-    val aosInstant = satellite.aosTime
-    val aosZone = aosInstant.atZone(ZoneId.systemDefault())
-    val aosDateStr = aosZone.toLocalDate().format(weatherDateOnlyFormat)
-    val aosHour = aosZone.hour
-
-    val matchedDay = weather.daily.firstOrNull { it.date == aosDateStr }
-    if (matchedDay == null) return
-
-    val isDaytime = aosHour in 6..17
-    val weatherText = if (isDaytime) matchedDay.dayWeather else matchedDay.nightWeather
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.weather_next_pass_label),
-            style = TextStyle(fontSize = 11.sp),
-            color = secondaryTextColor.copy(alpha = 0.8f)
-        )
-        Text(
-            text = satellite.name.take(8),
-            style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium),
-            color = stateColor
-        )
-        Text(
-            text = aosZone.format(weatherDateFormat),
-            style = TextStyle(fontSize = 11.sp),
-            color = secondaryTextColor
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        Icon(
-            imageVector = mapWeatherIcon(weatherText, isNight = !isDaytime),
-            contentDescription = weatherText,
-            tint = stateColor,
-            modifier = Modifier.size(14.dp)
-        )
-        Text(
-            text = "${matchedDay.nightTemp}~${matchedDay.dayTemp}°",
-            style = TextStyle(fontSize = 11.sp),
             color = secondaryTextColor
         )
     }
@@ -263,14 +172,4 @@ private fun InitialState(
 private fun formatTemperature(temp: String): String {
     val value = temp.toDoubleOrNull() ?: return "--"
     return String.format(java.util.Locale.US, "%.1f°C", value)
-}
-
-private fun formatUpdateTime(timestampMillis: Long): String {
-    val instant = Instant.ofEpochMilli(timestampMillis)
-    val time = instant.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
-    return "$time${UiConstants.WEATHER_UPDATED_SUFFIX}"
-}
-
-private object UiConstants {
-    const val WEATHER_UPDATED_SUFFIX = " 更新"
 }

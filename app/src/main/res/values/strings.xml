@@ -207,8 +207,6 @@
     <string name="weather_load_failed" translatable="false">天气加载失败</string>
     <string name="weather_retry" translatable="false">重试</string>
     <string name="weather_tap_to_load" translatable="false">点击加载天气</string>
-    <string name="weather_unknown_city" translatable="false">未知地区</string>
-    <string name="weather_next_pass_label" translatable="false">下次过境</string>
     <string name="weather_location_required" translatable="false">需要定位权限才能获取天气</string>
 
     <!-- 静态地图模块 -->

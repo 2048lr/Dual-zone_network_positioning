@@ -35,10 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -129,7 +126,6 @@ fun HomePagerMiuix(
                                 weather = businessState.weather,
                                 isLoading = businessState.weatherLoading,
                                 error = businessState.weatherError,
-                                nextSatellite = businessState.nextSatellite,
                                 onRefresh = actions.onRefreshWeather,
                             )
                         }
@@ -171,27 +167,12 @@ private fun HomeHeaderMiuix(
     val zonedNow = now.atZone(ZoneId.systemDefault())
     val localTime = zonedNow.format(timeFormatter)
     val utcTime = now.atZone(ZoneOffset.UTC).format(timeFormatter)
-    // 日期：第一行星期几，第二行"年 月 日"，其中"日"放大
-    val weekday = zonedNow.format(weekdayFormatter)
-    val dateYearMonth = "${zonedNow.year}年 ${zonedNow.monthValue}月 "
-    val dateDayText = "${zonedNow.dayOfMonth}日"
-    val dateLine = remember(stateColor, dateYearMonth, dateDayText) {
-        buildAnnotatedString {
-            withStyle(SpanStyle(fontSize = DATE_FONT_SIZE.sp, color = stateColor)) {
-                append(dateYearMonth)
-                withStyle(SpanStyle(fontSize = DATE_DAY_FONT_SIZE.sp)) {
-                    append(dateDayText)
-                }
-            }
-        }
-    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 时间 + 天气合并卡：同一背景容器内依次渲染天气内容与时间内容
-        // 天气在上（蓝色温度/图标优先显示），时间在下
+        // 时间 + 天气合并卡：本地时间 → UTC → 天气 → 每日一言
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -199,38 +180,13 @@ private fun HomeHeaderMiuix(
                 .background(stateColor.copy(alpha = 0.12f * LocalCardAlpha.current))
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // 天气内容：禁用自带背景，复用本卡背景
-            WeatherCard(
-                weather = state.weather,
-                isLoading = state.weatherLoading,
-                error = state.weatherError,
-                nextSatellite = state.nextSatellite,
-                onRefresh = onRefreshWeather,
-                modifier = Modifier.fillMaxWidth(),
-                applyBackground = false
+            // 本地时间
+            Text(
+                text = localTime,
+                fontSize = LOCAL_TIME_FONT_SIZE.sp,
+                color = stateColor
             )
-            // 天气内容与时间内容之间的分隔，与卡片内元素间距一致
-            Spacer(modifier = Modifier.height(6.dp))
-            // 本地时间 + 日期并排：时间在左，月/日（两行）在右
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Text(
-                    text = localTime,
-                    fontSize = LOCAL_TIME_FONT_SIZE.sp,
-                    color = stateColor
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = weekday,
-                        fontSize = DATE_FONT_SIZE.sp,
-                        color = stateColor
-                    )
-                    Text(text = dateLine)
-                }
-            }
+            // UTC 时间
             Text(
                 text = "$utcTime UTC",
                 fontSize = (LOCAL_TIME_FONT_SIZE * UTC_FONT_SIZE_SCALE).sp,
@@ -238,6 +194,15 @@ private fun HomeHeaderMiuix(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 2.dp)
+            )
+            // 天气内容：禁用自带背景，复用本卡背景
+            WeatherCard(
+                weather = state.weather,
+                isLoading = state.weatherLoading,
+                error = state.weatherError,
+                onRefresh = onRefreshWeather,
+                modifier = Modifier.fillMaxWidth(),
+                applyBackground = false
             )
             // 每日一言：超宽时水平滚动
             DailyQuoteScroller(
