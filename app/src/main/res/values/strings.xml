@@ -145,7 +145,7 @@
     <string name="filter_status_section" translatable="false">按状态</string>
     <string name="filter_mode_unknown" translatable="false">未知</string>
     <string name="filter_apply" translatable="false">应用筛选</string>
-    <string name="satellite_management" translatable="false">卫星管理</string>
+    <string name="satellite_management" translatable="false">卫星详情</string>
     <string name="satellite_management_desc" translatable="false">点击卫星可添加或取消特别关注。关注的卫星在即将过境和在境时会以高亮显示。</string>
     <string name="favorites_count" translatable="false">已关注</string>
     <string name="favorited" translatable="false">已关注</string>
