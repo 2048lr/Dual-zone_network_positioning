@@ -12,52 +12,29 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import androidx.core.content.ContextCompat
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import java.util.Collections
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/**
+ * 纯 Android Framework [LocationManager] 定位封装。
+ *
+ * 不依赖 Google Play Services（GMS），避免无 GMS 设备触发"请启用谷歌服务"弹窗。
+ * NETWORK_PROVIDER 优先（室内 Wi-Fi/基站毫秒级），GPS 兜底（室外高精度）。
+ */
 class LocationHelper(private val context: Context) {
-
-    private val fusedClient by lazy {
-        LocationServices.getFusedLocationProviderClient(context)
-    }
 
     private val locationManager by lazy {
         context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     }
-
-    /**
-     * 检测设备是否有 Google Play Services（GMS）。
-     *
-     * 无 GMS 设备（国内主流）直接跳过 FusedLocation 三路竞速，
-     * 避免每路 4-5s 空等超时，定位速度从 5-10s 降到 <0.1s~2s。
-     * 仅检测包是否存在，零网络/绑定开销。
-     */
-    private fun isGmsAvailable(): Boolean = try {
-        context.packageManager.getPackageInfo("com.google.android.gms", 0) != null
-    } catch (e: Exception) {
-        false
-    }
-
-    /** 缓存 GMS 可用性，避免每次定位都查 PackageManager */
-    private val gmsAvailable by lazy { isGmsAvailable() }
 
     fun hasPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
@@ -84,62 +61,15 @@ class LocationHelper(private val context: Context) {
             throw SecurityException("缺少定位权限")
         }
 
-        val errors = Collections.synchronizedList(mutableListOf<String>())
-
         return try {
-            withTimeout(10_000) {
-                coroutineScope {
-                    // 动态构建竞速策略列表：无 GMS 设备跳过 Fused 三路，避免 4-5s 空等超时
-                    val strategies = mutableListOf<Deferred<Location?>>()
-                    if (gmsAvailable) {
-                        strategies.add(async { fetchFusedLastLocation(errors) })
-                        strategies.add(async {
-                            fetchFusedCurrentLocation(
-                                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                                5_000,
-                                "Fused低精度",
-                                errors
-                            )
-                        })
-                        strategies.add(async {
-                            fetchFusedCurrentLocation(
-                                Priority.PRIORITY_HIGH_ACCURACY,
-                                4_000,
-                                "Fused高精度",
-                                errors
-                            )
-                        })
-                        strategies.add(async { fetchSingleFusedUpdate(4_000, errors) })
-                    }
-                    // LocationManager 始终参与（无 GMS 设备的主力）
-                    strategies.add(async { fetchLocationManagerLocation(6_000, errors) })
-
-                    val pending = strategies.toMutableList()
-                    while (pending.isNotEmpty()) {
-                        val done = select<Deferred<Location?>> {
-                            pending.forEach { deferred ->
-                                deferred.onAwait { deferred }
-                            }
-                        }
-                        val location = done.await()
-                        if (location != null) {
-                            pending.forEach { it.cancel() }
-                            return@coroutineScope location
-                        }
-                        pending.remove(done)
-                    }
-
-                    throw Exception("所有定位方式均失败")
-                }
-            }
+            withTimeout(10_000) { requestLocationManagerLocation() }
         } catch (e: TimeoutCancellationException) {
             throw Exception("定位超时，请检查手机是否开启 GPS/网络定位")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            val detail = errors.joinToString("; ")
             throw Exception(
-                "无法获取定位，请检查手机是否开启 GPS/网络定位，或检查是否禁止了本应用定位权限。详情: $detail"
+                "无法获取定位，请检查手机是否开启 GPS/网络定位，或检查是否禁止了本应用定位权限。详情: ${e.message ?: "失败"}"
             )
         }
     }
@@ -147,12 +77,9 @@ class LocationHelper(private val context: Context) {
     /**
      * 持续位置监听（Flow 形式）。
      *
-     * 基于 FusedLocationProviderClient.requestLocationUpdates 注册持续回调，
-     * 当设备位置变化超过 [minDistanceM] 或经过 [intervalMs] 时上报新位置。
+     * 基于 [LocationManager.requestLocationUpdates] 注册持续回调，
+     * NETWORK + GPS 双 provider 并行监听，取每次变化的位置上报。
      * Flow 被取消时自动移除回调，避免泄漏。
-     *
-     * 默认参数优先保证实时性：5 秒间隔 + 5 米最小位移 + 高精度优先级，
-     * 确保设备位置发生变化时经纬度能被及时捕获并更新到界面。
      *
      * @param intervalMs 期望的位置上报间隔（毫秒）
      * @param minDistanceM 最小位移阈值（米），小于此距离的变化不上报
@@ -166,199 +93,62 @@ class LocationHelper(private val context: Context) {
             return@callbackFlow
         }
 
-        val locationCallback = object : com.google.android.gms.location.LocationCallback() {
-            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                result.lastLocation?.let { trySend(it) }
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                trySend(location)
+            }
+
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {}
+
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+        }
+
+        // NETWORK + GPS 并行监听：室内 NETWORK 先出结果，室外 GPS 高精度
+        val providers = listOfNotNull(
+            LocationManager.NETWORK_PROVIDER,
+            LocationManager.GPS_PROVIDER
+        ).filter { provider ->
+            try {
+                locationManager.isProviderEnabled(provider)
+            } catch (e: Exception) {
+                false
             }
         }
 
-        val locationRequest = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            intervalMs
-        ).apply {
-            setMinUpdateDistanceMeters(minDistanceM)
-            setWaitForAccurateLocation(false)
-        }.build()
+        if (providers.isEmpty()) {
+            close(Exception("系统未开启任何定位源"))
+            return@callbackFlow
+        }
 
         try {
-            fusedClient.requestLocationUpdates(
-                locationRequest,
-                locationCallback,
-                Looper.getMainLooper()
-            ).addOnFailureListener { e ->
-                close(e)
+            for (provider in providers) {
+                try {
+                    locationManager.requestLocationUpdates(
+                        provider,
+                        intervalMs,
+                        minDistanceM,
+                        listener,
+                        Looper.getMainLooper()
+                    )
+                } catch (e: SecurityException) {
+                    // 忽略单个 provider 的权限异常，继续下一个
+                }
             }
         } catch (e: SecurityException) {
             close(e)
+            return@callbackFlow
         }
 
         awaitClose {
             try {
-                fusedClient.removeLocationUpdates(locationCallback)
+                locationManager.removeUpdates(listener)
             } catch (_: Exception) {
                 // 忽略移除回调时的异常
             }
         }
     }
-
-    private suspend fun fetchFusedLastLocation(errors: MutableList<String>): Location? {
-        return try {
-            withTimeout(1_500) { requestFusedLastLocation() }
-        } catch (e: TimeoutCancellationException) {
-            errors.add("Fused最近位置: 超时")
-            null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            errors.add("Fused最近位置: ${e.message ?: "失败"}")
-            null
-        }
-    }
-
-    private suspend fun fetchFusedCurrentLocation(
-        priority: Int,
-        timeoutMs: Long,
-        name: String,
-        errors: MutableList<String>
-    ): Location? {
-        return try {
-            withTimeout(timeoutMs) { requestFusedCurrentLocation(priority) }
-        } catch (e: TimeoutCancellationException) {
-            errors.add("$name: 超时")
-            null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            errors.add("$name: ${e.message ?: "失败"}")
-            null
-        }
-    }
-
-    private suspend fun fetchSingleFusedUpdate(
-        timeoutMs: Long,
-        errors: MutableList<String>
-    ): Location? {
-        return try {
-            withTimeout(timeoutMs) { requestSingleFusedUpdate() }
-        } catch (e: TimeoutCancellationException) {
-            errors.add("Fused单次更新: 超时")
-            null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            errors.add("Fused单次更新: ${e.message ?: "失败"}")
-            null
-        }
-    }
-
-    private suspend fun fetchLocationManagerLocation(
-        timeoutMs: Long,
-        errors: MutableList<String>
-    ): Location? {
-        return try {
-            withTimeout(timeoutMs) { requestLocationManagerLocation() }
-        } catch (e: TimeoutCancellationException) {
-            errors.add("系统定位: 超时")
-            null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            errors.add("系统定位: ${e.message ?: "失败"}")
-            null
-        }
-    }
-
-    private suspend fun requestFusedCurrentLocation(priority: Int): Location =
-        suspendCancellableCoroutine { continuation ->
-            val token = CancellationTokenSource()
-            try {
-                fusedClient.getCurrentLocation(
-                    priority,
-                    token.token
-                ).addOnSuccessListener { location ->
-                    if (location != null) {
-                        continuation.resume(location)
-                    } else {
-                        continuation.resumeWithException(NullPointerException("定位返回空值"))
-                    }
-                }.addOnFailureListener { exception ->
-                    continuation.resumeWithException(exception)
-                }.addOnCanceledListener {
-                    continuation.cancel()
-                }
-            } catch (e: SecurityException) {
-                continuation.resumeWithException(e)
-            }
-
-            continuation.invokeOnCancellation {
-                token.cancel()
-            }
-        }
-
-    private suspend fun requestFusedLastLocation(): Location =
-        suspendCancellableCoroutine { continuation ->
-            try {
-                fusedClient.lastLocation
-                    .addOnSuccessListener { location ->
-                        if (location != null) {
-                            continuation.resume(location)
-                        } else {
-                            continuation.resumeWithException(NullPointerException("没有最近一次定位记录"))
-                        }
-                    }
-                    .addOnFailureListener { exception ->
-                        continuation.resumeWithException(exception)
-                    }
-            } catch (e: SecurityException) {
-                continuation.resumeWithException(e)
-            }
-
-            // lastLocation 的 Task 没有显式取消 API，但注册取消回调明确意图：
-            // 取消后迟到的 resume 会被 CancellableContinuation 静默忽略
-            continuation.invokeOnCancellation { /* Task 无法取消，迟到回调由框架忽略 */ }
-        }
-
-    private suspend fun requestSingleFusedUpdate(): Location =
-        suspendCancellableCoroutine { continuation ->
-            try {
-                val request = LocationRequest.Builder(
-                    Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                    1000L
-                ).apply {
-                    setWaitForAccurateLocation(false)
-                    setMinUpdateIntervalMillis(500L)
-                    setMaxUpdateDelayMillis(2000L)
-                }.build()
-
-                // 防止批量回调 / failure 回调与 onLocationResult 竞争导致二次 resume 崩溃
-                val resumed = java.util.concurrent.atomic.AtomicBoolean(false)
-
-                val callback = object : com.google.android.gms.location.LocationCallback() {
-                    override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                        fusedClient.removeLocationUpdates(this)
-                        if (!resumed.compareAndSet(false, true)) return
-                        result.lastLocation?.let {
-                            continuation.resume(it)
-                        } ?: continuation.resumeWithException(NullPointerException("定位返回空值"))
-                    }
-                }
-
-                fusedClient.requestLocationUpdates(
-                    request,
-                    callback,
-                    Looper.getMainLooper()
-                ).addOnFailureListener { exception ->
-                    if (!resumed.compareAndSet(false, true)) return@addOnFailureListener
-                    continuation.resumeWithException(exception)
-                }
-
-                continuation.invokeOnCancellation {
-                    fusedClient.removeLocationUpdates(callback)
-                }
-            } catch (e: SecurityException) {
-                continuation.resumeWithException(e)
-            }
-        }
 
     private suspend fun requestLocationManagerLocation(): Location =
         suspendCancellableCoroutine { continuation ->

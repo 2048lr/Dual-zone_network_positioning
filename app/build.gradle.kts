@@ -319,7 +319,6 @@ dependencies {
     implementation(libs.androidx.palette)
 
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigationevent.compose)
@@ -344,9 +343,6 @@ dependencies {
 
     implementation(libs.hiddenapibypass)
     implementation(libs.material.kolor)
-
-    // Location Services
-    implementation(libs.play.services.location)
 
     // Satellite prediction
     implementation(libs.predict4java)
