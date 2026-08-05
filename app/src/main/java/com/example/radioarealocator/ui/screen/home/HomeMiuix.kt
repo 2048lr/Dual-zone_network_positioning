@@ -190,7 +190,8 @@ private fun HomeHeaderMiuix(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 时间 + 天气合并卡：同一背景容器内依次渲染时间内容与天气内容
+        // 时间 + 天气合并卡：同一背景容器内依次渲染天气内容与时间内容
+        // 天气在上（蓝色温度/图标优先显示），时间在下
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -198,6 +199,18 @@ private fun HomeHeaderMiuix(
                 .background(stateColor.copy(alpha = 0.12f * LocalCardAlpha.current))
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
+            // 天气内容：禁用自带背景，复用本卡背景
+            WeatherCard(
+                weather = state.weather,
+                isLoading = state.weatherLoading,
+                error = state.weatherError,
+                nextSatellite = state.nextSatellite,
+                onRefresh = onRefreshWeather,
+                modifier = Modifier.fillMaxWidth(),
+                applyBackground = false
+            )
+            // 天气内容与时间内容之间的分隔，与卡片内元素间距一致
+            Spacer(modifier = Modifier.height(6.dp))
             // 本地时间 + 日期并排：时间在左，月/日（两行）在右
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -233,18 +246,6 @@ private fun HomeHeaderMiuix(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp)
-            )
-            // 时间内容与天气内容之间的分隔，与卡片内元素间距一致
-            Spacer(modifier = Modifier.height(6.dp))
-            // 天气内容：禁用自带背景，复用本卡背景
-            WeatherCard(
-                weather = state.weather,
-                isLoading = state.weatherLoading,
-                error = state.weatherError,
-                nextSatellite = state.nextSatellite,
-                onRefresh = onRefreshWeather,
-                modifier = Modifier.fillMaxWidth(),
-                applyBackground = false
             )
         }
     }
