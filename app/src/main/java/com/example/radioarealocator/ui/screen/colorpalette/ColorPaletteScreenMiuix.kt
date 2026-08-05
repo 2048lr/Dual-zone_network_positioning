@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -111,6 +112,25 @@ fun ColorPaletteScreenMiuix(
     val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
         if (result.isSuccessful) {
             result.uriContent?.let { actions.onSetCustomBackground(it) }
+        }
+    }
+
+    // 先仅从相册选图，再进入裁剪界面（避免弹出相机/相册选择，且裁剪界面有确认按钮）
+    val pickMedia = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let {
+            cropLauncher.launch(
+                CropImageContractOptions(
+                    uri = it,
+                    cropImageOptions = CropImageOptions(
+                        guidelines = CropImageView.Guidelines.ON,
+                        fixAspectRatio = true,
+                        aspectRatioX = 16,
+                        aspectRatioY = 9,
+                    )
+                )
+            )
         }
     }
 
@@ -439,16 +459,8 @@ fun ColorPaletteScreenMiuix(
                                 )
                             },
                             onClick = {
-                                cropLauncher.launch(
-                                    CropImageContractOptions(
-                                        uri = null,
-                                        cropImageOptions = CropImageOptions(
-                                            guidelines = CropImageView.Guidelines.ON,
-                                            fixAspectRatio = true,
-                                            aspectRatioX = 16,
-                                            aspectRatioY = 9,
-                                        )
-                                    )
+                                pickMedia.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
                             },
                         )
