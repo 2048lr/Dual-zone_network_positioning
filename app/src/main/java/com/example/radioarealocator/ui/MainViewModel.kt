@@ -218,6 +218,11 @@ class MainViewModel : ViewModel() {
     private val _timeCardMaskColor = mutableStateOf(Color(ImageColorExtractor.DEFAULT_MASK_COLOR))
     val timeCardMaskColor: State<Color> = _timeCardMaskColor
 
+    // 取色去重：记录上次取色的文件 lastModified，相同则跳过，避免每次 resume 重复 decode
+    private var lastMaskColorFileLastModified: Long = -1L
+    // 取色协程：新的取色请求到来时取消上一次未完成的，避免并发竞态与遮罩色闪烁
+    private var maskColorJob: Job? = null
+
     /**
      * 刷新天气数据。
      *
@@ -338,13 +343,25 @@ class MainViewModel : ViewModel() {
             extractAndUpdateMaskColor(effectiveFile)
         } else {
             _timeCardBackgroundFile.value = null
+            // 无背景时重置遮罩色为默认值，避免下次设置新背景取色完成前残留旧色
+            _timeCardMaskColor.value = Color(ImageColorExtractor.DEFAULT_MASK_COLOR)
+            lastMaskColorFileLastModified = -1L
+            maskColorJob?.cancel()
+            maskColorJob = null
         }
     }
 
     private fun extractAndUpdateMaskColor(imageFile: File) {
-        viewModelScope.launch {
+        // 去重：同一文件（lastModified 相同）不重复取色
+        val currentLastModified = imageFile.lastModified()
+        if (currentLastModified == lastMaskColorFileLastModified) return
+
+        // 取消上一次未完成的取色，避免并发竞态与遮罩色闪烁
+        maskColorJob?.cancel()
+        maskColorJob = viewModelScope.launch {
+            var bitmap: android.graphics.Bitmap? = null
             try {
-                val bitmap = withContext(Dispatchers.IO) {
+                bitmap = withContext(Dispatchers.IO) {
                     val options = android.graphics.BitmapFactory.Options().apply {
                         inSampleSize = 4
                     }
@@ -354,16 +371,16 @@ class MainViewModel : ViewModel() {
                     _timeCardMaskColor.value = withContext(Dispatchers.IO) {
                         ImageColorExtractor.extractDominantColor(bitmap)
                     }
-                    bitmap.recycle()
+                    lastMaskColorFileLastModified = currentLastModified
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                // CancellationException 重新抛出以保留协程取消语义
+                if (e is kotlin.coroutines.cancellation.CancellationException) throw e
+                // 其他异常静默，保留默认遮罩色
+            } finally {
+                bitmap?.recycle()
             }
         }
-    }
-
-    fun clearCustomBackground() {
-        landscapeImageStore.clearCustomImage()
-        _timeCardBackgroundFile.value = null
     }
 
     companion object {

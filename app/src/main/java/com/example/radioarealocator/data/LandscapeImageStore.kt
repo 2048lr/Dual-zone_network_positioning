@@ -47,13 +47,26 @@ class LandscapeImageStore(context: Context) {
                 bitmap
             }
 
-            customImageFile.delete()
-            FileOutputStream(customImageFile).use { fos ->
-                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+            // 原子替换：先写临时文件，成功后再替换目标文件，避免写入失败导致旧背景丢失
+            val tmpFile = File(bgDir, "$CUSTOM_IMAGE_NAME.tmp")
+            var saved = false
+            try {
+                FileOutputStream(tmpFile).use { fos ->
+                    saved = scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+                }
+                if (saved) {
+                    // 写入成功后删除旧文件并重命名临时文件为目标文件
+                    if (customImageFile.exists()) customImageFile.delete()
+                    saved = tmpFile.renameTo(customImageFile)
+                }
+                if (!saved) tmpFile.delete()
+            } catch (_: Exception) {
+                tmpFile.delete()
+                saved = false
             }
             if (scaledBitmap !== bitmap) scaledBitmap.recycle()
             bitmap.recycle()
-            true
+            saved
         } catch (_: Exception) {
             false
         }
@@ -61,6 +74,8 @@ class LandscapeImageStore(context: Context) {
 
     fun clearCustomImage() {
         customImageFile.delete()
+        // 同时清理可能残留的临时文件
+        File(bgDir, "$CUSTOM_IMAGE_NAME.tmp").delete()
     }
 
     companion object {

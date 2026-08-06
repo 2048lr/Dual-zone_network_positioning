@@ -188,14 +188,18 @@ private fun HomeHeaderMiuix(
         ) {
             if (hasBackground) {
                 val file = state.timeCardBackgroundFile!!
-                AsyncImage(
-                    model = ImageRequest.Builder(
-                        androidx.compose.ui.platform.LocalContext.current
-                    ).data(file)
+                val context = androidx.compose.ui.platform.LocalContext.current
+                // remember ImageRequest，避免每秒时钟重组时重建请求；key 含 lastModified+length 防缓存碰撞
+                val request = remember(file, file.lastModified(), file.length()) {
+                    ImageRequest.Builder(context)
+                        .data(file)
                         .crossfade(true)
-                        .memoryCacheKey("timecard_${file.lastModified()}")
-                        .diskCacheKey("timecard_${file.lastModified()}")
-                        .build(),
+                        .memoryCacheKey("timecard_${file.lastModified()}_${file.length()}")
+                        .diskCacheKey("timecard_${file.lastModified()}_${file.length()}")
+                        .build()
+                }
+                AsyncImage(
+                    model = request,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.matchParentSize()
@@ -208,8 +212,9 @@ private fun HomeHeaderMiuix(
                             Brush.horizontalGradient(
                                 0f to state.timeCardMaskColor,
                                 0.25f to state.timeCardMaskColor.copy(alpha = 0.85f),
-                                0.5f to state.timeCardMaskColor.copy(alpha = 0.35f),
-                                0.8f to Color.Transparent
+                                0.5f to state.timeCardMaskColor.copy(alpha = 0.45f),
+                                0.8f to state.timeCardMaskColor.copy(alpha = 0.3f),
+                                1.0f to state.timeCardMaskColor.copy(alpha = 0.3f)
                             )
                         )
                 )

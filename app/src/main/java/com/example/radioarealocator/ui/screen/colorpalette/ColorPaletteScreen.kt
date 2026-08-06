@@ -1,6 +1,7 @@
 package com.example.radioarealocator.ui.screen.colorpalette
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -10,6 +11,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
+import com.example.radioarealocator.R
 import com.example.radioarealocator.RadioAreaLocatorApplication
 import com.example.radioarealocator.data.LandscapeImageStore
 import com.example.radioarealocator.ui.LocalMainViewModel
@@ -27,7 +29,7 @@ fun ColorPaletteScreen() {
     val activity = LocalActivity.current
     val viewModel = appViewModel<SettingsViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val imageStore = remember { LandscapeImageStore(context) }
+    val imageStore = remember { LandscapeImageStore(context.applicationContext) }
     val mainViewModel = LocalMainViewModel.current
     val currentPaletteStyle = try {
         PaletteStyle.valueOf(uiState.colorStyle)
@@ -64,9 +66,18 @@ fun ColorPaletteScreen() {
         onSetPageScale = viewModel::setPageScale,
         onSetCustomBackground = { uri ->
             if (imageStore.saveCustomImage(uri, context)) {
-                viewModel.setCustomBackgroundUri(uri.toString())
+                // 存储实际文件路径而非源 URI（源 URI 进程重启后可能失效）
+                viewModel.setCustomBackgroundUri(imageStore.customImageFile.absolutePath)
                 mainViewModel.refreshLandscapeImage()
+            } else {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.timecard_background_save_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
+            // 清理裁剪回退路径产生的临时文件
+            java.io.File(context.cacheDir, "crop_temp.jpg").delete()
         },
         onClearCustomBackground = {
             imageStore.clearCustomImage()

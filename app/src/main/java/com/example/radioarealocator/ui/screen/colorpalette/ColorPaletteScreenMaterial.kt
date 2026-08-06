@@ -130,10 +130,17 @@ fun ColorPaletteScreenMaterial(
                 ?: result.bitmap?.let { bitmap ->
                     // 回退：uriContent 为空时用 bitmap 保存到临时文件
                     val file = File(context.cacheDir, "crop_temp.jpg")
-                    FileOutputStream(file).use { fos ->
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+                    try {
+                        FileOutputStream(file).use { fos ->
+                            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)) {
+                                file.delete()
+                                return@let
+                            }
+                        }
+                        actions.onSetCustomBackground(Uri.fromFile(file))
+                    } catch (_: Exception) {
+                        file.delete()
                     }
-                    actions.onSetCustomBackground(Uri.fromFile(file))
                 }
         }
     }

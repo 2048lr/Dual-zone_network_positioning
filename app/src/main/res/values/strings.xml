@@ -86,6 +86,7 @@
     <string name="settings_custom_background_set">Custom image set. Tap to change.</string>
     <string name="settings_clear_background">Clear background image</string>
     <string name="settings_clear_background_summary">Remove custom image and restore normal card style.</string>
+    <string name="timecard_background_save_failed" translatable="false">背景设置失败，请重试</string>
 
     <!-- User project business strings (Chinese-only, marked translatable=false) -->
     <string name="action_refresh" translatable="false">刷新定位</string>
