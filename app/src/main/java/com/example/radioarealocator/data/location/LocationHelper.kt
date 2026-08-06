@@ -154,6 +154,7 @@ class LocationHelper(private val context: Context) {
             return@callbackFlow
         }
 
+        var registeredProvider = false
         try {
             for (provider in providers) {
                 try {
@@ -164,9 +165,14 @@ class LocationHelper(private val context: Context) {
                         listener,
                         Looper.getMainLooper()
                     )
+                    registeredProvider = true
                 } catch (e: SecurityException) {
                     // 忽略单个 provider 的权限异常，继续下一个
                 }
+            }
+            if (!registeredProvider) {
+                close(Exception("无法注册定位监听器"))
+                return@callbackFlow
             }
         } catch (e: SecurityException) {
             close(e)
@@ -286,6 +292,7 @@ class LocationHelper(private val context: Context) {
                 // 超时后用 fallback 兜底（外层 withTimeout 10s，这里 9s 提前兜底）
                 handler.postDelayed(timeoutRunnable, 9_000L)
 
+                var registeredProvider = false
                 for (provider in providers) {
                     try {
                         locationManager.requestLocationUpdates(
@@ -295,11 +302,17 @@ class LocationHelper(private val context: Context) {
                             listener,
                             Looper.getMainLooper()
                         )
+                        registeredProvider = true
                     } catch (e: SecurityException) {
                         // 忽略单个 provider 的权限异常，继续下一个
                     } catch (e: Exception) {
                         // 忽略单个 provider 异常
                     }
+                }
+                if (!registeredProvider && resumed.compareAndSet(false, true)) {
+                    handler.removeCallbacks(timeoutRunnable)
+                    removeListener(listener)
+                    continuation.resumeWithException(Exception("无法注册定位监听器"))
                 }
             } catch (e: SecurityException) {
                 if (resumed.compareAndSet(false, true)) {

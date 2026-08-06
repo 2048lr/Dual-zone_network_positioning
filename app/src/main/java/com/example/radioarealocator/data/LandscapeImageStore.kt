@@ -74,7 +74,7 @@ class LandscapeImageStore(context: Context) {
             if (rawHeight > reqHeight || rawWidth > reqWidth) {
                 val halfHeight = rawHeight / 2
                 val halfWidth = rawWidth / 2
-                while (halfHeight / inSampleSize >= reqHeight &&
+                while (halfHeight / inSampleSize >= reqHeight ||
                     halfWidth / inSampleSize >= reqWidth
                 ) {
                     inSampleSize *= 2
