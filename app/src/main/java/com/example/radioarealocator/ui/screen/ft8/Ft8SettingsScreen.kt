@@ -180,7 +180,7 @@ fun Ft8SettingsScreen(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
                     Text(
-                        "FT8 采用 8-FSK 调制, 每周期 15 秒发送 79 个音调。音频采样率 12000 Hz, 音调间隔 6.25 Hz。编码使用 (174,87) LDPC 纠错码。基于 FT8CN (BG7YOZ/N0BOY) 协议实现。",
+                        "FT8 采用 8-FSK GFSK 调制（BT=2.0），每周期 15 秒发送 79 个音调。音频采样率 12000 Hz，音调间隔 6.25 Hz。编码使用标准 (174,91) LDPC 纠错码 + CRC-14，与 WSJT-X / FT8CN 完全互通。",
                         style = MiuixTheme.textStyles.body2,
                         color = colorScheme.onSurfaceSecondary
                     )
