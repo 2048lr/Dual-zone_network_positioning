@@ -36,9 +36,9 @@ enum class Ft8Band(
 @Parcelize
 data class Ft8DecodedMessage(
     val utcTime: Long,
-    val snr: Int, // 信噪比 dB
+    val snr: Float, // 信噪比 dB
     val dt: Float, // 时间偏移 秒
-    val freqHz: Int, // 音频频率
+    val freqHz: Float, // 音频频率
     val raw77: Long, // 77-bit 消息原文
     val callsign: String,
     val grid: String?,

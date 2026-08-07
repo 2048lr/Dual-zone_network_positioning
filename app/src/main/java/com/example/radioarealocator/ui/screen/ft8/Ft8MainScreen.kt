@@ -297,12 +297,14 @@ fun Ft8MainScreen(
                         if (r.success) {
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                "CRC: ${if (r.crcValid) "有效" else "无效"} · SNR: ${"%.1f".format(r.snr)} dB · 频偏: ${r.freqOffset}",
+                                "SNR: %.1f dB · DT: %+.2f s · 频率: %.0f Hz · 同步分: %.1f".format(
+                                    r.snr, r.dt, r.freqHz, r.syncScore
+                                ),
                                 style = MiuixTheme.textStyles.footnote2,
                                 color = MiuixTheme.colorScheme.onSurfaceSecondary
                             )
                             Text(
-                                "RAW: 0x${r.raw77Hex}",
+                                "CRC: ${if (r.crcValid) "有效" else "无效"} · RAW: 0x${r.raw77Hex}",
                                 style = MiuixTheme.textStyles.footnote2,
                                 color = MiuixTheme.colorScheme.onSurfaceSecondary
                             )

@@ -23,7 +23,6 @@ data class Ft8DecodedEntry(
     val time: Long = System.currentTimeMillis(),
     val result: Ft8Decoder.DecodeResult,
 )
-
 data class Ft8UiState(
     val config: Ft8Config = Ft8Config(),
     val isEncoding: Boolean = false,
@@ -134,7 +133,7 @@ class Ft8ViewModel(application: Application) : AndroidViewModel(application) {
                     it.copy(
                         decodedEntries = entries.takeLast(MAX_DECODED_ENTRIES),
                         decodeStatus = if (result.success) {
-                            "解码成功: ${result.messageText}"
+                            "解码成功: ${result.messageText} (SNR ${result.snr} dB)"
                         } else {
                             "未检测到信号: ${result.messageText}"
                         },

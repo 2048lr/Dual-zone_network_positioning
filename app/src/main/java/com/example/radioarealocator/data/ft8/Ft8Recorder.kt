@@ -14,15 +14,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 
 /**
- * FT8 麦克风录音器：AudioRecord 连续采集，后台线程滑动窗口解码。
+ * FT8 麦克风录音器：AudioRecord 连续采集，按 15 秒 UTC 时隙对齐解码。
  *
- * 采样率 12000 Hz (FT8 标准), 每帧约 15s。录音线程持续写入环形缓冲，
- * 解码线程每 [DECODE_INTERVAL_MS] 从最新数据截取一个窗口尝试解码，
- * 解码结果通过 [onDecoded] 回调。
+ * 相比旧实现（固定 12000 Hz + 每 1.5s 解码 16s 窗口）的改进：
+ *  - 采样率优先 12000 Hz，若设备不支持则回退 48000/44100 并重采样到 12000；
+ *  - 解码窗口对齐 15 秒时隙（FT8 标准周期），每次只解码一个完整时隙；
+ *  - 解码回调提供 SNR / DT / 频率等完整信息。
  */
 class Ft8Recorder(
     private val context: Context,
@@ -61,35 +61,49 @@ class Ft8Recorder(
 
     private suspend fun CoroutineScope.runLoop() {
         try {
-            val sampleRate = Ft8Encoder.SAMPLE_RATE
-            val minBuffer = AudioRecord.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            )
-            // 缓冲足够大以容纳一个完整帧 (15s) + 余量
-            val bufferSize = maxOf(minBuffer, sampleRate * 16)
-
-            val record = AudioRecord.Builder()
-                .setAudioSource(MediaRecorder.AudioSource.MIC)
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setSampleRate(sampleRate)
-                        .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .build()
+            // 依次尝试：12000（标准）→ 48000 → 44100，取第一个可用的
+            val candidates = intArrayOf(12000, 48000, 44100)
+            var sampleRate = 0
+            var record: AudioRecord? = null
+            for (rate in candidates) {
+                val minBuffer = AudioRecord.getMinBufferSize(
+                    rate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
                 )
-                .setBufferSizeInBytes(bufferSize * 2)
-                .build()
-            audioRecord = record
-
-            if (record.state != AudioRecord.STATE_INITIALIZED) {
-                onStatus("录音初始化失败")
-                return
+                if (minBuffer <= 0) continue
+                val candidate = try {
+                    AudioRecord.Builder()
+                        .setAudioSource(MediaRecorder.AudioSource.MIC)
+                        .setAudioFormat(
+                            AudioFormat.Builder()
+                                .setSampleRate(rate)
+                                .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                .build()
+                        )
+                        .setBufferSizeInBytes(maxOf(minBuffer, rate / 10) * 2)
+                        .build()
+                } catch (e: Exception) {
+                    null
+                }
+                if (candidate != null && candidate.state == AudioRecord.STATE_INITIALIZED) {
+                    sampleRate = rate
+                    record = candidate
+                    break
+                } else {
+                    runCatching { candidate?.release() }
+                }
             }
 
+            if (record == null || sampleRate == 0) {
+                onStatus("录音初始化失败（无可用采样率）")
+                return
+            }
+            audioRecord = record
+
             record.startRecording()
-            onStatus("正在解码…")
+            onStatus("正在解码… (${sampleRate} Hz)")
 
             // 录音线程：持续读入环形缓冲
             val readThread = Thread {
@@ -99,8 +113,10 @@ class Ft8Recorder(
                     val read = record.read(readBuf, 0, readBuf.size, AudioRecord.READ_BLOCKING)
                     if (read > 0) {
                         synchronized(ringLock) {
-                            for (i in 0 until read) {
-                                ringBuffer[ringWrite] = readBuf[i]
+                            // 重采样到 12000
+                            val decimated = resampleTo12000(readBuf, read, sampleRate)
+                            for (s in decimated) {
+                                ringBuffer[ringWrite] = s
                                 ringWrite = (ringWrite + 1) % ringBuffer.size
                                 if (ringWrite == ringRead) {
                                     ringRead = (ringRead + 1) % ringBuffer.size
@@ -114,13 +130,18 @@ class Ft8Recorder(
             }
             readThread.start()
 
-            // 解码线程：每 DECODE_INTERVAL_MS 尝试解码一次
+            // 解码线程：每 15 秒时隙解码一次
+            var lastSlot = -1L
             while (isActive) {
                 delay(DECODE_INTERVAL_MS)
-                val window = readLatestWindow()
-                if (window.size >= Ft8Encoder.SAMPLE_RATE * 12) {
-                    val result = withContextSafe(window)
-                    onDecoded(result)
+                val nowSlot = (System.currentTimeMillis() / 1000) / 15
+                if (nowSlot != lastSlot) {
+                    lastSlot = nowSlot
+                    val window = readLatestWindow()
+                    if (window.size >= Ft8Encoder.SAMPLE_RATE * 12) {
+                        val result = withContextSafe(window)
+                        onDecoded(result)
+                    }
                 }
             }
 
@@ -133,13 +154,32 @@ class Ft8Recorder(
         }
     }
 
+    /** 把任意采样率音频重采样到 12000 Hz（线性插值） */
+    private fun resampleTo12000(src: ShortArray, srcLen: Int, srcRate: Int): ShortArray {
+        if (srcRate == Ft8Encoder.SAMPLE_RATE) {
+            return src.copyOfRange(0, srcLen)
+        }
+        val outLen = (srcLen.toLong() * Ft8Encoder.SAMPLE_RATE / srcRate).toInt()
+        val out = ShortArray(outLen)
+        val ratio = srcRate.toDouble() / Ft8Encoder.SAMPLE_RATE
+        for (i in 0 until outLen) {
+            val pos = i * ratio
+            val i0 = pos.toInt().coerceIn(0, srcLen - 1)
+            val i1 = (i0 + 1).coerceIn(0, srcLen - 1)
+            val frac = (pos - i0).toFloat()
+            out[i] = (src[i0] * (1 - frac) + src[i1] * frac).toInt().toShort()
+        }
+        return out
+    }
+
     private val ringLock = Any()
+    // 环形缓冲：16 秒的 12000 Hz 数据
     private val ringBuffer = ShortArray(Ft8Encoder.SAMPLE_RATE * 16)
     private var ringRead = 0
     private var ringWrite = 0
 
     private fun readLatestWindow(): ShortArray {
-        val windowSamples = Ft8Encoder.SAMPLE_RATE * 16
+        val windowSamples = Ft8Encoder.SAMPLE_RATE * 15
         val out = ShortArray(windowSamples)
         synchronized(ringLock) {
             val available = if (ringWrite >= ringRead) {
@@ -162,6 +202,6 @@ class Ft8Recorder(
         }
 
     companion object {
-        private const val DECODE_INTERVAL_MS = 1500L
+        private const val DECODE_INTERVAL_MS = 1000L
     }
 }
