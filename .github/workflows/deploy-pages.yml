@@ -5,7 +5,7 @@ name: Deploy Website to GitHub Pages
 #
 # 触发条件：
 #   - miuix 分支上 website/ 目录变更时自动部署
-#   - 新 Release 发布（published）后自动重新部署，刷新顶部版本号
+#   - 新 Release 发布（published）时由 relay-pages-deploy.yml 转发到 miuix 分支触发
 #   - 支持手动触发（workflow_dispatch）
 #
 # 部署时用已认证 API 拉取最新 release（含预发布）烘焙成 website/version.json，
@@ -23,10 +23,9 @@ on:
     paths:
       - 'website/**'
       - '.github/workflows/deploy-pages.yml'
-  # 新 Release 发布后立即重新部署，保证页面顶部版本号及时更新
-  release:
-    types:
-      - published
+  # 注意：release 事件不在本文件监听。
+  # release 触发的 run 运行在 tag ref 上，无法通过 github-pages 环境的
+  # "仅限 miuix 分支"保护规则；由 relay-pages-deploy.yml 转发到 miuix 分支触发。
   workflow_dispatch:
 
 # workflow 级最小权限，pages/id-token 写权限下沉到 deploy job
