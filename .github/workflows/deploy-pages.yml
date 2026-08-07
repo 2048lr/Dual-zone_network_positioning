@@ -5,7 +5,11 @@ name: Deploy Website to GitHub Pages
 #
 # 触发条件：
 #   - miuix 分支上 website/ 目录变更时自动部署
+#   - 新 Release 发布（published）后自动重新部署，刷新顶部版本号
 #   - 支持手动触发（workflow_dispatch）
+#
+# 部署时用已认证 API 拉取最新 release（含预发布）烘焙成 website/version.json，
+# 前端读取该文件显示版本号，避免匿名请求 api.github.com 触发限流。
 #
 # 前置配置：
 #   仓库 Settings → Pages → Source 选择 "GitHub Actions"
@@ -19,6 +23,10 @@ on:
     paths:
       - 'website/**'
       - '.github/workflows/deploy-pages.yml'
+  # 新 Release 发布后立即重新部署，保证页面顶部版本号及时更新
+  release:
+    types:
+      - published
   workflow_dispatch:
 
 # workflow 级最小权限，pages/id-token 写权限下沉到 deploy job
@@ -50,6 +58,41 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      # 用已认证的 API 拉取最新 release（含预发布），烘焙成 website/version.json
+      # 前端优先读本地 version.json，避免直接请求 api.github.com 触发匿名限流
+      - name: Bake latest release version
+        id: version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RESP=$(curl -sf \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases?per_page=5") || true
+
+          if [ -z "$RESP" ]; then
+            echo "::warning::GitHub API 不可用，保留仓库内 version.json"
+            exit 0
+          fi
+
+          TAG=$(echo "$RESP" | jq -r '.[] | select(.draft != true) | .tag_name' | head -1)
+          PRE=$(echo "$RESP" | jq -r 'map(select(.draft != true)) | if length > 0 then .[0].prerelease else false end')
+
+          if [ -z "$TAG" ]; then
+            echo "::warning::未找到已发布 release，保留仓库内 version.json"
+            exit 0
+          fi
+
+          cat > website/version.json <<EOF
+          {
+            "tag": "$TAG",
+            "prerelease": $PRE,
+            "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          echo "Baked version: $TAG (prerelease=$PRE)"
+          echo "version_tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Upload website artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -69,6 +112,7 @@ jobs:
           echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
           echo "| Branch | \`${{ github.ref_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Version | \`${{ steps.version.outputs.version_tag || '默认' }}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Pages URL | ${{ steps.deployment.outputs.page_url }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Deploy outcome | ${{ steps.deployment.outcome }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
