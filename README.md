@@ -1,6 +1,31 @@
-# 双区网络定位 (RadioAreaLocator)
+# HamKit
 
 为业余无线电爱好者打造的随身控制台——分区定位、卫星过境预测、CW 摩尔斯训练、过境提醒一体化。
+
+## 开发路线图
+
+### 已完成
+
+- **CW 练习器**（摩斯电码学习）
+- **卫星定位与追踪**
+- **AMSAT 卫星状态**
+- **日历过境提醒**
+
+### 短期计划
+
+- **FT8** 打磨（借鉴 [FT8CN](https://github.com/BG7HIM/FT8CN)）
+- **APRS** 打磨（借鉴 [aprsdroid](https://github.com/ge0rg/aprsdroid)）
+- **卫星功能重写**（借鉴 [look4sat](https://github.com/rt-bishop/Look4Sat)）
+
+### 长期计划
+
+- **RTTY** 开发（从零研究信号处理）
+
+### 扩展规划
+
+- QSO 日志记录
+- QSO 导出（XML）
+- 无线电中继查询（和相关授权方合作）
 
 ## 核心功能
 
@@ -27,7 +52,9 @@
 
 ## 应用截图
 
-![应用截图](images/IMG_20260620_010952.jpg)
+| 定位页面 | FT8 | APRS | CW 教程练习 |
+| --- | --- | --- | --- |
+| ![定位页面](images/定位页面.jpg) | ![FT8](images/FT8.jpg) | ![APRS](images/APRS.jpg) | ![CW 教程练习](images/CW-教程练习.jpg) |
 
 ## 技术栈
 
