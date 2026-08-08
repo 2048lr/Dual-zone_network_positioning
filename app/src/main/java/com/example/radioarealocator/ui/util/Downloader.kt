@@ -4,15 +4,17 @@ import com.example.radioarealocator.radioApp
 import okhttp3.Request
 import java.io.File
 
-/** GitHub Releases API：获取最新 release 信息 */
-private const val LATEST_RELEASE_URL =
-    "https://api.github.com/repos/fuxue-linkong/Dual-zone_network_positioning/releases/latest"
+/** GitHub Releases API：拉取最近若干 release（含预发布），取最新非草稿 */
+private const val RELEASES_URL =
+    "https://api.github.com/repos/fuxue-linkong/Dual-zone_network_positioning/releases?per_page=5"
 
 /**
  * 查询 GitHub 最新 release 信息。
  *
- * versionCode 从 release body 中提取（release.yml 写入格式：`Version: name (code)`），
- * 与 [com.example.radioarealocator.BuildConfig.VERSION_CODE] 比较判断是否有更新。
+ * 使用 releases 列表接口（而非 /releases/latest，后者会跳过预发布版本）。
+ * versionCode 提取优先级：
+ * 1. release body 中的 `Version: <name> (<code>)`（release.yml 自动发布时写入）；
+ * 2. 手工上传的 APK 文件名 `RadioAreaLocator_<name>_<code>(-release).apk`。
  *
  * @return 最新版本信息；网络失败或无 release 时返回默认空值
  */
@@ -20,18 +22,26 @@ fun checkNewVersion(): LatestVersionInfo {
     if (!isNetworkAvailable(radioApp)) return LatestVersionInfo()
     val defaultValue = LatestVersionInfo()
     runCatching {
-        radioApp.okhttpClient.newCall(Request.Builder().url(LATEST_RELEASE_URL).build()).execute()
+        radioApp.okhttpClient.newCall(Request.Builder().url(RELEASES_URL).build()).execute()
             .use { response ->
                 if (!response.isSuccessful) return defaultValue
                 val body = response.body.string()
-                val json = org.json.JSONObject(body)
+                val releases = org.json.JSONArray(body)
+
+                // 取最新非草稿 release（接口按发布时间倒序返回）
+                var json: org.json.JSONObject? = null
+                for (i in 0 until releases.length()) {
+                    val rel = releases.getJSONObject(i)
+                    if (!rel.optBoolean("draft", false)) {
+                        json = rel
+                        break
+                    }
+                }
+                if (json == null) return defaultValue
+
                 val changelog = json.optString("body")
                 val tagName = json.optString("tag_name")
                 val versionName = tagName.removePrefix("v")
-
-                // 从 body 提取 versionCode（格式：Version: 1.2.0-beta.1 (10)）
-                val versionCodeRegex = Regex("\\((\\d+)\\)")
-                val versionCode = versionCodeRegex.find(changelog)?.groupValues?.get(1)?.toIntOrNull() ?: 0
 
                 // 查找 APK 资源
                 val assets = json.optJSONArray("assets") ?: return defaultValue
@@ -43,6 +53,17 @@ fun checkNewVersion(): LatestVersionInfo {
                         downloadUrl = asset.getString("browser_download_url")
                         break
                     }
+                }
+
+                // 优先从 body 的 Version 行提取 versionCode（格式：Version: 1.2.0-beta.1 (10)）
+                var versionCode = Regex("Version:\\s*\\S+\\s*\\((\\d+)\\)")
+                    .find(changelog)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+
+                // 手工上传的 release body 可能没有 Version 行，退而提取 APK 文件名中的版本号
+                if (versionCode == 0 && downloadUrl.isNotEmpty()) {
+                    val fileName = downloadUrl.substringAfterLast('/')
+                    versionCode = Regex("_(\\d+)(?:-release)?\\.apk$")
+                        .find(fileName)?.groupValues?.get(1)?.toIntOrNull() ?: 0
                 }
 
                 return LatestVersionInfo(

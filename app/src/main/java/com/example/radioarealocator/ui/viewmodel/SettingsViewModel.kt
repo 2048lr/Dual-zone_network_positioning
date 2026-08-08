@@ -22,6 +22,7 @@ import com.example.radioarealocator.ui.theme.ColorMode
 import com.example.radioarealocator.ui.util.LatestVersionInfo
 import com.example.radioarealocator.ui.util.checkNewVersion
 import com.example.radioarealocator.ui.util.downloadApk
+import com.example.radioarealocator.ui.util.isNewerVersion
 import java.io.File
 
 class SettingsViewModel(
@@ -218,8 +219,13 @@ class SettingsViewModel(
         _uiState.update { it.copy(updateChecking = true, updateError = false) }
         viewModelScope.launch {
             val info = withContext(kotlinx.coroutines.Dispatchers.IO) { checkNewVersion() }
-            val hasUpdate = info.versionCode > BuildConfig.VERSION_CODE &&
-                info.downloadUrl.isNotEmpty()
+            val hasUpdate = if (info.versionCode > 0) {
+                info.versionCode > BuildConfig.VERSION_CODE
+            } else {
+                // versionCode 提取失败（手工发布的 release 可能不含 Version 行）
+                // 回退到语义化版本名比较，避免误报"已是最新版本"
+                isNewerVersion(info.versionName, BuildConfig.VERSION_NAME)
+            } && info.downloadUrl.isNotEmpty()
             _uiState.update {
                 it.copy(
                     updateChecking = false,
