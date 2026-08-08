@@ -2,6 +2,7 @@ package com.example.radioarealocator.ui.component.miuix.animation
 
 import android.annotation.SuppressLint
 import android.graphics.RuntimeShader
+import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VisibilityThreshold
@@ -40,8 +41,9 @@ class InteractiveHighlight(
     private var startPosition = Offset.Zero
     val offset: Offset get() = positionAnimation.value - startPosition
 
-    @Language("AGSL")
-    private val shader =
+    @get:Language("AGSL")
+    private val shader by lazy {
+        require(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
         RuntimeShader(
             """
     uniform float2 size;
@@ -55,6 +57,7 @@ class InteractiveHighlight(
         return color * intensity;
     }"""
         )
+    }
 
     val modifier: Modifier =
         Modifier.drawWithContent {
@@ -64,21 +67,23 @@ class InteractiveHighlight(
                     Color.White.copy(0.06f * progress),
                     blendMode = BlendMode.Plus
                 )
-                shader.apply {
-                    val position = position(size, positionAnimation.value)
-                    setFloatUniform("size", size.width, size.height)
-                    setColorUniform("color", Color.White.copy(0.12f * progress).toArgb())
-                    setFloatUniform("radius", size.minDimension * 1.2f)
-                    setFloatUniform(
-                        "position",
-                        position.x.fastCoerceIn(0f, size.width),
-                        position.y.fastCoerceIn(0f, size.height)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    shader.apply {
+                        val position = position(size, positionAnimation.value)
+                        setFloatUniform("size", size.width, size.height)
+                        setColorUniform("color", Color.White.copy(0.12f * progress).toArgb())
+                        setFloatUniform("radius", size.minDimension * 1.2f)
+                        setFloatUniform(
+                            "position",
+                            position.x.fastCoerceIn(0f, size.width),
+                            position.y.fastCoerceIn(0f, size.height)
+                        )
+                    }
+                    drawRect(
+                        ShaderBrush(shader),
+                        blendMode = BlendMode.Plus
                     )
                 }
-                drawRect(
-                    ShaderBrush(shader),
-                    blendMode = BlendMode.Plus
-                )
             }
 
             drawContent()
