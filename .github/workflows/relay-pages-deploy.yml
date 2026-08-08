@@ -33,6 +33,8 @@ jobs:
       - name: Dispatch deploy-pages.yml on miuix branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 本工作流未 checkout 仓库，gh 无法从 .git 推断仓库，需显式指定
+          GH_REPO: ${{ github.repository }}
         run: |
           gh workflow run deploy-pages.yml --ref miuix
           echo "已触发 miuix 分支上的 GitHub Pages 部署，将以最新 release 刷新页面版本号"
