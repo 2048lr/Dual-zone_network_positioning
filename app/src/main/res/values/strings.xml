@@ -1,6 +1,6 @@
 <resources>
     <!-- App identity -->
-    <string name="app_name" translatable="false">双区网络定位</string>
+    <string name="app_name" translatable="false">HamKit</string>
 
     <!-- UI Kit UI strings (English default) -->
     <string name="permission_section">Permissions</string>
@@ -99,7 +99,7 @@
     <string name="latitude" translatable="false">纬度</string>
     <string name="longitude" translatable="false">经度</string>
     <string name="location_status" translatable="false">定位状态</string>
-    <string name="location_detail_title" translatable="false">双区网格定位</string>
+    <string name="location_detail_title" translatable="false">HamKit</string>
     <string name="location_detail_desc" translatable="false">查看定位状态与位置地图</string>
     <string name="location_success" translatable="false">定位成功</string>
     <string name="zone_info" translatable="false">分区信息</string>

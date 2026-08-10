@@ -32,7 +32,7 @@
     <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
 
     <application
-        android:name=".RadioAreaLocatorApplication"
+        android:name=".HamKitApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -42,7 +42,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.RadioAreaLocator"
+        android:theme="@style/Theme.HamKit"
         tools:targetApi="31">
 
         <!-- 高德地图 SDK Key：由 manifestPlaceholders 在构建时注入 -->
@@ -54,7 +54,7 @@
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.RadioAreaLocator"
+            android:theme="@style/Theme.HamKit"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -84,7 +84,7 @@
             android:name=".data.reminder.ReminderReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.example.radioarealocator.ACTION_TRIGGER_REMINDER" />
+                <action android:name="com.example.hamkit.ACTION_TRIGGER_REMINDER" />
             </intent-filter>
         </receiver>
 

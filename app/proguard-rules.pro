@@ -33,9 +33,9 @@
 -dontwarn org.apache.commons.logging.**
 
 # 自定义 commons-logging 工厂（通过 SPI 注册，类名必须保留）
--keep class com.example.radioarealocator.logging.** { *; }
--keep class com.example.radioarealocator.logging.AndroidLogFactory { *; }
--keep class com.example.radioarealocator.logging.AndroidLog { *; }
+-keep class com.example.hamkit.logging.** { *; }
+-keep class com.example.hamkit.logging.AndroidLogFactory { *; }
+-keep class com.example.hamkit.logging.AndroidLog { *; }
 
 # 高德地图 SDK 3D地图（保留 native 接口和反射调用的类）
 -keep class com.amap.api.** { *; }
@@ -48,7 +48,7 @@
 -dontwarn com.loc.**
 
 # 保留 BuildConfig 中的加密 key 字段
--keep class com.example.radioarealocator.BuildConfig { *; }
+-keep class com.example.hamkit.BuildConfig { *; }
 
 # ──────────────────────────────────────────────────────────────────────────
 # WorkManager / Room：保留反射生成的数据库实现类

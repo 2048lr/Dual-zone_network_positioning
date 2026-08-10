@@ -48,7 +48,7 @@ val SHARD_B_RAW = byteArrayOf(
 
 // ShardC 派生参数（与 SecretManager.kt 一致）
 val SHARD_C_SALT = "R4d10_Ar34_L0c8t0r_2026_Salt"
-val APP_PACKAGE_NAME = "com.example.radioarealocator"
+val APP_PACKAGE_NAME = "com.example.hamkit"
 
 /**
  * 组装 256 位主密钥：ShardA ⊕ ShardB ⊕ ShardC。
@@ -120,7 +120,7 @@ apksign {
 }
 
 android {
-    namespace = "com.example.radioarealocator"
+    namespace = "com.example.hamkit"
     compileSdk {
         version = release(androidCompileSdkVersion) {
             minorApiLevel = androidCompileSdkVersionMinor
@@ -129,7 +129,7 @@ android {
     buildToolsVersion = androidBuildToolsVersion
 
     defaultConfig {
-        applicationId = "com.example.radioarealocator"
+        applicationId = "com.example.hamkit"
         minSdk = androidMinSdkVersion
         targetSdk = androidTargetSdkVersion
         versionCode = managerVersionCode
@@ -280,7 +280,7 @@ androidComponents {
 }
 
 base {
-    archivesName.set("RadioAreaLocator_${managerVersionName}_${managerVersionCode}")
+    archivesName.set("HamKit_${managerVersionName}_${managerVersionCode}")
 }
 
 kotlin {

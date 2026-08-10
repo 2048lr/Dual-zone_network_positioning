@@ -13,27 +13,27 @@
 ## 文件结构
 
 ### 新增文件
-1. `app/src/main/java/com/example/radioarealocator/data/cw/CWSettings.kt` - CW练习设置数据模型
-2. `app/src/main/java/com/example/radioarealocator/data/cw/CWProgress.kt` - CW练习进度数据模型
-3. `app/src/main/java/com/example/radioarealocator/data/cw/CWSettingsStore.kt` - CW设置存储
-4. `app/src/main/java/com/example/radioarealocator/data/cw/CWProgressStore.kt` - CW进度存储
-5. `app/src/main/java/com/example/radioarealocator/data/cw/MorseCodeGenerator.kt` - 摩尔斯电码生成器
-6. `app/src/main/java/com/example/radioarealocator/data/cw/MorseCodePlayer.kt` - 摩尔斯电码播放器
-7. `app/src/main/java/com/example/radioarealocator/ui/cw/CWPracticeScreen.kt` - CW练习主页
-8. `app/src/main/java/com/example/radioarealocator/ui/cw/FreePracticeSettingsScreen.kt` - 自由练习设置页面
-9. `app/src/main/java/com/example/radioarealocator/ui/cw/TutorialListScreen.kt` - 教程练习列表页面
-10. `app/src/main/java/com/example/radioarealocator/ui/cw/PracticeScreen.kt` - 练习页面
-11. `app/src/main/java/com/example/radioarealocator/ui/cw/CWPracticeViewModel.kt` - CW练习ViewModel
+1. `app/src/main/java/com/example/hamkit/data/cw/CWSettings.kt` - CW练习设置数据模型
+2. `app/src/main/java/com/example/hamkit/data/cw/CWProgress.kt` - CW练习进度数据模型
+3. `app/src/main/java/com/example/hamkit/data/cw/CWSettingsStore.kt` - CW设置存储
+4. `app/src/main/java/com/example/hamkit/data/cw/CWProgressStore.kt` - CW进度存储
+5. `app/src/main/java/com/example/hamkit/data/cw/MorseCodeGenerator.kt` - 摩尔斯电码生成器
+6. `app/src/main/java/com/example/hamkit/data/cw/MorseCodePlayer.kt` - 摩尔斯电码播放器
+7. `app/src/main/java/com/example/hamkit/ui/cw/CWPracticeScreen.kt` - CW练习主页
+8. `app/src/main/java/com/example/hamkit/ui/cw/FreePracticeSettingsScreen.kt` - 自由练习设置页面
+9. `app/src/main/java/com/example/hamkit/ui/cw/TutorialListScreen.kt` - 教程练习列表页面
+10. `app/src/main/java/com/example/hamkit/ui/cw/PracticeScreen.kt` - 练习页面
+11. `app/src/main/java/com/example/hamkit/ui/cw/CWPracticeViewModel.kt` - CW练习ViewModel
 
 ### 修改文件
-1. `app/src/main/java/com/example/radioarealocator/ui/MainScreen.kt` - 添加CW练习入口
+1. `app/src/main/java/com/example/hamkit/ui/MainScreen.kt` - 添加CW练习入口
 2. `app/src/main/res/values/strings.xml` - 添加字符串资源
 3. `app/build.gradle.kts` - 添加依赖
 
 ### 测试文件
-1. `app/src/test/java/com/example/radioarealocator/data/cw/MorseCodeGeneratorTest.kt` - 摩尔斯电码生成器测试
-2. `app/src/test/java/com/example/radioarealocator/data/cw/CWSettingsStoreTest.kt` - CW设置存储测试
-3. `app/src/test/java/com/example/radioarealocator/data/cw/CWProgressStoreTest.kt` - CW进度存储测试
+1. `app/src/test/java/com/example/hamkit/data/cw/MorseCodeGeneratorTest.kt` - 摩尔斯电码生成器测试
+2. `app/src/test/java/com/example/hamkit/data/cw/CWSettingsStoreTest.kt` - CW设置存储测试
+3. `app/src/test/java/com/example/hamkit/data/cw/CWProgressStoreTest.kt` - CW进度存储测试
 
 ---
 
@@ -114,14 +114,14 @@ git commit -m "feat: add CW practice dependencies and string resources"
 ### 任务 2：创建数据模型
 
 **文件：**
-- 创建：`app/src/main/java/com/example/radioarealocator/data/cw/CWSettings.kt`
-- 创建：`app/src/main/java/com/example/radioarealocator/data/cw/CWProgress.kt`
+- 创建：`app/src/main/java/com/example/hamkit/data/cw/CWSettings.kt`
+- 创建：`app/src/main/java/com/example/hamkit/data/cw/CWProgress.kt`
 
 - [ ] **步骤 1：创建CWSettings数据模型**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/data/cw/CWSettings.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/data/cw/CWSettings.kt`：
 ```kotlin
-package com.example.radioarealocator.data.cw
+package com.example.hamkit.data.cw
 
 enum class CharacterSet {
     LETTERS, NUMBERS, SYMBOLS, CUSTOM
@@ -143,9 +143,9 @@ data class CWSettings(
 
 - [ ] **步骤 2：创建CWProgress数据模型**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/data/cw/CWProgress.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/data/cw/CWProgress.kt`：
 ```kotlin
-package com.example.radioarealocator.data.cw
+package com.example.hamkit.data.cw
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -166,7 +166,7 @@ data class CWProgress(
 - [ ] **步骤 3：Commit**
 
 ```bash
-git add app/src/main/java/com/example/radioarealocator/data/cw/
+git add app/src/main/java/com/example/hamkit/data/cw/
 git commit -m "feat: add CW practice data models"
 ```
 
@@ -175,14 +175,14 @@ git commit -m "feat: add CW practice data models"
 ### 任务 3：创建数据存储
 
 **文件：**
-- 创建：`app/src/main/java/com/example/radioarealocator/data/cw/CWSettingsStore.kt`
-- 创建：`app/src/main/java/com/example/radioarealocator/data/cw/CWProgressStore.kt`
+- 创建：`app/src/main/java/com/example/hamkit/data/cw/CWSettingsStore.kt`
+- 创建：`app/src/main/java/com/example/hamkit/data/cw/CWProgressStore.kt`
 
 - [ ] **步骤 1：创建CWSettingsStore**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/data/cw/CWSettingsStore.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/data/cw/CWSettingsStore.kt`：
 ```kotlin
-package com.example.radioarealocator.data.cw
+package com.example.hamkit.data.cw
 
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -230,9 +230,9 @@ class CWSettingsStore(private val context: Context) {
 
 - [ ] **步骤 2：创建CWProgressStore**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/data/cw/CWProgressStore.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/data/cw/CWProgressStore.kt`：
 ```kotlin
-package com.example.radioarealocator.data.cw
+package com.example.hamkit.data.cw
 
 import android.content.Context
 import androidx.room.Dao
@@ -310,7 +310,7 @@ class CWProgressStore(context: Context) {
 - [ ] **步骤 3：Commit**
 
 ```bash
-git add app/src/main/java/com/example/radioarealocator/data/cw/
+git add app/src/main/java/com/example/hamkit/data/cw/
 git commit -m "feat: add CW practice data stores"
 ```
 
@@ -319,14 +319,14 @@ git commit -m "feat: add CW practice data stores"
 ### 任务 4：创建摩尔斯电码生成器
 
 **文件：**
-- 创建：`app/src/main/java/com/example/radioarealocator/data/cw/MorseCodeGenerator.kt`
-- 测试：`app/src/test/java/com/example/radioarealocator/data/cw/MorseCodeGeneratorTest.kt`
+- 创建：`app/src/main/java/com/example/hamkit/data/cw/MorseCodeGenerator.kt`
+- 测试：`app/src/test/java/com/example/hamkit/data/cw/MorseCodeGeneratorTest.kt`
 
 - [ ] **步骤 1：编写失败的测试**
 
-创建文件 `app/src/test/java/com/example/radioarealocator/data/cw/MorseCodeGeneratorTest.kt`：
+创建文件 `app/src/test/java/com/example/hamkit/data/cw/MorseCodeGeneratorTest.kt`：
 ```kotlin
-package com.example.radioarealocator.data.cw
+package com.example.hamkit.data.cw
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -357,14 +357,14 @@ class MorseCodeGeneratorTest {
 
 - [ ] **步骤 2：运行测试验证失败**
 
-运行：`./gradlew test --tests "com.example.radioarealocator.data.cw.MorseCodeGeneratorTest"`
+运行：`./gradlew test --tests "com.example.hamkit.data.cw.MorseCodeGeneratorTest"`
 预期：FAIL，报错 "MorseCodeGenerator not defined"
 
 - [ ] **步骤 3：编写最少实现代码**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/data/cw/MorseCodeGenerator.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/data/cw/MorseCodeGenerator.kt`：
 ```kotlin
-package com.example.radioarealocator.data.cw
+package com.example.hamkit.data.cw
 
 class MorseCodeGenerator {
     private val morseCodeMap = mapOf(
@@ -404,13 +404,13 @@ class MorseCodeGenerator {
 
 - [ ] **步骤 4：运行测试验证通过**
 
-运行：`./gradlew test --tests "com.example.radioarealocator.data.cw.MorseCodeGeneratorTest"`
+运行：`./gradlew test --tests "com.example.hamkit.data.cw.MorseCodeGeneratorTest"`
 预期：PASS
 
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add app/src/main/java/com/example/radioarealocator/data/cw/MorseCodeGenerator.kt app/src/test/java/com/example/radioarealocator/data/cw/MorseCodeGeneratorTest.kt
+git add app/src/main/java/com/example/hamkit/data/cw/MorseCodeGenerator.kt app/src/test/java/com/example/hamkit/data/cw/MorseCodeGeneratorTest.kt
 git commit -m "feat: add Morse code generator"
 ```
 
@@ -419,13 +419,13 @@ git commit -m "feat: add Morse code generator"
 ### 任务 5：创建摩尔斯电码播放器
 
 **文件：**
-- 创建：`app/src/main/java/com/example/radioarealocator/data/cw/MorseCodePlayer.kt`
+- 创建：`app/src/main/java/com/example/hamkit/data/cw/MorseCodePlayer.kt`
 
 - [ ] **步骤 1：创建MorseCodePlayer**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/data/cw/MorseCodePlayer.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/data/cw/MorseCodePlayer.kt`：
 ```kotlin
-package com.example.radioarealocator.data.cw
+package com.example.hamkit.data.cw
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -553,7 +553,7 @@ class MorseCodePlayer {
 - [ ] **步骤 2：Commit**
 
 ```bash
-git add app/src/main/java/com/example/radioarealocator/data/cw/MorseCodePlayer.kt
+git add app/src/main/java/com/example/hamkit/data/cw/MorseCodePlayer.kt
 git commit -m "feat: add Morse code player"
 ```
 
@@ -562,27 +562,27 @@ git commit -m "feat: add Morse code player"
 ### 任务 6：创建CW练习ViewModel
 
 **文件：**
-- 创建：`app/src/main/java/com/example/radioarealocator/ui/cw/CWPracticeViewModel.kt`
+- 创建：`app/src/main/java/com/example/hamkit/ui/cw/CWPracticeViewModel.kt`
 
 - [ ] **步骤 1：创建CWPracticeViewModel**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/ui/cw/CWPracticeViewModel.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/ui/cw/CWPracticeViewModel.kt`：
 ```kotlin
-package com.example.radioarealocator.ui.cw
+package com.example.hamkit.ui.cw
 
 import android.app.Application
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.radioarealocator.data.cw.CWProgress
-import com.example.radioarealocator.data.cw.CWProgressStore
-import com.example.radioarealocator.data.cw.CWSettings
-import com.example.radioarealocator.data.cw.CWSettingsStore
-import com.example.radioarealocator.data.cw.CharacterSet
-import com.example.radioarealocator.data.cw.MorseCodeGenerator
-import com.example.radioarealocator.data.cw.MorseCodePlayer
-import com.example.radioarealocator.data.cw.PlayMode
+import com.example.hamkit.data.cw.CWProgress
+import com.example.hamkit.data.cw.CWProgressStore
+import com.example.hamkit.data.cw.CWSettings
+import com.example.hamkit.data.cw.CWSettingsStore
+import com.example.hamkit.data.cw.CharacterSet
+import com.example.hamkit.data.cw.MorseCodeGenerator
+import com.example.hamkit.data.cw.MorseCodePlayer
+import com.example.hamkit.data.cw.PlayMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -738,7 +738,7 @@ class CWPracticeViewModel(application: Application) : AndroidViewModel(applicati
 - [ ] **步骤 2：Commit**
 
 ```bash
-git add app/src/main/java/com/example/radioarealocator/ui/cw/CWPracticeViewModel.kt
+git add app/src/main/java/com/example/hamkit/ui/cw/CWPracticeViewModel.kt
 git commit -m "feat: add CW practice ViewModel"
 ```
 
@@ -747,16 +747,16 @@ git commit -m "feat: add CW practice ViewModel"
 ### 任务 7：创建CW练习UI组件
 
 **文件：**
-- 创建：`app/src/main/java/com/example/radioarealocator/ui/cw/CWPracticeScreen.kt`
-- 创建：`app/src/main/java/com/example/radioarealocator/ui/cw/FreePracticeSettingsScreen.kt`
-- 创建：`app/src/main/java/com/example/radioarealocator/ui/cw/TutorialListScreen.kt`
-- 创建：`app/src/main/java/com/example/radioarealocator/ui/cw/PracticeScreen.kt`
+- 创建：`app/src/main/java/com/example/hamkit/ui/cw/CWPracticeScreen.kt`
+- 创建：`app/src/main/java/com/example/hamkit/ui/cw/FreePracticeSettingsScreen.kt`
+- 创建：`app/src/main/java/com/example/hamkit/ui/cw/TutorialListScreen.kt`
+- 创建：`app/src/main/java/com/example/hamkit/ui/cw/PracticeScreen.kt`
 
 - [ ] **步骤 1：创建CWPracticeScreen**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/ui/cw/CWPracticeScreen.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/ui/cw/CWPracticeScreen.kt`：
 ```kotlin
-package com.example.radioarealocator.ui.cw
+package com.example.hamkit.ui.cw
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -786,8 +786,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.radioarealocator.R
-import com.example.radioarealocator.ui.theme.LocalCardAlpha
+import com.example.hamkit.R
+import com.example.hamkit.ui.theme.LocalCardAlpha
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -864,9 +864,9 @@ private fun CWPracticeListItem(
 
 - [ ] **步骤 2：创建FreePracticeSettingsScreen**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/ui/cw/FreePracticeSettingsScreen.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/ui/cw/FreePracticeSettingsScreen.kt`：
 ```kotlin
-package com.example.radioarealocator.ui.cw
+package com.example.hamkit.ui.cw
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -888,10 +888,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.radioarealocator.R
-import com.example.radioarealocator.data.cw.CharacterSet
-import com.example.radioarealocator.data.cw.CWSettings
-import com.example.radioarealocator.data.cw.PlayMode
+import com.example.hamkit.R
+import com.example.hamkit.data.cw.CharacterSet
+import com.example.hamkit.data.cw.CWSettings
+import com.example.hamkit.data.cw.PlayMode
 
 @Composable
 fun FreePracticeSettingsScreen(
@@ -1017,9 +1017,9 @@ fun FreePracticeSettingsScreen(
 
 - [ ] **步骤 3：创建TutorialListScreen**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/ui/cw/TutorialListScreen.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/ui/cw/TutorialListScreen.kt`：
 ```kotlin
-package com.example.radioarealocator.ui.cw
+package com.example.hamkit.ui.cw
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -1041,8 +1041,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.radioarealocator.R
-import com.example.radioarealocator.ui.theme.LocalCardAlpha
+import com.example.hamkit.R
+import com.example.hamkit.ui.theme.LocalCardAlpha
 
 data class TutorialLesson(
     val id: Int,
@@ -1118,9 +1118,9 @@ private fun TutorialLessonItem(
 
 - [ ] **步骤 4：创建PracticeScreen**
 
-创建文件 `app/src/main/java/com/example/radioarealocator/ui/cw/PracticeScreen.kt`：
+创建文件 `app/src/main/java/com/example/hamkit/ui/cw/PracticeScreen.kt`：
 ```kotlin
-package com.example.radioarealocator.ui.cw
+package com.example.hamkit.ui.cw
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -1142,7 +1142,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.radioarealocator.R
+import com.example.hamkit.R
 
 @Composable
 fun PracticeScreen(
@@ -1262,7 +1262,7 @@ fun PracticeScreen(
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add app/src/main/java/com/example/radioarealocator/ui/cw/
+git add app/src/main/java/com/example/hamkit/ui/cw/
 git commit -m "feat: add CW practice UI components"
 ```
 
@@ -1271,11 +1271,11 @@ git commit -m "feat: add CW practice UI components"
 ### 任务 8：修改MainScreen添加CW练习入口
 
 **文件：**
-- 修改：`app/src/main/java/com/example/radioarealocator/ui/MainScreen.kt`
+- 修改：`app/src/main/java/com/example/hamkit/ui/MainScreen.kt`
 
 - [ ] **步骤 1：添加CW练习入口**
 
-在 `app/src/main/java/com/example/radioarealocator/ui/MainScreen.kt` 的 `HomeListContent` 函数中添加：
+在 `app/src/main/java/com/example/hamkit/ui/MainScreen.kt` 的 `HomeListContent` 函数中添加：
 ```kotlin
 item {
     HomeListItem(
@@ -1313,7 +1313,7 @@ selectedTab == 0 && cwSubScreen != 0 -> cwSubScreen = 0
 - [ ] **步骤 3：Commit**
 
 ```bash
-git add app/src/main/java/com/example/radioarealocator/ui/MainScreen.kt
+git add app/src/main/java/com/example/hamkit/ui/MainScreen.kt
 git commit -m "feat: add CW practice entry to main screen"
 ```
 
@@ -1322,9 +1322,9 @@ git commit -m "feat: add CW practice entry to main screen"
 ### 任务 9：集成测试
 
 **文件：**
-- 测试：`app/src/test/java/com/example/radioarealocator/data/cw/MorseCodeGeneratorTest.kt`
-- 测试：`app/src/test/java/com/example/radioarealocator/data/cw/CWSettingsStoreTest.kt`
-- 测试：`app/src/test/java/com/example/radioarealocator/data/cw/CWProgressStoreTest.kt`
+- 测试：`app/src/test/java/com/example/hamkit/data/cw/MorseCodeGeneratorTest.kt`
+- 测试：`app/src/test/java/com/example/hamkit/data/cw/CWSettingsStoreTest.kt`
+- 测试：`app/src/test/java/com/example/hamkit/data/cw/CWProgressStoreTest.kt`
 
 - [ ] **步骤 1：运行所有测试**
 

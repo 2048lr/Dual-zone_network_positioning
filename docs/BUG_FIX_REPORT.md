@@ -28,7 +28,7 @@
 
 - **严重度**：高
 - **类别**：功能缺陷
-- **模块**：[ZoneResolver.kt](../app/src/main/java/com/example/radioarealocator/data/zone/ZoneResolver.kt)
+- **模块**：[ZoneResolver.kt](../app/src/main/java/com/example/hamkit/data/zone/ZoneResolver.kt)
 - **错误场景**：
   相邻区域在边界经纬度（如经度 40.0）上同时命中，导致 `resolve()` 返回错误分区。
   例如：欧洲区域 maxLon=40、俄罗斯区域 minLon=40，经度 40.0 的坐标会被两个区域同时匹配。
@@ -57,7 +57,7 @@
 
 - **严重度**：高
 - **类别**：功能缺陷
-- **模块**：[SatellitePredictor.kt](../app/src/main/java/com/example/radioarealocator/data/satellite/SatellitePredictor.kt)
+- **模块**：[SatellitePredictor.kt](../app/src/main/java/com/example/hamkit/data/satellite/SatellitePredictor.kt)
 - **错误场景**：
   当卫星当前正在过境（isCurrentlyVisible=true）时，UI 显示的 AOS（入境时间）是下一次过境的时间，而非当前过境的实际开始时间。
 - **根因**：
@@ -73,7 +73,7 @@
 
 - **严重度**：高
 - **类别**：并发安全
-- **模块**：[FavoriteSatellitesStore.kt](../app/src/main/java/com/example/radioarealocator/data/satellite/FavoriteSatellitesStore.kt)
+- **模块**：[FavoriteSatellitesStore.kt](../app/src/main/java/com/example/hamkit/data/satellite/FavoriteSatellitesStore.kt)
 - **错误场景**：
   多线程并发调用 `toggle(catalogNumber)` 时，可能丢失修改。
   例如：线程 A 读取 {1,2}，线程 B 读取 {1,2}，A 写入 {1,2,3}，B 写入 {1,2,4}，最终结果丢失了 3 或 4。
@@ -95,7 +95,7 @@
 
 - **严重度**：中
 - **类别**：性能问题
-- **模块**：[MainActivity.kt](../app/src/main/java/com/example/radioarealocator/MainActivity.kt)
+- **模块**：[MainActivity.kt](../app/src/main/java/com/example/hamkit/MainActivity.kt)
 - **错误场景**：
   用户选择高分辨率背景图（如 4000×6000）时，`BitmapFactory.decodeStream()` 直接解码原图，可能消耗 100MB+ 内存，导致 OOM 崩溃。
 - **根因**：
@@ -120,7 +120,7 @@
 
 - **严重度**：中
 - **类别**：性能问题
-- **模块**：[MainScreen.kt](../app/src/main/java/com/example/radioarealocator/ui/MainScreen.kt)
+- **模块**：[MainScreen.kt](../app/src/main/java/com/example/hamkit/ui/MainScreen.kt)
 - **错误场景**：
   每个在境卫星的 `SatelliteItem` 内部都有一个 `LaunchedEffect` 每秒更新 `nowMillis`，N 个在境卫星会启动 N 个独立的 1Hz 协程，导致不必要的重组和 CPU 占用。
 - **根因**：
@@ -168,7 +168,7 @@
 
 - **严重度**：中
 - **类别**：功能缺陷
-- **模块**：[SettingsStore.kt](../app/src/main/java/com/example/radioarealocator/data/SettingsStore.kt) + [MainViewModel.kt](../app/src/main/java/com/example/radioarealocator/ui/MainViewModel.kt)
+- **模块**：[SettingsStore.kt](../app/src/main/java/com/example/hamkit/data/SettingsStore.kt) + [MainViewModel.kt](../app/src/main/java/com/example/hamkit/ui/MainViewModel.kt)
 - **错误场景**：
   用户在设置中切换卫星数据来源（ALL / CelesTrak / SatNOGS），重启应用后恢复为默认值 "ALL"。
 - **根因**：
@@ -193,7 +193,7 @@
 
 - **严重度**：低
 - **类别**：用户体验
-- **模块**：[MainScreen.kt](../app/src/main/java/com/example/radioarealocator/ui/MainScreen.kt)
+- **模块**：[MainScreen.kt](../app/src/main/java/com/example/hamkit/ui/MainScreen.kt)
 - **错误场景**：
   用户打开卫星筛选弹窗后旋转屏幕或切到后台，弹窗自动收起，需重新点击打开。
 - **根因**：
@@ -208,7 +208,7 @@
 
 - **严重度**：低
 - **类别**：兼容性
-- **模块**：[AboutScreen.kt](../app/src/main/java/com/example/radioarealocator/ui/AboutScreen.kt)
+- **模块**：[AboutScreen.kt](../app/src/main/java/com/example/hamkit/ui/AboutScreen.kt)
 - **错误场景**：
   Android 13+（API 33+）上调用 `getPackageInfo(name, 0)` 触发废弃警告，未来版本可能失效。
 - **根因**：
@@ -243,7 +243,7 @@
 
 - **严重度**：高
 - **类别**：编译错误
-- **模块**：[ZoneResolver.kt](../app/src/main/java/com/example/radioarealocator/data/zone/ZoneResolver.kt)
+- **模块**：[ZoneResolver.kt](../app/src/main/java/com/example/hamkit/data/zone/ZoneResolver.kt)
 - **错误场景**：
   Bug #1 修复时使用 `lat in minLat until maxLat`，但 `until` 仅适用于 `Int`/`Long`，`Double` 类型编译失败：`Unresolved reference 'until'`。
 - **根因**：
@@ -269,7 +269,7 @@
 
 ### 新增单元测试用例
 
-为 Bug #1 边界修复新增 3 个测试用例（位于 [ZoneResolverTest.kt](../app/src/test/java/com/example/radioarealocator/data/zone/ZoneResolverTest.kt)）：
+为 Bug #1 边界修复新增 3 个测试用例（位于 [ZoneResolverTest.kt](../app/src/test/java/com/example/hamkit/data/zone/ZoneResolverTest.kt)）：
 
 1. `boundary longitude 40 belongs to europe not russia`：验证边界点归属
 2. `polar boundaries are still matched`：验证极值边界仍可命中
@@ -281,10 +281,10 @@
 
 | 测试类 | 测试数 | 覆盖 Bug | 说明 |
 |--------|--------|----------|------|
-| [SettingsStoreIntegrationTest](../app/src/androidTest/java/com/example/radioarealocator/data/SettingsStoreIntegrationTest.kt) | 7 | #7 | satelliteSource/backgroundUri 持久化与恢复 |
-| [FavoriteSatellitesStoreIntegrationTest](../app/src/androidTest/java/com/example/radioarealocator/data/satellite/FavoriteSatellitesStoreIntegrationTest.kt) | 7 | #3 | toggle 单线程读写 + 50 协程并发不丢失 |
-| [SatelliteFilterIntegrationTest](../app/src/androidTest/java/com/example/radioarealocator/ui/SatelliteFilterIntegrationTest.kt) | 11 | #8 | rememberSaveable 状态恢复 + applyFilter 8 种条件组合 |
-| [MainViewModelIntegrationTest](../app/src/androidTest/java/com/example/radioarealocator/ui/MainViewModelIntegrationTest.kt) | 9 | #7 | ViewModel 销毁重建后状态恢复 |
+| [SettingsStoreIntegrationTest](../app/src/androidTest/java/com/example/hamkit/data/SettingsStoreIntegrationTest.kt) | 7 | #7 | satelliteSource/backgroundUri 持久化与恢复 |
+| [FavoriteSatellitesStoreIntegrationTest](../app/src/androidTest/java/com/example/hamkit/data/satellite/FavoriteSatellitesStoreIntegrationTest.kt) | 7 | #3 | toggle 单线程读写 + 50 协程并发不丢失 |
+| [SatelliteFilterIntegrationTest](../app/src/androidTest/java/com/example/hamkit/ui/SatelliteFilterIntegrationTest.kt) | 11 | #8 | rememberSaveable 状态恢复 + applyFilter 8 种条件组合 |
+| [MainViewModelIntegrationTest](../app/src/androidTest/java/com/example/hamkit/ui/MainViewModelIntegrationTest.kt) | 9 | #7 | ViewModel 销毁重建后状态恢复 |
 | **合计** | **34** | | |
 
 #### 关键集成测试场景

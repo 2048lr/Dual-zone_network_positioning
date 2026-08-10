@@ -1,6 +1,6 @@
 # 敏感信息保护方案：三碎片密钥 + AES-256-GCM
 
-> 本文档描述 RadioAreaLocator 应用的客户端加密方案，该方案完全摆脱对 GitHub Secrets 的依赖，
+> 本文档描述 HamKit 应用的客户端加密方案，该方案完全摆脱对 GitHub Secrets 的依赖，
 > 在保障敏感信息（高德 API Key、SDK Key）安全的前提下，实现 CI/CD 零密钥配置构建。
 
 ---
@@ -189,7 +189,7 @@
 
 ### 4.2 运行时解密（SecretManager.kt）
 
-核心组件在 [SecretManager.kt](../app/src/main/java/com/example/radioarealocator/data/crypto/SecretManager.kt)：
+核心组件在 [SecretManager.kt](../app/src/main/java/com/example/hamkit/data/crypto/SecretManager.kt)：
 
 1. **ShardB 去混淆**：
    ```kotlin
@@ -213,7 +213,7 @@
 
 ### 4.3 初始化时机
 
-在 [RadioAreaLocatorApplication.kt](../app/src/main/java/com/example/radioarealocator/RadioAreaLocatorApplication.kt) 的 `onCreate()` 中：
+在 [HamKitApplication.kt](../app/src/main/java/com/example/hamkit/HamKitApplication.kt) 的 `onCreate()` 中：
 
 ```kotlin
 override fun onCreate() {
@@ -234,7 +234,7 @@ override fun onCreate() {
 
 ### 4.4 业务模块使用
 
-天气服务 [WeatherApiService.kt](../app/src/main/java/com/example/radioarealocator/data/weather/WeatherApiService.kt)：
+天气服务 [WeatherApiService.kt](../app/src/main/java/com/example/hamkit/data/weather/WeatherApiService.kt)：
 
 ```kotlin
 private fun apiKey(): String {
@@ -360,10 +360,10 @@ gradle assembleRelease   # Release APK（需签名配置）
 | 文件 | 作用 |
 |------|------|
 | [app/build.gradle.kts](../app/build.gradle.kts) | 碎片常量定义、加密函数、`encryptSecrets` 任务 |
-| [app/src/main/java/.../crypto/SecretManager.kt](../app/src/main/java/com/example/radioarealocator/data/crypto/SecretManager.kt) | 运行时密钥组装与解密 |
+| [app/src/main/java/.../crypto/SecretManager.kt](../app/src/main/java/com/example/hamkit/data/crypto/SecretManager.kt) | 运行时密钥组装与解密 |
 | [app/src/main/assets/secrets.dat](../app/src/main/assets/secrets.dat) | 加密后的密文文件（二进制，入库） |
-| [app/src/main/java/.../RadioAreaLocatorApplication.kt](../app/src/main/java/com/example/radioarealocator/RadioAreaLocatorApplication.kt) | 应用入口，初始化 SecretManager + SDK Key 注入 |
-| [app/src/main/java/.../weather/WeatherApiService.kt](../app/src/main/java/com/example/radioarealocator/data/weather/WeatherApiService.kt) | 天气 API 调用，使用 `SecretManager.getSecret()` |
+| [app/src/main/java/.../HamKitApplication.kt](../app/src/main/java/com/example/hamkit/HamKitApplication.kt) | 应用入口，初始化 SecretManager + SDK Key 注入 |
+| [app/src/main/java/.../weather/WeatherApiService.kt](../app/src/main/java/com/example/hamkit/data/weather/WeatherApiService.kt) | 天气 API 调用，使用 `SecretManager.getSecret()` |
 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) | CI 工作流，已移除 Secrets 注入步骤 |
 | [.github/workflows/release.yml](../.github/workflows/release.yml) | Release 工作流，已移除 Secrets 注入步骤 |
 

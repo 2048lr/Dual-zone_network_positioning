@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "RadioAreaLocator"
+rootProject.name = "HamKit"
 include(":app")
