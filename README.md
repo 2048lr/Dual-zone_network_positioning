@@ -94,6 +94,10 @@
 
 也欢迎提出功能需求（能力有限，不一定能实现）。
 
+## 交流群
+
+![HamKit QQ群](images/hamkitqq.jpg)
+
 ## 许可证
 
 [MIT License](LICENSE)
