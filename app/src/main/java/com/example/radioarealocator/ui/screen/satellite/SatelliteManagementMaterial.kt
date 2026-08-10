@@ -175,14 +175,14 @@ private fun SatelliteManagementContentMaterial(
     val totalCount = satelliteState.satellites.size
     val favoriteCount = satelliteState.satellites.count { it.catalogNumber in favorites }
 
-    // 统一倒计时时钟
+    // 统一倒计时时钟：有任意过境卫星时每秒更新，及时检测过境结束
     var inPassNowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    val hasInPassSatellites = filteredSatellites.any { it.isCurrentlyVisible }
-    LaunchedEffect(hasInPassSatellites) {
-        if (hasInPassSatellites) {
+    val hasSatellitesWithPasses = filteredSatellites.isNotEmpty()
+    LaunchedEffect(hasSatellitesWithPasses) {
+        if (hasSatellitesWithPasses) {
             while (true) {
                 inPassNowMillis = System.currentTimeMillis()
-                delay(5000)
+                delay(1000)
             }
         }
     }
@@ -276,7 +276,7 @@ private fun SatelliteManagementContentMaterial(
                         effectiveStatus = effectiveStatus,
                         isFavorite = sat.catalogNumber in favorites,
                         isStatusInherited = isInherited,
-                        nowMillis = if (sat.isCurrentlyVisible) inPassNowMillis else 0L,
+                        nowMillis = inPassNowMillis,
                         statusSegments = satelliteState.segmentStatuses[sat.catalogNumber],
                         onToggleFavorite = { onToggleFavorite(sat.catalogNumber) }
                     )
@@ -531,18 +531,22 @@ private fun SatelliteItemMaterial(
     // 分段时间线默认折叠，点击卡片展开
     var expanded by rememberSaveable(satellite.catalogNumber) { mutableStateOf(false) }
 
-    val timeInfo = remember(satellite.aosTime, satellite.losTime, satellite.isCurrentlyVisible, nowMillis) {
+    val timeInfo = remember(satellite.aosTime, satellite.losTime, nowMillis) {
         val formatter = satelliteTimeFormatterM
         val zone = ZoneId.systemDefault()
-        if (satellite.isCurrentlyVisible) {
-            val losTime = satellite.losTime.atZone(zone).format(formatter)
-            val now = if (nowMillis > 0) Instant.ofEpochMilli(nowMillis) else Instant.now()
-            val remainingSeconds = Duration.between(now, satellite.losTime).seconds
-            val remainingText = formatRemainingTimeM(remainingSeconds)
-            SatelliteTimeInfoM.InPass(losTime, remainingText)
-        } else {
-            val aosTime = satellite.aosTime.atZone(zone).format(formatter)
-            SatelliteTimeInfoM.Upcoming(aosTime)
+        val now = if (nowMillis > 0) Instant.ofEpochMilli(nowMillis) else Instant.now()
+        when {
+            now < satellite.aosTime -> {
+                SatelliteTimeInfoM.Upcoming(satellite.aosTime.atZone(zone).format(formatter))
+            }
+            now < satellite.losTime -> {
+                val losTime = satellite.losTime.atZone(zone).format(formatter)
+                val remainingSeconds = Duration.between(now, satellite.losTime).seconds
+                SatelliteTimeInfoM.InPass(losTime, formatRemainingTimeM(remainingSeconds))
+            }
+            else -> {
+                SatelliteTimeInfoM.Ended
+            }
         }
     }
 
@@ -559,7 +563,7 @@ private fun SatelliteItemMaterial(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (satellite.isCurrentlyVisible) {
+                if (timeInfo is SatelliteTimeInfoM.InPass) {
                     Modifier.border(
                         width = 1.5.dp,
                         color = MaterialTheme.colorScheme.primary,
@@ -673,6 +677,13 @@ private fun SatelliteItemMaterial(
                         isActive = false
                     )
                 }
+                is SatelliteTimeInfoM.Ended -> {
+                    TimeBadgeM(
+                        label = stringResource(R.string.in_pass),
+                        value = "过境已结束",
+                        isActive = false
+                    )
+                }
             }
         }
     }
@@ -685,6 +696,7 @@ private val satelliteTimeFormatterM = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 private sealed class SatelliteTimeInfoM {
     data class InPass(val losTime: String, val remainingText: String) : SatelliteTimeInfoM()
     data class Upcoming(val aosTime: String) : SatelliteTimeInfoM()
+    data object Ended : SatelliteTimeInfoM()
 }
 
 private fun formatRemainingTimeM(seconds: Long): String {
