@@ -1,5 +1,7 @@
 # HamKit
 
+[中文](README.md)丨English
+
 An all-in-one console for amateur radio enthusiasts — zone positioning, satellite pass prediction, CW Morse training, transit alerts, and more.
 
 ## Roadmap
