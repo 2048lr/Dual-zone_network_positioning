@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -70,7 +69,7 @@ fun MarkdownContent(
                 contentAlignment = Alignment.Center,
             ) {
                 when (LocalUiMode.current) {
-                    UiMode.Material -> LoadingIndicator()
+                    UiMode.Material -> InfiniteProgressIndicator()
                     UiMode.Miuix -> InfiniteProgressIndicator()
                 }
             }

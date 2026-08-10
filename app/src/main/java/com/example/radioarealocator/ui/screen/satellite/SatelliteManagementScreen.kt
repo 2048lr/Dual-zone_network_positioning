@@ -76,6 +76,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
@@ -266,7 +267,15 @@ private fun SatelliteManagementContent(
         // 占位态 / 列表
         when {
             satelliteState.isSatelliteLoading && filteredSatellites.isEmpty() -> {
-                item { SatellitePlaceholderCard { Text(stringResource(R.string.processing)) } }
+                item {
+                    SatellitePlaceholderCard {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            InfiniteProgressIndicator(color = colorScheme.onBackground)
+                            Spacer(Modifier.height(12.dp))
+                            Text(stringResource(R.string.processing))
+                        }
+                    }
+                }
             }
             satelliteState.satelliteError != null -> {
                 item {

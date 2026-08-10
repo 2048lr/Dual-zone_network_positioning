@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -113,7 +112,7 @@ private fun UpdateCheckingDialog() {
             title = { Text(stringResource(R.string.settings_check_update)) },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
+                    InfiniteProgressIndicator()
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = stringResource(R.string.update_checking),

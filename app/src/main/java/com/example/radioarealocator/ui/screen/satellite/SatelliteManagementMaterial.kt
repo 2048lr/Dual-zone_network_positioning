@@ -38,7 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -249,7 +249,7 @@ private fun SatelliteManagementContentMaterial(
 
         when {
             satelliteState.isSatelliteLoading && filteredSatellites.isEmpty() -> {
-                item { SatellitePlaceholderCardMaterial { CircularProgressIndicator() } }
+                item { SatellitePlaceholderCardMaterial { InfiniteProgressIndicator() } }
             }
             satelliteState.satelliteError != null -> {
                 item {

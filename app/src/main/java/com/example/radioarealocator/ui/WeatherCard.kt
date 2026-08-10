@@ -25,9 +25,8 @@ import com.example.radioarealocator.R
 import com.example.radioarealocator.data.weather.WeatherResult
 import com.example.radioarealocator.data.weather.mapWeatherIcon
 import com.example.radioarealocator.ui.theme.LocalCardAlpha
-import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -110,12 +109,9 @@ private fun LoadingState(stateColor: Color) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        CircularProgressIndicator(
+        InfiniteProgressIndicator(
             modifier = Modifier.size(20.dp),
-            strokeWidth = 2.dp,
-            colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                foregroundColor = stateColor
-            )
+            color = stateColor,
         )
         Text(
             text = stringResource(R.string.weather_loading),
