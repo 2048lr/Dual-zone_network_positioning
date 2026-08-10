@@ -1,6 +1,6 @@
 # HamKit
 
-[中文]丨[English](README_EN.md)
+中文丨[English](README_EN.md)
 
 为业余无线电爱好者打造的随身控制台——分区定位、卫星过境预测、CW 摩尔斯训练、过境提醒等功能一体化。
 
