@@ -68,10 +68,11 @@ interface RadioInfoDao {
  * 缓存最近一次拉取结果，离线时由 [RadioInfoRepository] 回退使用。
  *
  * v1 → v2：新增 status / description 列（旧缓存通过迁移保留或重建）。
+ * v2 → v3：清空历史缓存（旧数据名称存有字面量 "null"），改用新解析器重拉。
  */
 @Database(
     entities = [RadioInfoEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class TransmitterDatabase : RoomDatabase() {
@@ -88,8 +89,7 @@ abstract class TransmitterDatabase : RoomDatabase() {
                     TransmitterDatabase::class.java,
                     "radio_info_database"
                 )
-                    // v1→v2 新增 status/description 列；转发器数据是低价值缓存，
-                    // 直接用重建迁移，避免手写 SQL 迁移的维护成本
+                    // 转发器数据是低价值缓存，直接用重建迁移，避免手写 SQL 迁移的维护成本
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance

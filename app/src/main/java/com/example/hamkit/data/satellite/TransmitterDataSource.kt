@@ -86,18 +86,19 @@ class TransmitterDataSource {
         if (uplinkHz == null && downlinkHz == null) return null
 
         // 模式优先取上行模式，其次下行模式，再其次旧版 "mode" 字段
-        val mode = item.optString("uplink_mode", "")
-            .takeIf { it.isNotBlank() }
-            ?: item.optString("downlink_mode", "")
-                .takeIf { it.isNotBlank() }
-                ?: item.optString("mode", "")
+        val mode = item.optString("uplink_mode", "").cleanTransmitterField()
+            ?: item.optString("downlink_mode", "").cleanTransmitterField()
+            ?: item.optString("mode", "").cleanTransmitterField()
+            ?: ""
 
-        // 名称：优先 API name，其次 description，最后按模式+频率拼接
-        val rawName = item.optString("name", "").trim()
-        val description = item.optString("description", "").trim()
+        // 名称：优先 API name，其次 description，最后按模式+频率拼接。
+        // name/description 为 JSON null 时 optString 返回字面量 "null"，视为缺失；
+        // 中括号 []（如 "[Beacon]"）一并剔除。
+        val rawName = item.optString("name", "").cleanTransmitterField()
+        val description = item.optString("description", "").cleanTransmitterField()
         val name = when {
-            rawName.isNotEmpty() -> rawName
-            description.isNotEmpty() -> description
+            rawName != null -> rawName
+            description != null -> description
             else -> {
                 val freqHz = downlinkHz ?: uplinkHz
                 if (freqHz != null) {
@@ -111,7 +112,8 @@ class TransmitterDataSource {
 
         // 状态：active / inactive / future / unknown（缺省按 unknown）
         val status = item.optString("status", "").trim().lowercase()
-            .takeIf { it.isNotBlank() } ?: RadioInfo.STATUS_UNKNOWN
+            .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+            ?: RadioInfo.STATUS_UNKNOWN
 
         return RadioInfo(
             noradCatId = noradCatId,
@@ -121,7 +123,7 @@ class TransmitterDataSource {
             mode = mode.trim(),
             inverted = item.optBoolean("inverted", false),
             status = status,
-            description = description,
+            description = description.orEmpty(),
         )
     }
 
@@ -133,3 +135,15 @@ class TransmitterDataSource {
             "https://db.satnogs.org/api/transmitters/?format=json"
     }
 }
+
+/**
+ * 清理单条转发器字段值：
+ * - 空串/空白/字面量 "null"（大小写不敏感，JSON null 经 optString 得到）视为缺失，返回 null
+ * - 剔除中括号 []（如 "[Beacon]" → "Beacon"）
+ */
+private fun String.cleanTransmitterField(): String? =
+    trim()
+        .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        ?.filterNot { it == '[' || it == ']' }
+        ?.trim()
+        ?.ifEmpty { null }

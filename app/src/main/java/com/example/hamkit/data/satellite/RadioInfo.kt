@@ -1,5 +1,7 @@
 package com.example.hamkit.data.satellite
 
+import java.util.Locale
+
 /**
  * 卫星转发器（transmitter）频率信息，来自 SatNOGS DB API
  * （https://db.satnogs.org/api/transmitters/）。
@@ -30,6 +32,39 @@ data class RadioInfo(
     /** 是否处于活跃状态 */
     val isActive: Boolean
         get() = status == STATUS_ACTIVE
+
+    /**
+     * 展示名称，参照 Look4Sat 处理流程（其以 API "description" 字段作为转发器标题）：
+     * 优先 [description]，其次 [name]；视为"无名称"的情况：空串、空白、
+     * 字面量 "null"（大小写不敏感，JSON null 经 optString 得到）。顺带剔除中括号 []。
+     * 描述与名称均无效时，按"模式 + 频率"生成名称（如 "FM 145.800 MHz"），
+     * 保证展示出的转发器始终有名字、不出现「未命名转发器」。
+     */
+    val displayName: String
+        get() = (description
+            .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+            ?: name
+                .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+            ?: "")
+            .filterNot { it == '[' || it == ']' }
+            .trim()
+            .ifBlank { buildFrequencyName() }
+
+    /** 展示用模式：剔除空串/空白/字面量 "null"，无有效值时返回空串 */
+    val displayMode: String
+        get() = mode
+            .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+            ?: ""
+
+    /** 无描述/名称时按"模式 + 频率"生成展示名称（Look4Sat 风格，保证总有名字） */
+    private fun buildFrequencyName(): String = buildString {
+        val displayMode = displayMode
+        if (displayMode.isNotBlank()) append(displayMode).append(" ")
+        val freqHz = downlinkHz ?: uplinkHz
+        if (freqHz != null) {
+            append(String.format(Locale.US, "%.3f MHz", freqHz / 1_000_000.0))
+        }
+    }.trim()
 
     companion object {
         const val STATUS_ACTIVE = "active"

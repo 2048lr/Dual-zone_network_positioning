@@ -86,6 +86,86 @@ class TransmitterDataSourceTest {
         assertEquals("OK", radios[0].name)
     }
 
+    @Test
+    fun `parseTransmitters - null name falls back to description`() {
+        val json = """
+            [
+              {"uuid":"u6","norad_cat_id":25544,"name":null,
+               "uplink_low":145800000,"downlink_low":145800000,"description":"FM Voice"}
+            ]
+        """.trimIndent()
+        val radio = TransmitterDataSource().parseTransmitters(json)[0]
+        assertEquals("FM Voice", radio.name)
+        assertEquals("FM Voice", radio.description)
+    }
+
+    @Test
+    fun `parseTransmitters - literal null string name treated as missing`() {
+        val json = """
+            [
+              {"uuid":"u7","norad_cat_id":25544,"name":"null",
+               "uplink_low":145800000,"downlink_low":145800000,"description":"Beacon"}
+            ]
+        """.trimIndent()
+        val radio = TransmitterDataSource().parseTransmitters(json)[0]
+        assertEquals("Beacon", radio.name)
+    }
+
+    @Test
+    fun `parseTransmitters - brackets stripped from name and description`() {
+        val json = """
+            [
+              {"uuid":"u8","norad_cat_id":25544,"name":"[Beacon]",
+               "uplink_low":145800000,"downlink_low":145800000,"description":"[FM] Voice"}
+            ]
+        """.trimIndent()
+        val radio = TransmitterDataSource().parseTransmitters(json)[0]
+        assertEquals("Beacon", radio.name)
+        assertEquals("FM Voice", radio.description)
+    }
+
+    @Test
+    fun `parseTransmitters - both name and description null falls back to frequency`() {
+        val json = """
+            [
+              {"uuid":"u9","norad_cat_id":25544,"name":null,"description":null,
+               "uplink_low":145800000,"downlink_low":145800000}
+            ]
+        """.trimIndent()
+        val radio = TransmitterDataSource().parseTransmitters(json)[0]
+        assertEquals("145.800 MHz", radio.name)
+    }
+
+    // ── displayName / displayMode 展示字段（参照 Look4Sat）──
+
+    @Test
+    fun `displayName - prefers description like Look4Sat, then name`() {
+        assertEquals("FM Voice", RadioInfo(25544, "FM Voice").displayName)
+        assertEquals("U/V FM", RadioInfo(25544, "FM Voice", description = "U/V FM").displayName)
+        // description 优先；无 description 时回退 name，并剔除中括号
+        assertEquals("Beacon", RadioInfo(25544, "[Beacon]", description = "null").displayName)
+        assertEquals("U/V FM", RadioInfo(25544, "[Beacon]", description = "[U/V] FM").displayName)
+        assertEquals("FM Voice", RadioInfo(25544, "null", description = "FM Voice").displayName)
+        assertEquals("FM Voice", RadioInfo(25544, "", description = "[FM Voice]").displayName)
+    }
+
+    @Test
+    fun `displayName - falls back to mode+frequency name, never unnamed`() {
+        assertEquals("FM 145.800 MHz", RadioInfo(25544, "null", description = "NULL", downlinkHz = 145800000, mode = "FM").displayName)
+        assertEquals("145.800 MHz", RadioInfo(25544, "   ", description = "null", downlinkHz = 145800000).displayName)
+        assertEquals("435.000 MHz", RadioInfo(25544, "null", description = "null", uplinkHz = 435000000).displayName)
+        // 无频率（实际数据源会过滤）时为绝对兜底
+        assertEquals("FM", RadioInfo(25544, "null", description = "NULL", mode = "FM").displayName)
+    }
+
+    @Test
+    fun `displayMode - filters blank and null mode`() {
+        assertEquals("FM", RadioInfo(25544, "a", mode = "FM").displayMode)
+        assertEquals("", RadioInfo(25544, "a", mode = "null").displayMode)
+        assertEquals("", RadioInfo(25544, "a", mode = "NULL").displayMode)
+        assertEquals("", RadioInfo(25544, "a", mode = "  ").displayMode)
+    }
+
     // ── 解析：数组 + 多转发器/多状态 ──
 
     @Test
