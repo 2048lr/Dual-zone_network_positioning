@@ -38,7 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -187,14 +187,14 @@ private fun SatelliteManagementContentMaterial(
     val totalCount = satelliteItems.size
     val favoriteCount = satelliteItems.count { it.catalogNumber in favorites }
 
-    // 统一倒计时时钟：有任意过境卫星时每秒更新，及时检测过境结束
+    // 统一倒计时时钟
     var inPassNowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    val hasSatellitesWithPasses = filteredSatellites.any { it.pass != null }
-    LaunchedEffect(hasSatellitesWithPasses) {
-        if (hasSatellitesWithPasses) {
+    val hasInPassSatellites = filteredSatellites.any { it.isCurrentlyVisible }
+    LaunchedEffect(hasInPassSatellites) {
+        if (hasInPassSatellites) {
             while (true) {
                 inPassNowMillis = System.currentTimeMillis()
-                delay(1000)
+                delay(5000)
             }
         }
     }
@@ -249,7 +249,7 @@ private fun SatelliteManagementContentMaterial(
 
         when {
             satelliteState.isSatelliteLoading && filteredSatellites.isEmpty() -> {
-                item { SatellitePlaceholderCardMaterial { InfiniteProgressIndicator() } }
+                item { SatellitePlaceholderCardMaterial { CircularProgressIndicator() } }
             }
             satelliteState.satelliteError != null -> {
                 item {
@@ -289,7 +289,7 @@ private fun SatelliteManagementContentMaterial(
                         effectiveStatus = effectiveStatus,
                         isFavorite = sat.catalogNumber in favorites,
                         isStatusInherited = isInherited,
-                        nowMillis = inPassNowMillis,
+                        nowMillis = if (sat.isCurrentlyVisible) inPassNowMillis else 0L,
                         statusSegments = satelliteState.segmentStatuses[sat.catalogNumber],
                         onToggleFavorite = { onToggleFavorite(sat.catalogNumber) },
                         onSatelliteClick = { onSatelliteClick(sat.catalogNumber) }
@@ -547,27 +547,18 @@ private fun SatelliteItemMaterial(
     var expanded by rememberSaveable(satellite.catalogNumber) { mutableStateOf(false) }
 
     val pass = satellite.pass
-    val timeInfo = remember(pass?.aosTime, pass?.losTime, nowMillis) {
+    val timeInfo = remember(pass?.aosTime, pass?.losTime, pass?.isCurrentlyVisible, nowMillis) {
         val formatter = satelliteTimeFormatterM
         val zone = ZoneId.systemDefault()
         when {
             pass == null -> null
-            else -> {
+            pass.isCurrentlyVisible -> {
+                val losTime = pass.losTime.atZone(zone).format(formatter)
                 val now = if (nowMillis > 0) Instant.ofEpochMilli(nowMillis) else Instant.now()
-                when {
-                    now < pass.aosTime -> {
-                        SatelliteTimeInfoM.Upcoming(pass.aosTime.atZone(zone).format(formatter))
-                    }
-                    now < pass.losTime -> {
-                        val losTime = pass.losTime.atZone(zone).format(formatter)
-                        val remainingSeconds = Duration.between(now, pass.losTime).seconds
-                        SatelliteTimeInfoM.InPass(losTime, formatRemainingTimeM(remainingSeconds))
-                    }
-                    else -> {
-                        SatelliteTimeInfoM.Ended
-                    }
-                }
+                val remainingSeconds = Duration.between(now, pass.losTime).seconds
+                SatelliteTimeInfoM.InPass(losTime, formatRemainingTimeM(remainingSeconds))
             }
+            else -> SatelliteTimeInfoM.Upcoming(pass.aosTime.atZone(zone).format(formatter))
         }
     }
 
@@ -584,7 +575,7 @@ private fun SatelliteItemMaterial(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (timeInfo is SatelliteTimeInfoM.InPass) {
+                if (pass?.isCurrentlyVisible == true) {
                     Modifier.border(
                         width = 1.5.dp,
                         color = MaterialTheme.colorScheme.primary,
@@ -731,13 +722,6 @@ private fun SatelliteItemMaterial(
                         isActive = false
                     )
                 }
-                is SatelliteTimeInfoM.Ended -> {
-                    TimeBadgeM(
-                        label = stringResource(R.string.in_pass),
-                        value = "过境已结束",
-                        isActive = false
-                    )
-                }
                 null -> {
                     TimeBadgeM(
                         label = stringResource(R.string.no_pass_window),
@@ -791,9 +775,9 @@ private fun TransceiverRowM(radio: RadioInfo) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val title = if (radio.inverted) "INV: ${radio.name}" else radio.name
+            val title = if (radio.inverted) "INV: ${radio.displayName}" else radio.displayName
             Text(
-                text = title.ifEmpty { stringResource(R.string.transceiver_unnamed) },
+                text = title.ifBlank { stringResource(R.string.transceiver_unnamed) },
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -801,11 +785,17 @@ private fun TransceiverRowM(radio: RadioInfo) {
             )
             RadioStatusBadgeM(radio)
         }
-        val freqText = listOfNotNull(
-            radio.downlinkHz?.let { "RX ${formatMHzM(it)}" },
-            radio.uplinkHz?.let { "TX ${formatMHzM(it)}" },
-            radio.mode.takeIf { it.isNotBlank() }
-        ).joinToString("  ")
+        val freqText = buildString {
+            if (radio.downlinkHz != null) {
+                append("RX ${formatMHzM(radio.downlinkHz)}")
+            }
+            if (radio.uplinkHz != null) {
+                if (isNotEmpty()) append("  ")
+                append("TX ${formatMHzM(radio.uplinkHz)}")
+            }
+            if (isNotEmpty() && radio.displayMode.isNotBlank()) append("  ")
+            if (radio.displayMode.isNotBlank()) append(radio.displayMode)
+        }
         if (freqText.isNotEmpty()) {
             Text(
                 text = freqText,
@@ -852,7 +842,6 @@ private val satelliteTimeFormatterM = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 private sealed class SatelliteTimeInfoM {
     data class InPass(val losTime: String, val remainingText: String) : SatelliteTimeInfoM()
     data class Upcoming(val aosTime: String) : SatelliteTimeInfoM()
-    data object Ended : SatelliteTimeInfoM()
 }
 
 private fun formatRemainingTimeM(seconds: Long): String {

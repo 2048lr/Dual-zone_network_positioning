@@ -380,7 +380,7 @@ private fun SatelliteDetailPlaceholderMaterial(content: @Composable () -> Unit) 
  */
 @Composable
 private fun TransceiverDetailRowMaterial(radio: RadioInfo) {
-    val title = if (radio.inverted) "INV: ${radio.name}" else radio.name
+    val title = if (radio.inverted) "INV: ${radio.displayName}" else radio.displayName
     val (statusText, statusColor) = when (radio.status) {
         RadioInfo.STATUS_ACTIVE -> "活跃" to Color(0xFF4CAF50)
         RadioInfo.STATUS_FUTURE -> "未启用" to Color(0xFF42A5F5)
@@ -393,7 +393,7 @@ private fun TransceiverDetailRowMaterial(radio: RadioInfo) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = title.ifEmpty { stringResource(R.string.transceiver_unnamed) },
+                text = title.ifBlank { stringResource(R.string.transceiver_unnamed) },
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
@@ -408,7 +408,7 @@ private fun TransceiverDetailRowMaterial(radio: RadioInfo) {
         val freqText = listOfNotNull(
             radio.downlinkHz?.let { "RX ${formatMhzTextMaterial(it)}" },
             radio.uplinkHz?.let { "TX ${formatMhzTextMaterial(it)}" },
-            radio.mode.takeIf { it.isNotBlank() }
+            radio.displayMode.takeIf { it.isNotBlank() }
         ).joinToString("  ")
         if (freqText.isNotEmpty()) {
             Text(
