@@ -360,6 +360,8 @@ class MainViewModel : ViewModel() {
     }
 
     fun refreshLandscapeImage() {
+        // 优先用户自定义背景，否则回退到默认 the_moon 背景（确保默认文件已就绪）
+        landscapeImageStore.ensureDefaultImage()
         val effectiveFile = landscapeImageStore.effectiveImageFile
         if (effectiveFile != null && effectiveFile.exists()) {
             _timeCardBackgroundFile.value = effectiveFile
@@ -391,7 +393,7 @@ class MainViewModel : ViewModel() {
 
     fun clearCustomBackground() {
         landscapeImageStore.clearCustomImage()
-        _timeCardBackgroundFile.value = null
+        refreshLandscapeImage()
     }
 
     companion object {
