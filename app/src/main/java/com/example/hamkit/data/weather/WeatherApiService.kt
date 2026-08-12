@@ -109,10 +109,12 @@ class WeatherApiService {
         val adcode = addrComponent.optString("adcode")
         if (adcode.isEmpty()) throw WeatherApiException("adcode 为空")
 
-        // city 可能为空（直辖市），回退到 province
+        // city 可能为空（直辖市），回退到 province。
+        // 高德 regeo 对直辖市返回 city 为空数组 []，optString 会得到字符串 "[]"，
+        // 需一并视为空，否则城市名会错误显示为 "[]"。
         val city = addrComponent.optString("city")
         val province = addrComponent.optString("province")
-        val cityName = if (city.isNotEmpty()) city else province
+        val cityName = if (city.isNotEmpty() && city != "[]") city else province
 
         if (cityName.isEmpty()) {
             throw WeatherApiException("城市名为空")
