@@ -214,7 +214,7 @@ private fun HomeHeaderMaterial(
                 // UTC 时间
                 Text(
                     text = "$utcTime UTC",
-                    fontSize = (LOCAL_TIME_FONT_SIZE * UTC_FONT_SIZE_SCALE).sp,
+                    fontSize = UTC_TIME_FONT_SIZE.sp,
                     color = secondaryColor,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -233,7 +233,8 @@ private fun HomeHeaderMaterial(
                         MaterialTheme.colorScheme.outline
                     }),
                     secondaryTextColor = if (hasBackground) whiteTextSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    applyBackground = false
+                    applyBackground = false,
+                    temperatureFontSize = WEATHER_TEMP_FONT_SIZE
                 )
                 DailyQuoteScroller(
                     quote = state.dailyQuote,

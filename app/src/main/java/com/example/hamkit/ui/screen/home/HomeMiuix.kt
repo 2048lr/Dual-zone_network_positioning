@@ -237,7 +237,7 @@ private fun HomeHeaderMiuix(
                 // UTC 时间
                 Text(
                     text = "$utcTime UTC",
-                    fontSize = (LOCAL_TIME_FONT_SIZE * UTC_FONT_SIZE_SCALE).sp,
+                    fontSize = UTC_TIME_FONT_SIZE.sp,
                     color = secondaryColor,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -252,7 +252,8 @@ private fun HomeHeaderMiuix(
                     modifier = Modifier.fillMaxWidth(),
                     stateColor = if (hasBackground) whiteText else (if (state.weather != null) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.outline),
                     secondaryTextColor = if (hasBackground) whiteTextSecondary else MiuixTheme.colorScheme.onSurfaceSecondary,
-                    applyBackground = false
+                    applyBackground = false,
+                    temperatureFontSize = WEATHER_TEMP_FONT_SIZE
                 )
                 // 每日一言：超宽时水平滚动
                 DailyQuoteScroller(

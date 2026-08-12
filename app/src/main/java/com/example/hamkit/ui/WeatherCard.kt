@@ -43,6 +43,8 @@ fun WeatherCard(
     secondaryTextColor: Color = MiuixTheme.colorScheme.onSurfaceSecondary,
     // 是否绘制自带圆角背景；合并进其他卡片时传 false 仅渲染内容
     applyBackground: Boolean = true,
+    // 温度数字字号（sp）；时间卡片为与 UTC 时间字号调换，会传入较小值
+    temperatureFontSize: Float = 26f,
 ) {
     val finalModifier = if (applyBackground) {
         modifier
@@ -65,6 +67,7 @@ fun WeatherCard(
                 weather = weather,
                 stateColor = stateColor,
                 secondaryTextColor = secondaryTextColor,
+                temperatureFontSize = temperatureFontSize,
             )
             else -> InitialState(
                 stateColor = stateColor,
@@ -79,6 +82,7 @@ private fun WeatherContent(
     weather: WeatherResult,
     stateColor: Color,
     secondaryTextColor: Color,
+    temperatureFontSize: Float,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -92,7 +96,7 @@ private fun WeatherContent(
         )
         Text(
             text = formatTemperature(weather.now.temp),
-            style = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Medium),
+            style = TextStyle(fontSize = temperatureFontSize.sp, fontWeight = FontWeight.Medium),
             color = stateColor
         )
         Text(

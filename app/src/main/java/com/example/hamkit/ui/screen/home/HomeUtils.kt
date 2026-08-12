@@ -44,8 +44,10 @@ fun getAppVersion(context: Context): AppVersion {
 
 /** 本地时间字号（sp） */
 internal const val LOCAL_TIME_FONT_SIZE = 44
-/** UTC 时间字号相对本地时间的缩放比例 */
-internal const val UTC_FONT_SIZE_SCALE = 0.4f
+/** UTC 时间字号（sp）。原为 44×0.4=17.6，与天气温度字号调换后固定为 26 */
+internal const val UTC_TIME_FONT_SIZE = 26
+/** 天气温度字号（sp）。原为 26，与 UTC 时间字号调换后固定为 17.6（44×0.4） */
+internal const val WEATHER_TEMP_FONT_SIZE = 17.6f
 /** 每日一言水平滚动速度（px/秒） */
 internal const val QUOTE_SCROLL_SPEED_PX_PER_SEC = 12f
 /** 每日一言滚到端点后暂停时长（毫秒） */
