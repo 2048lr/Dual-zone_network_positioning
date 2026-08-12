@@ -55,7 +55,6 @@ import coil.request.ImageRequest
 import com.example.hamkit.R
 import com.example.hamkit.permission.PermissionState
 import com.example.hamkit.ui.WeatherCard
-import com.example.hamkit.ui.component.material.TonalCard
 import com.example.hamkit.ui.theme.LocalCardAlpha
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -89,7 +88,7 @@ fun HomePagerMaterial(
             // 业务卡片使用 Miuix 主题色板，外层包裹 MiuixTheme 以确保渲染正确
             MiuixTheme {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // 条件卡：定位未授权 → 权限引导卡 + 独立每日言/天气；定位已授权 → 时间排布（替换权限卡行）
+                    // 条件卡：定位未授权 → 仅权限引导卡；定位已授权 → 时间排布 + 各功能入口
                     if (permissionState.requiredGranted) {
                         // 时间排布：时间卡（含每日言滚动）+ 紧贴的天气卡
                         HomeHeaderMaterial(businessState, actions.onRefreshWeather)
@@ -97,21 +96,13 @@ fun HomePagerMaterial(
                         SatelliteListCard(businessState, actions)
                         // 定位详情入口
                         LocationEntryCard(actions.onLocationDetailClick)
+                        CwEntryCard(actions.onCWPracticeClick)
+                        AprsEntryCard(actions.onAprsClick)
+                        Ft8EntryCard(actions.onFt8Click)
                     } else {
-                        // 权限卡片：引导用户授权定位
+                        // 权限卡片：引导用户授权定位（未授权时隐藏其余卡片）
                         PermissionCard(permissionState, actions.onPermissionsClick)
-                        // 未授权时独立显示每日言 + 天气卡
-                        DailyQuoteCard(businessState.dailyQuote)
-                        WeatherCard(
-                            weather = businessState.weather,
-                            isLoading = businessState.weatherLoading,
-                            error = businessState.weatherError,
-                            onRefresh = actions.onRefreshWeather,
-                        )
                     }
-                    CwEntryCard(actions.onCWPracticeClick)
-                    AprsEntryCard(actions.onAprsClick)
-                    Ft8EntryCard(actions.onFt8Click)
                 }
             }
             Spacer(Modifier.height(bottomInnerPadding))
@@ -341,20 +332,6 @@ private fun PermissionCard(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun DailyQuoteCard(quote: String) {
-    TonalCard {
-        Text(
-            text = quote,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-        )
     }
 }
 

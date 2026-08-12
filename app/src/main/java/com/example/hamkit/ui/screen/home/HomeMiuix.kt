@@ -114,7 +114,7 @@ fun HomePagerMiuix(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        // 条件卡：定位未授权 → 权限引导卡 + 独立每日言/天气；定位已授权 → 时间排布（替换权限卡行）
+                        // 条件卡：定位未授权 → 仅权限引导卡；定位已授权 → 时间排布 + 各功能入口
                         if (permissionState.requiredGranted) {
                             // 时间排布：时间卡（含每日言滚动）+ 紧贴的天气卡
                             HomeHeaderMiuix(businessState, actions.onRefreshWeather)
@@ -122,23 +122,15 @@ fun HomePagerMiuix(
                             SatelliteListCardMiuix(businessState, actions)
                             // 定位详情入口：跳转到定位状态+地图子页面
                             LocationEntryCardMiuix(actions.onLocationDetailClick)
+                            // CW 练习入口
+                            CwEntryCardMiuix(actions.onCWPracticeClick)
+                            // APRS 入口
+                            AprsEntryCardMiuix(actions.onAprsClick)
+                            Ft8EntryCardMiuix(actions.onFt8Click)
                         } else {
-                            // 权限卡片：引导用户授权定位
+                            // 权限卡片：引导用户授权定位（未授权时隐藏其余卡片）
                             PermissionCardMiuix(permissionState, actions.onPermissionsClick)
-                            // 未授权时独立显示每日言 + 天气卡
-                            DailyQuoteCard(businessState.dailyQuote)
-                            WeatherCard(
-                                weather = businessState.weather,
-                                isLoading = businessState.weatherLoading,
-                                error = businessState.weatherError,
-                                onRefresh = actions.onRefreshWeather,
-                            )
                         }
-                        // CW 练习入口
-                        CwEntryCardMiuix(actions.onCWPracticeClick)
-                        // APRS 入口
-                        AprsEntryCardMiuix(actions.onAprsClick)
-                        Ft8EntryCardMiuix(actions.onFt8Click)
                     }
                     Spacer(Modifier.height(bottomInnerPadding))
                 }
@@ -362,24 +354,6 @@ private fun TopBar(
             title = stringResource(R.string.app_name),
             scrollBehavior = scrollBehavior
         )
-    }
-}
-
-@Composable
-private fun DailyQuoteCard(quote: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Text(
-                text = quote,
-                fontSize = 14.sp,
-                color = colorScheme.onSurfaceVariantSummary,
-                fontWeight = FontWeight.Medium,
-            )
-        }
     }
 }
 
