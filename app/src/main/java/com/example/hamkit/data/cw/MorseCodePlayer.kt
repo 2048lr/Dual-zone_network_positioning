@@ -67,6 +67,7 @@ class MorseCodePlayer {
                     track.play()
                 }
 
+                var needSymbolGap = false
                 for (char in morseCode) {
                     if (!isPlaying) break
 
@@ -80,14 +81,24 @@ class MorseCodePlayer {
                     if (!isPlaying) break
 
                     when (char) {
-                        '.' -> playTone(dotDuration.toInt(), safeFrequency, sampleRate)
-                        '-' -> playTone(dashDuration.toInt(), safeFrequency, sampleRate)
-                        ' ' -> Thread.sleep(charGap.toLong())
-                        '/' -> Thread.sleep(wordGap.toLong())
-                    }
-
-                    if (char != ' ' && char != '/') {
-                        Thread.sleep(symbolGap.toLong())
+                        '.' -> {
+                            if (needSymbolGap) Thread.sleep(symbolGap.toLong())
+                            playTone(dotDuration.toInt(), safeFrequency, sampleRate)
+                            needSymbolGap = true
+                        }
+                        '-' -> {
+                            if (needSymbolGap) Thread.sleep(symbolGap.toLong())
+                            playTone(dashDuration.toInt(), safeFrequency, sampleRate)
+                            needSymbolGap = true
+                        }
+                        ' ' -> {
+                            Thread.sleep(charGap.toLong())
+                            needSymbolGap = false
+                        }
+                        '/' -> {
+                            Thread.sleep(wordGap.toLong())
+                            needSymbolGap = false
+                        }
                     }
 
                     if (playMode == PlayMode.INTERVAL) {

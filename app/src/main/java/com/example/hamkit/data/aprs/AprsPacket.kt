@@ -1,12 +1,13 @@
 package com.example.hamkit.data.aprs
 
 import android.location.Location
+import java.util.Locale
 
 object AprsPacket {
     private val QRG_RE = Regex(".*?(\\d{2,3}[.,]\\d{3,4}).*?")
 
     fun passcode(callsign: String): Int {
-        val call = callsign.split("-")[0].uppercase() + "\u0000"
+        val call = callsign.split("-")[0].uppercase(Locale.ROOT) + "\u0000"
         var hash = 0x73e2
         for (i in 0 until call.length - 1 step 2) {
             hash = hash xor (call[i].code shl 8)
@@ -76,14 +77,18 @@ object AprsPacket {
         symbolCode: Char,
         comment: String
     ): String {
-        val latVal = (90.0 - latitude) * 380926.0
-        val lonVal = (180.0 + longitude) * 190463.0
+        // 标准压缩编码要求先四舍五入成整数，再按 base-91 整数分解，
+        // 避免浮点小数导致最低位字符偏差 1
+        val latVal = Math.round((90.0 - latitude) * 380926.0)
+        val lonVal = Math.round((180.0 + longitude) * 190463.0)
 
         val latBytes = ByteArray(4) { i ->
-            ((latVal / Math.pow(91.0, (3 - i).toDouble())) % 91 + 33).toInt().toByte()
+            val div = Math.pow(91.0, (3 - i).toDouble()).toLong()
+            ((latVal / div) % 91 + 33).toInt().toByte()
         }
         val lonBytes = ByteArray(4) { i ->
-            ((lonVal / Math.pow(91.0, (3 - i).toDouble())) % 91 + 33).toInt().toByte()
+            val div = Math.pow(91.0, (3 - i).toDouble()).toLong()
+            ((lonVal / div) % 91 + 33).toInt().toByte()
         }
 
         val compressed = String(latBytes, Charsets.US_ASCII) +
@@ -95,16 +100,25 @@ object AprsPacket {
     private fun formatLat(lat: Double): String {
         val isNorth = lat >= 0
         val absLat = kotlin.math.abs(lat)
-        val degrees = absLat.toInt()
-        val minutes = (absLat - degrees) * 60.0
+        var degrees = absLat.toInt()
+        var minutes = (absLat - degrees) * 60.0
+        // 浮点误差可能导致 minutes 被四舍五入成 60.00（非法），进位到度
+        if (minutes >= 59.9995) {
+            degrees += 1
+            minutes = 0.0
+        }
         return "%02d%05.2f%s".format(degrees, minutes, if (isNorth) "N" else "S")
     }
 
     private fun formatLon(lon: Double): String {
         val isEast = lon >= 0
         val absLon = kotlin.math.abs(lon)
-        val degrees = absLon.toInt()
-        val minutes = (absLon - degrees) * 60.0
+        var degrees = absLon.toInt()
+        var minutes = (absLon - degrees) * 60.0
+        if (minutes >= 59.9995) {
+            degrees += 1
+            minutes = 0.0
+        }
         return "%03d%05.2f%s".format(degrees, minutes, if (isEast) "E" else "W")
     }
 

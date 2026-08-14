@@ -32,6 +32,7 @@ class Ft8Recorder(
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var job: Job? = null
+    private val recordLock = Any()
     private var audioRecord: AudioRecord? = null
 
     val isRecording: Boolean
@@ -49,9 +50,20 @@ class Ft8Recorder(
     fun stop() {
         job?.cancel()
         job = null
-        runCatching { audioRecord?.stop() }
-        runCatching { audioRecord?.release() }
-        audioRecord = null
+        // 释放录音设备，让阻塞在 read() 的读线程尽快退出
+        releaseAudioRecord()
+    }
+
+    /** 幂等释放录音设备（stop() 与 runLoop 清理路径都可能调用，仅释放一次） */
+    private fun releaseAudioRecord() {
+        synchronized(recordLock) {
+            val rec = audioRecord
+            if (rec != null) {
+                runCatching { rec.stop() }
+                runCatching { rec.release() }
+                audioRecord = null
+            }
+        }
     }
 
     private fun hasPermission(): Boolean {
@@ -109,23 +121,28 @@ class Ft8Recorder(
             val readThread = Thread {
                 android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
                 val readBuf = ShortArray(sampleRate / 10) // 0.1s 块
-                while (scope.isActive) {
-                    val read = record.read(readBuf, 0, readBuf.size, AudioRecord.READ_BLOCKING)
-                    if (read > 0) {
-                        synchronized(ringLock) {
-                            // 重采样到 12000
-                            val decimated = resampleTo12000(readBuf, read, sampleRate)
-                            for (s in decimated) {
-                                ringBuffer[ringWrite] = s
-                                ringWrite = (ringWrite + 1) % ringBuffer.size
-                                if (ringWrite == ringRead) {
-                                    ringRead = (ringRead + 1) % ringBuffer.size
+                try {
+                    while (true) {
+                        val read = record.read(readBuf, 0, readBuf.size, AudioRecord.READ_BLOCKING)
+                        if (read > 0) {
+                            synchronized(ringLock) {
+                                // 重采样到 12000
+                                val decimated = resampleTo12000(readBuf, read, sampleRate)
+                                for (s in decimated) {
+                                    ringBuffer[ringWrite] = s
+                                    ringWrite = (ringWrite + 1) % ringBuffer.size
+                                    if (ringWrite == ringRead) {
+                                        ringRead = (ringRead + 1) % ringBuffer.size
+                                    }
                                 }
                             }
+                        } else if (read < 0) {
+                            // 任何错误码（含 release 后的 ERROR_DEAD_OBJECT）都退出
+                            break
                         }
-                    } else if (read == AudioRecord.ERROR_INVALID_OPERATION) {
-                        break
                     }
+                } catch (_: Exception) {
+                    // release 后 read() 可能抛 IllegalStateException，正常退出
                 }
             }
             readThread.start()
@@ -146,11 +163,10 @@ class Ft8Recorder(
             }
 
             readThread.join(1000)
-            runCatching { record.stop() }
-            runCatching { record.release() }
-            audioRecord = null
+            releaseAudioRecord()
         } catch (e: Exception) {
             onStatus("录音错误: ${e.message}")
+            releaseAudioRecord()
         }
     }
 

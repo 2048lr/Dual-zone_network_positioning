@@ -37,12 +37,20 @@ class ReminderReceiver : BroadcastReceiver() {
         )
 
         val store = ReminderStore(context)
-        val settings = store.loadSettings()
-        val helper = ReminderNotificationHelper(context)
+        // SharedPreferences 读取 + 通知构建/渠道创建属磁盘 IO，转后台线程避免主线程 ANR
+        val pendingResult = goAsync()
+        Thread {
+            try {
+                val settings = store.loadSettings()
+                val helper = ReminderNotificationHelper(context)
 
-        // 渠道可能未创建（首次触发）或被用户修改，重新创建一次保证一致
-        helper.createChannel(settings)
-        helper.showPassReminder(item)
+                // 渠道可能未创建（首次触发）或被用户修改，重新创建一次保证一致
+                helper.createChannel(settings)
+                helper.showPassReminder(item)
+            } finally {
+                pendingResult.finish()
+            }
+        }.start()
     }
 
     companion object {

@@ -103,6 +103,9 @@ class LiveSatelliteTracker(
 
     private val satelliteName = tle.name.trim().ifEmpty { tle.catnum.toString() }
     private val catalogNumber = tle.catnum
+    private val stationLatDeg = latitudeDeg
+    private val stationLonDeg = longitudeDeg
+    private val stationAltM = altitudeM
     private val propagator: SatellitePropagator? = try {
         SatellitePropagator(tle, latitudeDeg, longitudeDeg, altitudeM)
     } catch (e: CancellationException) {
@@ -122,6 +125,7 @@ class LiveSatelliteTracker(
     /** 卫星轨迹历史（方位角/仰角度数对），按时间升序排列 */
     val trackHistory: StateFlow<List<Pair<Double, Double>>> = _trackHistory.asStateFlow()
 
+    private val historyLock = Any()
     private val historyBuffer = mutableListOf<Pair<Double, Double>>()
 
     /**
@@ -129,25 +133,31 @@ class LiveSatelliteTracker(
      */
     fun start() {
         if (tickJob?.isActive == true) return
-        historyBuffer.clear()
-        _trackHistory.value = emptyList()
+        synchronized(historyLock) {
+            historyBuffer.clear()
+            _trackHistory.value = emptyList()
+        }
         tickJob = scope.launch {
             while (isActive) {
                 val info = computeOnce()
                 _liveInfo.value = info
                 if (info != null && info.elevationDeg > -5.0) {
-                    historyBuffer.add(info.azimuthDeg to info.elevationDeg)
-                    if (historyBuffer.size > MAX_TRACK_HISTORY) {
-                        historyBuffer.removeAt(0)
+                    synchronized(historyLock) {
+                        historyBuffer.add(info.azimuthDeg to info.elevationDeg)
+                        if (historyBuffer.size > MAX_TRACK_HISTORY) {
+                            historyBuffer.removeAt(0)
+                        }
+                        _trackHistory.value = historyBuffer.toList()
                     }
-                    _trackHistory.value = historyBuffer.toList()
                 } else if (info == null || info.elevationDeg <= -5.0) {
                     // 卫星连续低于 -5° 仰角时清空轨迹，避免过时数据残留
-                    if (historyBuffer.isNotEmpty()) {
-                        val last = historyBuffer.last()
-                        if (last.second <= -5.0) {
-                            historyBuffer.clear()
-                            _trackHistory.value = emptyList()
+                    synchronized(historyLock) {
+                        if (historyBuffer.isNotEmpty()) {
+                            val last = historyBuffer.last()
+                            if (last.second <= -5.0) {
+                                historyBuffer.clear()
+                                _trackHistory.value = emptyList()
+                            }
                         }
                     }
                 }
@@ -163,8 +173,10 @@ class LiveSatelliteTracker(
         tickJob?.cancel()
         tickJob = null
         _liveInfo.value = null
-        historyBuffer.clear()
-        _trackHistory.value = emptyList()
+        synchronized(historyLock) {
+            historyBuffer.clear()
+            _trackHistory.value = emptyList()
+        }
     }
 
     /**
@@ -197,12 +209,12 @@ class LiveSatelliteTracker(
         // rangeRate 单位 km/s → m/s
         val rangeRateMps = pos.rangeRateKmPerSec * 1000.0
 
-        // 日月位置：失败时静默降级为 null
+        // 日月位置使用地面站坐标（观察者视角），失败时静默降级为 null
         val sun = runCatchingCancellable {
-            CelestialComputer.sunPosition(subpointLat, subpointLon, pos.altitudeKm * 1000.0, epochMillis)
+            CelestialComputer.sunPosition(stationLatDeg, stationLonDeg, stationAltM, epochMillis)
         }
         val moon = runCatchingCancellable {
-            CelestialComputer.moonPosition(subpointLat, subpointLon, pos.altitudeKm * 1000.0, epochMillis)
+            CelestialComputer.moonPosition(stationLatDeg, stationLonDeg, stationAltM, epochMillis)
         }
         // 蚀检测：isSunlit 为 true 表示被太阳照射；失败时回退为日照（false）
         val eclipsed = runCatchingCancellable {

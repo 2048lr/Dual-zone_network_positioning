@@ -71,6 +71,7 @@ class SatellitePropagator(
         minutesAfter: Int,
     ): List<PropagatedPosition> {
         val engine = engine ?: return emptyList()
+        if (incrementSeconds <= 0) return emptyList()
         val startMs = epochMillis - minutesBefore * 60_000L
         val endMs = epochMillis + minutesAfter * 60_000L
         val stepMs = incrementSeconds * 1000L

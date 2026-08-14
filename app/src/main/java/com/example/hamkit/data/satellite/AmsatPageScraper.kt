@@ -8,6 +8,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -217,7 +218,7 @@ class AmsatPageScraper {
      */
     private fun parseDate(dateStr: String): LocalDate? {
         return try {
-            val formatter = DateTimeFormatter.ofPattern("MMM d")
+            val formatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
             val parsed = java.time.MonthDay.parse(dateStr, formatter)
             val year = LocalDate.now().year
             parsed.atYear(year)

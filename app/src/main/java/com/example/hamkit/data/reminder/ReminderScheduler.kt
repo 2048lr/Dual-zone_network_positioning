@@ -78,7 +78,7 @@ class ReminderScheduler(private val context: Context) {
             // Android 14+ 新装 App 默认不授予精确闹钟权限，需先检查 canScheduleExactAlarms，
             // 未授权时回退到非精确闹钟（误差可达数分钟到数十分钟），避免直接抛 SecurityException
             // 导致本次调度被静默丢弃（旧实现 catch 后回退、但每次都先抛异常打日志不是好做法）。
-            if (alarmManager.canScheduleExactAlarms()) {
+            if (hasExactAlarmCapability()) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerAtMillis,

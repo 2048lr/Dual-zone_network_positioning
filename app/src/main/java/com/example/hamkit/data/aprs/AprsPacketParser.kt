@@ -54,9 +54,14 @@ object AprsPacketParser {
         // APRS message format: :DESTINATION:message{NNN
         // payload starts with ':', then 9-char destination, then ':', then message
         val body = payload.substring(1) // skip first ':'
+        // 目标字段固定 9 字符（空格补齐），畸形报文不足时直接丢弃而非越界
+        if (body.length < 10) {
+            throw IllegalArgumentException("Message payload too short: $payload")
+        }
         val dest = body.substring(0, 9).trim()
         val msgContent = body.substring(9).removePrefix(":")
-        val msgNumberMatch = Regex("\\{(\\d+)$").find(msgContent)
+        // APRS 消息编号为 1-5 位字母数字组合（如 {A1}、{ABC12}），非纯数字
+        val msgNumberMatch = Regex("\\{([A-Za-z0-9]{1,5})$").find(msgContent)
 
         val msgNumber = msgNumberMatch?.groupValues?.getOrNull(1)
         val cleanBody = if (msgNumber != null) {

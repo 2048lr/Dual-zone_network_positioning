@@ -34,18 +34,24 @@ class ReminderBootReceiver : BroadcastReceiver() {
             return
         }
 
-        // 第一步：立即恢复已存储的闹钟（从 ReminderStore 读取未过期的提醒项）
-        try {
-            val store = ReminderStore(context)
-            val settings = store.loadSettings()
-            val items = store.loadItems()
-            if (settings.enabled && items.isNotEmpty()) {
-                val scheduler = ReminderScheduler(context)
-                scheduler.scheduleAll(items, settings)
+        // 第一步：恢复已存储的闹钟。SharedPreferences 读取 + JSON 解析属磁盘 IO，
+        // 用 goAsync + 后台线程避免在主线程（10s 限制）触发 ANR。
+        val pendingResult = goAsync()
+        Thread {
+            try {
+                val store = ReminderStore(context)
+                val settings = store.loadSettings()
+                val items = store.loadItems()
+                if (settings.enabled && items.isNotEmpty()) {
+                    val scheduler = ReminderScheduler(context)
+                    scheduler.scheduleAll(items, settings)
+                }
+            } catch (_: Exception) {
+                // 读取或调度失败不影响第二步，Worker 会重新建立完整状态
+            } finally {
+                pendingResult.finish()
             }
-        } catch (_: Exception) {
-            // 读取或调度失败不影响第二步，Worker 会重新建立完整状态
-        }
+        }.start()
 
         // 第二步：入队一次性刷新任务，延迟 30 秒避免开机瞬间网络不可用
         // Worker 会独立完成"TLE 下载 + 过境预测 + 闹钟注册"全链路

@@ -82,7 +82,9 @@ interface AprsMessageDao {
     @Query("DELETE FROM aprs_messages WHERE timestamp < :beforeTimestamp")
     suspend fun deleteOldMessages(beforeTimestamp: Long)
 
-    @Query("SELECT DISTINCT CASE WHEN is_outgoing = 1 THEN destination ELSE source END as callsign FROM aprs_messages ORDER BY timestamp DESC")
+    // 按每个会话伙伴的最新消息时间排序：DISTINCT + ORDER BY 非结果列会导致排序用旧时间戳，
+    // 改用 GROUP BY + MAX(timestamp)
+    @Query("SELECT CASE WHEN is_outgoing = 1 THEN destination ELSE source END as callsign FROM aprs_messages GROUP BY callsign ORDER BY MAX(timestamp) DESC")
     fun getConversationPartners(): Flow<List<String>>
 
     @Query("SELECT * FROM aprs_messages WHERE is_outgoing = 1 AND status IN (0, 3) ORDER BY timestamp ASC")

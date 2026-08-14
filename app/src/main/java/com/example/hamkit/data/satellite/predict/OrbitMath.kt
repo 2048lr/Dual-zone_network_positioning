@@ -37,7 +37,7 @@ internal object OrbitMath {
      * 把"年内日数"（epoch day of year，含小数）转换为月、日、时、分、秒。
      * 闰年按 [year] 每 4 年一次近似（2000 为闰年，公式与标准实现一致）。
      */
-    fun days2mdhms(year: Int, days: Double): IntArray {
+    fun days2mdhms(year: Int, days: Double): DoubleArray {
         val lmonth = intArrayOf(
             31, if (year % 4 == 0) 29 else 28, 31, 30, 31, 30,
             31, 31, 30, 31, 30, 31
@@ -45,7 +45,8 @@ internal object OrbitMath {
         val dayofyr = Math.floor(days).toInt()
         var i = 0
         var inttemp = 0
-        while (dayofyr > inttemp + lmonth[i] && i < 11) {
+        // 先判断下标再访问，避免潜在越界
+        while (i < 11 && dayofyr > inttemp + lmonth[i]) {
             inttemp += lmonth[i]
             i++
         }
@@ -55,8 +56,9 @@ internal object OrbitMath {
         val hr = Math.floor(temp).toInt()
         temp = (temp - hr) * 60.0
         val minute = Math.floor(temp).toInt()
+        // 秒保留小数亚秒精度（截断会丢失 TLE 历元日的小数部分）
         val sec = (temp - minute) * 60.0
-        return intArrayOf(mon, day, hr, minute, Math.floor(sec).toInt())
+        return doubleArrayOf(mon.toDouble(), day.toDouble(), hr.toDouble(), minute.toDouble(), sec)
     }
 
     /**

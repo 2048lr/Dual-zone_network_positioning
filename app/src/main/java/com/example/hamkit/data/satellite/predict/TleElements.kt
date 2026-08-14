@@ -40,7 +40,7 @@ class TleElements private constructor(
     /** 历元时刻（UTC） */
     val epoch: Instant by lazy {
         val mdhms = OrbitMath.days2mdhms(epochYear, epochDays)
-        val jd = OrbitMath.jday(mdhms[0], mdhms[1], mdhms[2], mdhms[3], mdhms[4], 0.0)
+        val jd = OrbitMath.jday(epochYear, mdhms[0].toInt(), mdhms[1].toInt(), mdhms[2].toInt(), mdhms[3].toInt(), mdhms[4])
         // 由儒略日重建时间戳（秒级精度，含小数日）
         val millis = ((jd - 2440587.5) * 86400.0 * 1000.0).toLong()
         Instant.ofEpochMilli(millis)
@@ -141,9 +141,9 @@ class TleElements private constructor(
             val ecc = eccRaw / 1e7
             val year = if (epochYy < 57) epochYy + 2000 else epochYy + 1900
 
-            // 历元儒略日（由年/日内数转换）
+            // 历元儒略日（由年/日内数转换，保留亚秒精度）
             val mdhms = OrbitMath.days2mdhms(year, epochDay)
-            val jd = OrbitMath.jday(year, mdhms[0], mdhms[1], mdhms[2], mdhms[3], mdhms[4].toDouble())
+            val jd = OrbitMath.jday(year, mdhms[0].toInt(), mdhms[1].toInt(), mdhms[2].toInt(), mdhms[3].toInt(), mdhms[4])
 
             return TleElements(
                 name = name,

@@ -168,9 +168,13 @@ class ReminderNotificationHelper(private val context: Context) {
 
     /**
      * 取消所有提醒通知（不取消闹钟调度，调度由 [ReminderScheduler] 负责）。
+     *
+     * 逐个按 catalogNumber 取消，避免 [NotificationManager.cancelAll] 误清
+     * 其他功能（如 APRS、下载进度）的通知。
      */
-    fun cancelAll() {
-        notificationManager.cancelAll()
+    fun cancelAll(catalogNumbers: List<Int>) {
+        catalogNumbers.forEach { notificationManager.cancel(it) }
+        notificationManager.cancel(AUTO_ADD_ID)
     }
 
     companion object {

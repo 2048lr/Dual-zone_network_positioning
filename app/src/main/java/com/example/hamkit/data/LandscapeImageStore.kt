@@ -52,12 +52,13 @@ class LandscapeImageStore(context: Context) {
 
     fun saveCustomImage(sourceUri: Uri, context: Context): Boolean {
         return try {
-            val inputStream = context.contentResolver.openInputStream(sourceUri) ?: return false
             val options = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
-            BitmapFactory.decodeStream(inputStream, null, options)
-            inputStream.close()
+            // 用 use 保证流在异常路径（解码失败/OOM）下也被关闭
+            context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                BitmapFactory.decodeStream(inputStream, null, options)
+            } ?: return false
 
             val maxWidth = 1920
             options.inSampleSize = calculateInSampleSize(
@@ -65,9 +66,9 @@ class LandscapeImageStore(context: Context) {
             )
             options.inJustDecodeBounds = false
 
-            val stream = context.contentResolver.openInputStream(sourceUri) ?: return false
-            val bitmap = BitmapFactory.decodeStream(stream, null, options)
-            stream.close()
+            val bitmap = context.contentResolver.openInputStream(sourceUri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            } ?: return false
 
             if (bitmap == null) return false
 

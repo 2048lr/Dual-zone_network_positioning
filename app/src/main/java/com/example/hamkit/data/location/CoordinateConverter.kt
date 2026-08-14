@@ -30,17 +30,17 @@ object CoordinateConverter {
 
     private fun transformLat(x: Double, y: Double): Double {
         var ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * sqrt(abs(x))
-        ret += (20.0 * sin(6.0 * x * X_PI) + 20.0 * sin(2.0 * x * X_PI)) * 2.0 / 3.0
-        ret += (20.0 * sin(y * X_PI) + 40.0 * sin(y / 3.0 * X_PI)) * 2.0 / 3.0
-        ret += (160.0 * sin(y / 12.0 * X_PI) + 320.0 * sin(y * X_PI / 30.0)) * 2.0 / 3.0
+        ret += (20.0 * sin(6.0 * x * Math.PI) + 20.0 * sin(2.0 * x * Math.PI)) * 2.0 / 3.0
+        ret += (20.0 * sin(y * Math.PI) + 40.0 * sin(y / 3.0 * Math.PI)) * 2.0 / 3.0
+        ret += (160.0 * sin(y / 12.0 * Math.PI) + 320.0 * sin(y * Math.PI / 30.0)) * 2.0 / 3.0
         return ret
     }
 
     private fun transformLng(x: Double, y: Double): Double {
         var ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * sqrt(abs(x))
-        ret += (20.0 * sin(6.0 * x * X_PI) + 20.0 * sin(2.0 * x * X_PI)) * 2.0 / 3.0
-        ret += (20.0 * sin(x * X_PI) + 40.0 * sin(x / 3.0 * X_PI)) * 2.0 / 3.0
-        ret += (150.0 * sin(x / 12.0 * X_PI) + 300.0 * sin(x / 30.0 * X_PI)) * 2.0 / 3.0
+        ret += (20.0 * sin(6.0 * x * Math.PI) + 20.0 * sin(2.0 * x * Math.PI)) * 2.0 / 3.0
+        ret += (20.0 * sin(x * Math.PI) + 40.0 * sin(x / 3.0 * Math.PI)) * 2.0 / 3.0
+        ret += (150.0 * sin(x / 12.0 * Math.PI) + 300.0 * sin(x / 30.0 * Math.PI)) * 2.0 / 3.0
         return ret
     }
 

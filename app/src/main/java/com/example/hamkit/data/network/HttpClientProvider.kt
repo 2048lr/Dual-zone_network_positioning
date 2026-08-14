@@ -17,11 +17,19 @@ object HttpClientProvider {
      * 共享的 OkHttpClient 实例。
      * 连接池：5 个空闲连接，存活 5 分钟。
      * 超时：连接 15s，读取 30s，写入 30s。
+     * 统一 User-Agent，避免与 [HamKitApplication.okhttpClient] 的 UA 头不一致。
      */
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .connectionPool(okhttp3.ConnectionPool(5, 5, TimeUnit.MINUTES))
+        .addInterceptor { block ->
+            block.proceed(
+                block.request().newBuilder()
+                    .header("User-Agent", "HamKit")
+                    .build()
+            )
+        }
         .build()
 }

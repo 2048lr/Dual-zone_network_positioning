@@ -274,7 +274,7 @@ class LocationHelper(private val context: Context) {
                             null
                         }
                     }
-                    .filter { it.accuracy <= CACHE_MAX_ACCURACY_METERS }
+                    .filter { it.hasAccuracy() && it.accuracy <= CACHE_MAX_ACCURACY_METERS }
                     .maxByOrNull { if (it.accuracy > 0) it.time / it.accuracy.toLong() else it.time }
 
                 if (bestCached != null && bestCached.accuracy <= ACCURACY_THRESHOLD_METERS) {
