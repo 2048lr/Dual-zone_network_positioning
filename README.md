@@ -6,7 +6,7 @@
 
 ## 网站
 
-hamkit.click
+[hamkit.click](https://hamkit.click)
 
 ## 开发路线图
 
