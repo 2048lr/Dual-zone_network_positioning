@@ -18,7 +18,6 @@ on:
       - 'docs/**'
       - '.github/*.md'
       - 'log/**'
-      - 'website/**'
   pull_request:
     branches:
       - miuix

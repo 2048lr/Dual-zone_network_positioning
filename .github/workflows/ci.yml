@@ -22,7 +22,6 @@ on:
       - 'docs/**'
       - '.github/*.md'
       - 'log/**'
-      - 'website/**'
   workflow_dispatch:
 
 permissions:
