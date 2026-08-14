@@ -62,7 +62,7 @@
         const badge = document.getElementById('release-badge');
         if (!badge) return;
 
-        const REPO = 'fuxue-linkong/Dual-zone_network_positioning';
+        const REPO = 'fuxue-linkong/HamKit';
         const CACHE_KEY = 'ral-latest-version';
         const CACHE_TTL = 5 * 60 * 1000; // 5 分钟内复用缓存，减少 GitHub API 限流风险
 

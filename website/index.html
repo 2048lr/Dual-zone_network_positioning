@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="HamKit 双区网络定位 — 为业余无线电爱好者打造的随身控制台。GPS 定位、CQ/ITU 分区、Maidenhead 网格、卫星过境预测、CW 摩尔斯训练、过境提醒。">
+    <meta name="description" content="HamKit — 为业余无线电爱好者打造的随身控制台。分区定位、卫星过境预测、CW 摩尔斯训练、FT8 数字模式、APRS、过境提醒一体化。">
     <meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
-    <title>双区网络定位 · HamKit</title>
+    <title>HamKit · 业余无线电随身控制台</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <style>
@@ -40,7 +40,7 @@
             <a href="#stack">技术</a>
             <a href="#developer">开发者</a>
         </nav>
-        <a class="nav__cta" href="https://github.com/fuxue-linkong/Dual-zone_network_positioning" target="_blank" rel="noopener">
+        <a class="nav__cta" href="https://github.com/fuxue-linkong/HamKit" target="_blank" rel="noopener">
             <span>查看源码</span>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
         </a>
@@ -54,7 +54,7 @@
                 <span id="release-badge">正在加载…</span>
             </div>
             <h1 class="hero__title">
-                双区网络定位
+                HamKit
             </h1>
             <p class="hero__subtitle">
                 从地面坐标到轨道预测，从业余分区到摩尔斯电码。
@@ -67,7 +67,7 @@
                     查看应用预览
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
                 </a>
-                <a class="btn btn--ghost" href="https://github.com/fuxue-linkong/Dual-zone_network_positioning/releases/latest" target="_blank" rel="noopener">下载 APK</a>
+                <a class="btn btn--ghost" href="https://github.com/fuxue-linkong/HamKit/releases/latest" target="_blank" rel="noopener">下载 APK</a>
             </div>
         </section>
 
@@ -76,7 +76,7 @@
             <div class="section__head">
                 <span class="section__tag">FEATURES</span>
                 <h2 class="section__title">核心功能</h2>
-                <p class="section__desc">从地面坐标到轨道预测，从电波分区到摩尔斯电码 — 四大模块覆盖业余无线电日常所需。</p>
+                <p class="section__desc">从地面坐标到轨道预测，从电波分区到数字模式 — 覆盖业余无线电日常所需。</p>
             </div>
 
             <div class="features">
@@ -104,7 +104,7 @@
                         </svg>
                     </div>
                     <h3 class="feature__title">卫星过境预测</h3>
-                    <p class="feature__text">基于 predict4java 的 SGP4/SDP4 轨道计算，支持 CelesTrak TLE 数据源，并行预测未来 48 小时过境，实时 AMSAT 状态查询，支持收藏常用卫星。</p>
+                    <p class="feature__text">自研 SGP4/SDP4 轨道计算引擎，支持 CelesTrak TLE 数据源，并行预测未来 48 小时过境，实时 AMSAT 状态查询，支持收藏常用卫星。</p>
                     <div class="feature__tags">
                         <span>SGP4</span><span>CelesTrak</span><span>AMSAT</span><span>收藏</span>
                     </div>
@@ -133,6 +133,33 @@
                     <p class="feature__text">AlarmManager 精确闹钟 + WorkManager 每日刷新，AOS 前可配提前量提醒。重启自动恢复，支持仅白天模式。</p>
                     <div class="feature__tags">
                         <span>AlarmManager</span><span>WorkManager</span><span>BootReceiver</span><span>后台预测</span>
+                    </div>
+                </article>
+
+                <article class="feature">
+                    <div class="feature__icon">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M2 12h3l2-6 3 12 3-9 2 3h7"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature__title">FT8 数字模式<span class="feature__badge">打磨中</span></h3>
+                    <p class="feature__text">基于 WSJT-X / ft8_lib 标准：LDPC(174,91) 软判决解码、CRC-14、GFSK 调制与 15 秒时隙对齐，支持与真实 FT8 信号互通。</p>
+                    <div class="feature__tags">
+                        <span>FT8</span><span>LDPC(174,91)</span><span>GFSK</span><span>软判决</span>
+                    </div>
+                </article>
+
+                <article class="feature">
+                    <div class="feature__icon">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5" fill="currentColor"/>
+                            <path d="M3 21h18" />
+                        </svg>
+                    </div>
+                    <h3 class="feature__title">APRS<span class="feature__badge">打磨中</span></h3>
+                    <p class="feature__text">APRS 报文收发与解析、位置信标、符号选择与地图展示，支持多种报文类型。</p>
+                    <div class="feature__tags">
+                        <span>APRS</span><span>信标</span><span>报文解析</span><span>地图</span>
                     </div>
                 </article>
             </div>
@@ -218,7 +245,8 @@
                 <div class="stack__group">
                     <h3 class="stack__title">领域专用</h3>
                     <ul class="stack__list">
-                        <li><span class="stack__name">predict4java</span><span class="stack__ver">1.3.1</span></li>
+                        <li><span class="stack__name">自研 SGP4/SDP4 引擎</span><span class="stack__ver">—</span></li>
+                        <li><span class="stack__name">predict4java（差分验证）</span><span class="stack__ver">1.3.1</span></li>
                         <li><span class="stack__name">高德地图 3D SDK</span><span class="stack__ver">latest</span></li>
                         <li><span class="stack__name">MPAndroidChart</span><span class="stack__ver">v3.1.0</span></li>
                         <li><span class="stack__name">Coil Compose</span><span class="stack__ver">2.7.0</span></li>
@@ -294,9 +322,9 @@
                 </div>
                 <div class="footer__col">
                     <h4>资源</h4>
-                    <a href="https://github.com/fuxue-linkong/Dual-zone_network_positioning" target="_blank" rel="noopener">GitHub 仓库</a>
-                    <a href="https://github.com/fuxue-linkong/Dual-zone_network_positioning/releases" target="_blank" rel="noopener">Releases</a>
-                    <a href="https://github.com/fuxue-linkong/Dual-zone_network_positioning/issues" target="_blank" rel="noopener">提交 Issue</a>
+                    <a href="https://github.com/fuxue-linkong/HamKit" target="_blank" rel="noopener">GitHub 仓库</a>
+                    <a href="https://github.com/fuxue-linkong/HamKit/releases" target="_blank" rel="noopener">Releases</a>
+                    <a href="https://github.com/fuxue-linkong/HamKit/issues" target="_blank" rel="noopener">提交 Issue</a>
                     <a href="mailto:fuxuelingkong@outlook.com">邮件反馈</a>
                 </div>
                 <div class="footer__col">

@@ -410,9 +410,31 @@ main {
     justify-content: center;
 }
 .feature__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
+}
+.feature__badge {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border: 1px solid rgba(232, 179, 76, 0.4);
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: #E8B34C;
+    background: rgba(232, 179, 76, 0.12);
+}
+@media (prefers-color-scheme: light) {
+    .feature__badge {
+        color: #B7791F;
+        border-color: rgba(183, 121, 31, 0.4);
+        background: rgba(183, 121, 31, 0.1);
+    }
 }
 .feature__text {
     font-size: 14px;
