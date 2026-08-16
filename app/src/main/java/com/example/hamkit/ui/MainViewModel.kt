@@ -846,14 +846,45 @@ class MainViewModel : ViewModel() {
 
     /**
      * 仅刷新卫星源（不重新定位）。用于卫星页"更新卫星源"按钮。
+     *
+     * 乐观先行：点击瞬间用现有缓存就地回显（有定位则立即重算预测，命中 15 分钟
+     * 预测缓存时 loading 瞬间结束），UI 在 100ms 内完成响应，与网络无关。
+     * 最新 TLE 在后台从 hamkit.click 镜像静默拉取后替换结果，不打断用户。
      * 无定位时也允许更新：只更新 TLE 缓存，等有定位后再做预测。
      */
     fun refreshSatelliteSourceOnly() {
         satelliteOnlyJob?.cancel()
-        _satelliteState.value = _satelliteState.value.copy(
-            isSatelliteLoading = true,
-            satelliteError = null
-        )
+
+        val cachedTles = _satelliteState.value.cachedTles
+        val current = _locationState.value.result
+
+        // ── 乐观先行（同步，<100ms）──
+        // 有缓存 TLE 时先用它回显，让 UI 立即有反应，不等待网络。
+        if (cachedTles.isNotEmpty()) {
+            if (current != null) {
+                // 有定位：立即用缓存 TLE 触发预测。
+                // triggerPrediction 内部命中 15 分钟预测缓存时跳过 SGP4 直接回填，
+                // loading 瞬间结束；未命中则后台协程计算，UI 已感知到响应。
+                _satelliteState.value = _satelliteState.value.copy(satelliteError = null)
+                triggerPrediction(current.latitude, current.longitude, cachedTles)
+            } else {
+                // 无定位：直接回显缓存列表，结束 loading
+                _satelliteState.value = _satelliteState.value.copy(
+                    isSatelliteLoading = false,
+                    cachedTles = cachedTles,
+                    satelliteError = null,
+                    lastSatelliteUpdateTime = Instant.now()
+                )
+            }
+        } else {
+            // 首次使用无缓存：无法乐观，只能等后台拉取
+            _satelliteState.value = _satelliteState.value.copy(
+                isSatelliteLoading = true,
+                satelliteError = null
+            )
+        }
+
+        // ── 后台刷新：从 hamkit.click 镜像拉取最新 TLE，到货后静默替换 ──
         satelliteOnlyJob = viewModelScope.launch {
             try {
                 val tles = fetchAndCacheTLEs()
@@ -862,10 +893,10 @@ class MainViewModel : ViewModel() {
                     radioInfoRepository.refresh()
                     _radioMap.value = radioInfoRepository.getAllRadios()
                 }
-                val current = _locationState.value.result
-                if (current != null) {
-                    // 有定位：重新预测
-                    triggerPrediction(current.latitude, current.longitude, tles)
+                val loc = _locationState.value.result
+                if (loc != null) {
+                    // 有定位：用最新 TLE 重新预测，结果静默替换 UI
+                    triggerPrediction(loc.latitude, loc.longitude, tles)
                 } else {
                     // 无定位：仅更新缓存，等待定位后再预测
                     _satelliteState.value = _satelliteState.value.copy(
@@ -879,10 +910,13 @@ class MainViewModel : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _satelliteState.value = _satelliteState.value.copy(
-                    isSatelliteLoading = false,
-                    satelliteError = e.message ?: "卫星源更新失败"
-                )
+                // 乐观已回显则不打断用户；无缓存才置 error
+                if (cachedTles.isEmpty()) {
+                    _satelliteState.value = _satelliteState.value.copy(
+                        isSatelliteLoading = false,
+                        satelliteError = e.message ?: "卫星源更新失败"
+                    )
+                }
             }
         }
     }
