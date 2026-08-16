@@ -435,17 +435,19 @@ class SatelliteDataSource {
     companion object {
         private const val TAG = "SatelliteDataSource"
 
-        // SatNOGS 源改用 CelesTrak 整理的 satnogs 分组（3le 文本格式），
-        // 避免直接请求 db.satnogs.org（国内访问不稳定），CelesTrak 有 CDN 且已过滤失效卫星
+        // TLE 源走 tle.hamkit.click CDN（S3 源站 + CloudFront 分发），
+        // 由 scripts/upload_tle_to_s3.sh 定时从 CelesTrak 拉取并上传，避免国内
+        // 直连 celestrak.org 不稳定。镜像内容与 CelesTrak 原始响应一致，
+        // 解析/合并逻辑不变；修改 S3 key 须同步 scripts/upload_tle_to_s3.sh。
         private const val SATNOGS_URL =
-            "https://celestrak.org/NORAD/elements/gp.php?GROUP=satnogs&FORMAT=3le"
+            "https://tle.hamkit.click/tle/satnogs.3le"
         private const val CELESTRAK_URL =
-            "https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=3le"
-        // CelesTrak 全部活跃卫星（CSV 格式，Phase 3 新增）
+            "https://tle.hamkit.click/tle/amateur.3le"
+        // 全部活跃卫星（CSV 格式，Phase 3 新增）
         private const val ACTIVE_URL =
-            "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=csv"
+            "https://tle.hamkit.click/tle/active.csv"
         // ISS / ARISS 单星源（Phase 3 新增）
         private const val ISS_URL =
-            "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=3le"
+            "https://tle.hamkit.click/tle/iss.3le"
     }
 }
