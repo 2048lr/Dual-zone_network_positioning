@@ -67,7 +67,11 @@ class ReminderRefreshWorker(
             val tles = if (cached == null || isCacheExpired(cached.updatedAt)) {
                 // 缓存过期或不存在，重新下载 TLE
                 val dataSource = SatelliteDataSource()
-                val fresh = dataSource.fetchAmateurTLEs()
+                val fresh = dataSource.fetchAmateurTLEs(
+                    enableAmateur = settingsStore.tleSourceAmateur,
+                    enableSatnogs = settingsStore.tleSourceSatnogs,
+                    enableActive = settingsStore.tleSourceActive
+                )
                 cacheStore.save(fresh, Instant.now())
                 fresh
             } else {
