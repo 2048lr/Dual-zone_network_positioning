@@ -85,4 +85,56 @@ class DownloaderTest {
         assertEquals("", info.downloadUrl)
         assertEquals("notes", info.changelog)
     }
+
+    @Test
+    fun `parseUpdateJson parses all four fields`() {
+        val info = parseUpdateJson(
+            """
+            {
+              "versionCode": 42,
+              "versionName": "2.1.2",
+              "downloadUrl": "https://apk.hamkit.click/release/HamKit_2.1.2_42-release.apk",
+              "changelog": "## 更新日志\n- 修复若干问题"
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(42, info.versionCode)
+        assertEquals("2.1.2", info.versionName)
+        assertEquals(
+            "https://apk.hamkit.click/release/HamKit_2.1.2_42-release.apk",
+            info.downloadUrl,
+        )
+        assertEquals("## 更新日志\n- 修复若干问题", info.changelog)
+    }
+
+    @Test
+    fun `parseUpdateJson tolerates missing fields with optXxx defaults`() {
+        // versionCode 缺失 → 默认 0；其余字段按实际返回。是否回退由 checkNewVersion() 判定。
+        val missingCode = parseUpdateJson(
+            """{"versionName":"2.1.2","downloadUrl":"https://apk.hamkit.click/x.apk","changelog":"x"}"""
+        )
+        assertEquals(0, missingCode.versionCode)
+        assertEquals("2.1.2", missingCode.versionName)
+        assertEquals("https://apk.hamkit.click/x.apk", missingCode.downloadUrl)
+        assertEquals("x", missingCode.changelog)
+
+        // downloadUrl 缺失 → 空串
+        val missingUrl = parseUpdateJson(
+            """{"versionCode":42,"versionName":"2.1.2","changelog":"x"}"""
+        )
+        assertEquals(42, missingUrl.versionCode)
+        assertEquals("2.1.2", missingUrl.versionName)
+        assertEquals("", missingUrl.downloadUrl)
+        assertEquals("x", missingUrl.changelog)
+    }
+
+    @Test
+    fun `parseUpdateJson returns default on invalid JSON`() {
+        val info = parseUpdateJson("not json")
+        assertEquals(0, info.versionCode)
+        assertEquals("", info.versionName)
+        assertEquals("", info.downloadUrl)
+        assertEquals("", info.changelog)
+    }
 }
