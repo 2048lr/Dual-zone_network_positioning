@@ -4,8 +4,12 @@ import com.example.hamkit.radioApp
 import okhttp3.HttpUrl
 import okhttp3.Request
 import java.io.File
+import java.util.concurrent.TimeUnit
 
-/** GitHub Releases API：拉取最近若干 release（含预发布），取最新非草稿 */
+/** 官网更新清单（优先源）；服务器不可达时回退 GitHub Releases。 */
+private const val UPDATE_JSON_URL = "https://hamkit.click/update.json"
+
+/** GitHub Releases API：拉取最近若干 release（含预发布），取最新非草稿（回退源） */
 private const val RELEASES_URL =
     "https://api.github.com/repos/fuxue-linkong/Dual-zone_network_positioning/releases?per_page=5"
 
@@ -13,20 +17,55 @@ private const val RELEASES_URL =
 private const val APK_CDN_HOST = "apk.hamkit.click"
 
 /**
- * 查询 GitHub 最新 release 信息，并将 APK asset 映射到官网 CDN。
+ * 查询最新版本信息。
  *
- * 使用 releases 列表接口（而非 /releases/latest，后者会跳过预发布版本）。
+ * 优先从官网 `hamkit.click/update.json` 拉取更新日志（字段与 [LatestVersionInfo] 一一对应）；
+ * 任何失败（连接超时 / DNS 失败 / 非 2xx / JSON 解析失败 / `versionCode <= 0` /
+ * `downloadUrl` 为空）均视为服务器不可达，回退到 GitHub Releases API。
+ *
+ * GitHub 回退路径使用 releases 列表接口（而非 /releases/latest，后者会跳过预发布版本），
  * versionCode 提取优先级：
  * 1. release body 中的 `Version: <name> (<code>)`（release.yml 自动发布时写入）；
  * 2. 手工上传的 APK 文件名 `HamKit_<name>_<code>(-release).apk`。
+ * GitHub 路径下 APK 文件名来自 GitHub asset，但下载流量走 `apk.hamkit.click` 对应的
+ * CloudFront 分配；官网 JSON 路径下 `downloadUrl` 由 JSON 直接给出。
  *
- * 更新日志和版本信息始终来自 GitHub；APK 文件名来自 GitHub asset，但下载流量走
- * `apk.hamkit.click` 对应的 CloudFront 分配。
- *
- * @return 最新版本信息；网络失败或无 release 时返回默认空值
+ * @return 最新版本信息；网络失败或两源均无可用数据时返回默认空值
  */
 fun checkNewVersion(): LatestVersionInfo {
     if (!isNetworkAvailable(radioApp)) return LatestVersionInfo()
+
+    // 官网请求用短超时客户端，避免 hamkit.click 不可达时用户长时间等待才回退 GitHub。
+    // newBuilder() 复用 radioApp.okhttpClient 的连接池与缓存，开销可忽略。
+    val quickClient = radioApp.okhttpClient.newBuilder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .build()
+
+    val fromWebsite = runCatching {
+        quickClient.newCall(Request.Builder().url(UPDATE_JSON_URL).build()).execute()
+            .use { response ->
+                if (!response.isSuccessful) return@runCatching null
+                parseUpdateJson(response.body.string())
+            }
+    }.getOrNull()
+    if (fromWebsite != null &&
+        fromWebsite.versionCode > 0 &&
+        fromWebsite.downloadUrl.isNotEmpty()
+    ) {
+        return fromWebsite
+    }
+
+    // 回退到 GitHub Releases。
+    return checkNewVersionFromGitHub()
+}
+
+/**
+ * 从 GitHub Releases API 拉取最新 release 信息，并将 APK asset 映射到官网 CDN。
+ *
+ * @return 最新版本信息；网络失败或无 release 时返回默认空值
+ */
+private fun checkNewVersionFromGitHub(): LatestVersionInfo {
     val defaultValue = LatestVersionInfo()
     runCatching {
         radioApp.okhttpClient.newCall(Request.Builder().url(RELEASES_URL).build()).execute()
@@ -37,6 +76,21 @@ fun checkNewVersion(): LatestVersionInfo {
     }
     return defaultValue
 }
+
+/**
+ * 解析官网 update.json（单个 JSON 对象，字段与 [LatestVersionInfo] 一一对应）。
+ *
+ * 字段缺失或非法 JSON 时返回空 [LatestVersionInfo]，由调用方据此触发 GitHub 回退。
+ */
+internal fun parseUpdateJson(body: String): LatestVersionInfo = runCatching {
+    val obj = org.json.JSONObject(body)
+    LatestVersionInfo(
+        versionCode = obj.optInt("versionCode", 0),
+        versionName = obj.optString("versionName"),
+        downloadUrl = obj.optString("downloadUrl"),
+        changelog = obj.optString("changelog"),
+    )
+}.getOrDefault(LatestVersionInfo())
 
 /** 将 GitHub Releases API 响应转换为应用更新信息。 */
 internal fun parseLatestVersion(body: String): LatestVersionInfo {
