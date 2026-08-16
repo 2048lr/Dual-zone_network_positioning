@@ -65,6 +65,13 @@ class SatelliteDataSource {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    // active 源（全量活跃卫星 CSV，gzip 后约 900KB）单独用更长读取超时，
+    // 避免弱网下 30s 内未读完被静默跳过，导致卫星列表只有 ~600 颗而非 16k+。
+    private val activeClient = HttpClientProvider.client.newBuilder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
+        .build()
+
     private val amsatStatusApi = AmsatStatusApiService()
 
     /**
@@ -84,13 +91,13 @@ class SatelliteDataSource {
      *
      * @param enableAmateur 是否启用 CelesTrak amateur 分组（默认 true）
      * @param enableSatnogs 是否启用 CelesTrak satnogs 分组（默认 true）
-     * @param enableActive 是否启用 CelesTrak active 分组（默认 false，全量拉取较大）
+     * @param enableActive 是否启用 CelesTrak active 分组（默认 true，含全部活跃卫星 16k+）
      * @param customUrl 可选自定义 TLE URL（3le 或 CSV，默认 null）
      */
     suspend fun fetchAmateurTLEs(
         enableAmateur: Boolean = true,
         enableSatnogs: Boolean = true,
-        enableActive: Boolean = false,
+        enableActive: Boolean = true,
         customUrl: String? = null,
     ): List<SourcedTLE> = withContext(Dispatchers.IO) {
         coroutineScope {
@@ -317,7 +324,7 @@ class SatelliteDataSource {
             .url(ACTIVE_URL)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        activeClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("CelesTrak active 请求失败：${response.code}")
             }
