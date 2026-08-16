@@ -13,15 +13,15 @@
 ### 已完成
 
 - **CW 练习器**（摩斯电码学习）
-- **卫星定位与追踪**
+- **卫星定位与追踪**（自研 SGP4/SDP4 引擎，Look4Sat 风格雷达图，SatNOGS 转发器频率库）
 - **AMSAT 卫星状态**
 - **日历过境提醒**
+- **首页时间卡**（实时天气温度、UTC 时间、自定义背景图裁剪）
 
 ### 短期计划
 
 - **FT8** 打磨（借鉴 [FT8CN](https://github.com/BG7HIM/FT8CN)）
 - **APRS** 打磨（借鉴 [aprsdroid](https://github.com/ge0rg/aprsdroid)）
-- **卫星功能重写**（借鉴 [look4sat](https://github.com/rt-bishop/Look4Sat)）
 
 ### 长期计划
 
@@ -41,8 +41,10 @@
 - 反向地理编码显示当前位置地址（3 秒去抖、失败指数退避自动恢复）
 
 ### 卫星过境预测
-- 基于 predict4java 的 **SGP4/SDP4** 轨道计算，并行预测未来 48 小时过境
+- 自研 **SGP4/SDP4** 轨道计算引擎（predict4java 仅用于差分验证），并行预测未来 48 小时过境
 - 支持 **CelesTrak** TLE 数据源（amateur / satnogs 分组）
+- 内置 **SatNOGS 转发器频率库**，提供收发器名称与频率信息
+- **Look4Sat 风格雷达图**，极坐标实时显示在境卫星方位与俯仰
 - 实时 **AMSAT** 状态查询（含延续标记），BJT 分段时间线，在境倒计时
 - 收藏常用卫星，按收藏 → 在境 → AOS 排序
 
@@ -56,6 +58,11 @@
 - AOS 前可配提前量提醒，支持仅白天模式
 - 重启自动恢复（BootReceiver）
 
+### 首页时间卡
+- 集成实时天气温度与 UTC 时间
+- 支持自定义背景图（内置 the_moon 月相图）与图片裁剪
+- MaterialKolor 从背景图自动提取色板生成主题
+
 ## 应用截图
 
 | 定位页面 | FT8 | APRS | CW 教程练习 |
@@ -67,7 +74,8 @@
 **语言与框架**
 - Kotlin 2.4.0
 - Jetpack Compose (BOM 2026.05.01)
-- Material 3 Expressive + Miuix KMP 0.9.3
+- Material 3 Expressive (1.5.0-alpha22) + Miuix KMP 0.9.3
+- Navigation3 1.1.2
 - Coroutines 1.11.0
 
 **数据与定位**
@@ -76,13 +84,15 @@
 - OkHttp 5.3.2 / WorkManager 2.10.0
 
 **领域专用**
-- predict4java 1.3.1（卫星轨道预测）
+- 自研 SGP4/SDP4 引擎（predict4java 1.3.1 仅用于差分验证）
+- SatNOGS 转发器频率库
 - 高德地图 3D SDK
 - MPAndroidChart v3.1.0
 - Coil Compose 2.7.0 / Palette 1.0.0
+- MaterialKolor 4.1.1（动态取色）/ Commonmark 0.28.0（Markdown 渲染）
 
 **工程化**
-- Gradle 9.4.1 / KSP 2.3.10
+- Gradle 9.4.1 / AGP 9.2.1 / KSP 2.3.10
 - JaCoCo 0.8.12 / R8 ProGuard
 - GitHub Actions CI/CD
 
@@ -94,7 +104,7 @@
 
 ## 反馈
 
-如有 bug 请在 [Issues](https://github.com/fuxue-linkong/Dual-zone_network_positioning/issues) 中提出，或发送邮件至 fuxuelingkong@outlook.com。
+如有 bug 请在 [Issues](https://github.com/fuxue-linkong/HamKit/issues) 中提出，或发送邮件至 fuxuelingkong@outlook.com。
 
 也欢迎提出功能需求（能力有限，不一定能实现）。
 
