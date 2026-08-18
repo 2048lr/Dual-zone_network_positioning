@@ -65,6 +65,13 @@ class SatelliteDataSource {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    // active 源（全量活跃卫星 CSV，gzip 后约 900KB）单独用更长读取超时，
+    // 避免弱网下 30s 内未读完被静默跳过，导致卫星列表只有 ~600 颗而非 16k+。
+    private val activeClient = HttpClientProvider.client.newBuilder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
+        .build()
+
     private val amsatStatusApi = AmsatStatusApiService()
 
     /**
@@ -84,13 +91,13 @@ class SatelliteDataSource {
      *
      * @param enableAmateur 是否启用 CelesTrak amateur 分组（默认 true）
      * @param enableSatnogs 是否启用 CelesTrak satnogs 分组（默认 true）
-     * @param enableActive 是否启用 CelesTrak active 分组（默认 false，全量拉取较大）
+     * @param enableActive 是否启用 CelesTrak active 分组（默认 true，含全部活跃卫星 16k+）
      * @param customUrl 可选自定义 TLE URL（3le 或 CSV，默认 null）
      */
     suspend fun fetchAmateurTLEs(
         enableAmateur: Boolean = true,
         enableSatnogs: Boolean = true,
-        enableActive: Boolean = false,
+        enableActive: Boolean = true,
         customUrl: String? = null,
     ): List<SourcedTLE> = withContext(Dispatchers.IO) {
         coroutineScope {
@@ -317,7 +324,7 @@ class SatelliteDataSource {
             .url(ACTIVE_URL)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        activeClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("CelesTrak active 请求失败：${response.code}")
             }
@@ -435,17 +442,19 @@ class SatelliteDataSource {
     companion object {
         private const val TAG = "SatelliteDataSource"
 
-        // SatNOGS 源改用 CelesTrak 整理的 satnogs 分组（3le 文本格式），
-        // 避免直接请求 db.satnogs.org（国内访问不稳定），CelesTrak 有 CDN 且已过滤失效卫星
+        // TLE 源走 tle.hamkit.click CDN（S3 源站 + CloudFront 分发），
+        // 由 scripts/upload_tle_to_s3.sh 定时从 CelesTrak 拉取并上传，避免国内
+        // 直连 celestrak.org 不稳定。镜像内容与 CelesTrak 原始响应一致，
+        // 解析/合并逻辑不变；修改 S3 key 须同步 scripts/upload_tle_to_s3.sh。
         private const val SATNOGS_URL =
-            "https://celestrak.org/NORAD/elements/gp.php?GROUP=satnogs&FORMAT=3le"
+            "https://tle.hamkit.click/tle/satnogs.3le"
         private const val CELESTRAK_URL =
-            "https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=3le"
-        // CelesTrak 全部活跃卫星（CSV 格式，Phase 3 新增）
+            "https://tle.hamkit.click/tle/amateur.3le"
+        // 全部活跃卫星（CSV 格式，Phase 3 新增）
         private const val ACTIVE_URL =
-            "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=csv"
+            "https://tle.hamkit.click/tle/active.csv"
         // ISS / ARISS 单星源（Phase 3 新增）
         private const val ISS_URL =
-            "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=3le"
+            "https://tle.hamkit.click/tle/iss.3le"
     }
 }

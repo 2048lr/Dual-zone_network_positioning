@@ -49,7 +49,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,6 +62,7 @@ import com.example.hamkit.ui.component.miuix.effect.ColorBlendToken
 import com.example.hamkit.ui.theme.LocalEnableBlur
 import com.example.hamkit.ui.theme.isInDarkTheme
 import com.example.hamkit.ui.util.BlurredBar
+import com.example.hamkit.ui.util.rememberAppIconPainter
 import com.example.hamkit.ui.util.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -311,7 +311,7 @@ private fun AboutContent(
                                 )
                             } else Modifier
                         ),
-                    painter = painterResource(id = R.mipmap.ic_launcher),
+                    painter = rememberAppIconPainter(),
                     contentDescription = null,
                 )
             }
