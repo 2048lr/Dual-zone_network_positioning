@@ -146,9 +146,10 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          # 高德 Android SDK Key：客户端标识，按包名 + 签名 SHA-1 限制；
-          # 不再有 secrets.dat / 三碎片方案。
+          # 高德 Android SDK Key + Web 服务 Key：都是客户端标识；
+          # SDK Key 按包名 + 签名 SHA-1 限制，Web Key 靠配额/监控。
           AMAP_SDK_KEY: ${{ secrets.AMAP_SDK_KEY }}
+          AMAP_WEB_KEY: ${{ secrets.AMAP_WEB_KEY }}
         run: |
           set -o pipefail
           gradle assembleRelease \

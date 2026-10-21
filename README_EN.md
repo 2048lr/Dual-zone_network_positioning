@@ -107,7 +107,7 @@ Official website: https://hamkit.click
 **Data & Location**
 - Room 2.7.0 / DataStore 1.1.4
 - Google Play Services Location 21.3.0
-- Open-Meteo (weather, no client-side key)
+- Amap Android SDK + Web services (maps / weather / reverse geocoding)
 - OkHttp 5.3.2 / WorkManager 2.10.0
 
 **Domain-specific**

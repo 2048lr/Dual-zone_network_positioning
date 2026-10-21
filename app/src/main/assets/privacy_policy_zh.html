@@ -53,7 +53,7 @@
   <ul>
     <li><strong>信息：</strong>设备定位得到的经纬度、海拔、速度、方向，以及由坐标反查得到的地址/行政区。</li>
     <li><strong>目的：</strong>计算 CQ/ITU 分区与 Maidenhead 网格；显示地图；查询当地天气；计算卫星过境与多普勒；在你主动开启 APRS 上报时发送位置。</li>
-    <li><strong>方式：</strong>定位在本地完成；天气会把坐标发送给 Open-Meteo；地址由 Android 系统 Geocoder 处理（可能使用设备厂商的地理编码服务）；地图由高德 Android SDK 显示；APRS 上报会把呼号与位置发送到 APRS-IS。</li>
+    <li><strong>方式：</strong>定位在本地完成；天气与逆地理编码会把坐标发送给高德地图开放平台；地图由高德 Android SDK 显示；APRS 上报会把呼号与位置发送到 APRS-IS。</li>
     <li><strong>法律依据：</strong>你的单独同意（《个人信息保护法》第 29 条）。你可以在系统设置中关闭定位权限，或拒绝首次启动时的位置同意。</li>
   </ul>
 
@@ -84,9 +84,7 @@
   <h2>3. 第三方服务与共享</h2>
   <p>为实现功能，以下第三方可能会处理必要的信息。我们不会出售你的个人信息。</p>
   <ul>
-    <li><strong>高德地图开放平台：</strong>仅用于地图显示（Android SDK），会接收设备/网络信息；其隐私政策见 <a href="https://lbs.amap.com/pages/privacy/">lbs.amap.com/pages/privacy</a>。</li>
-    <li><strong>Open-Meteo：</strong>天气查询，接收经纬度；其隐私政策见 <a href="https://open-meteo.com/en/terms">open-meteo.com/en/terms</a>。</li>
-    <li><strong>Android 系统 Geocoder / 设备厂商：</strong>逆地理编码地址，具体处理取决于设备系统/厂商。</li>
+    <li><strong>高德地图开放平台：</strong>地图显示、天气查询、逆地理编码。会接收坐标、设备/网络信息；其隐私政策见 <a href="https://lbs.amap.com/pages/privacy/">lbs.amap.com/pages/privacy</a>。</li>
     <li><strong>APRS-IS：</strong>你主动连接并开启上报时，呼号、位置、消息会进入公开网络。默认只读、位置上报默认关闭。</li>
     <li><strong>CelesTrak / SatNOGS / AMSAT：</strong>提供卫星 TLE、转发器频率、状态数据；请求会携带 IP/User-Agent，不包含你的位置。</li>
     <li><strong>GitHub / hamkit.click：</strong>检查与下载更新；会接收 IP/User-Agent。</li>
@@ -102,7 +100,7 @@
   </ul>
 
   <h2>5. 数据出境</h2>
-  <p>APRS-IS 是国际业余无线电网络，服务器可能位于中国境外；CelesTrak、SatNOGS、AMSAT、GitHub、Open-Meteo 等也位于中国境外。使用这些功能时，相关请求（可能包含 IP、呼号、位置、消息）可能传输到境外。高德地图服务在中国境内。若你不希望数据出境，请关闭 APRS 上报、避免使用依赖境外数据源的功能。</p>
+  <p>APRS-IS 是国际业余无线电网络，服务器可能位于中国境外；CelesTrak、SatNOGS、AMSAT、GitHub 等也位于中国境外。使用这些功能时，相关请求（可能包含 IP、呼号、位置、消息）可能传输到境外。高德地图服务（含天气/逆地理编码）在中国境内。若你不希望数据出境，请关闭 APRS 上报、避免使用依赖境外数据源的功能。</p>
 
   <h2>6. 权限</h2>
   <ul>

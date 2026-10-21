@@ -110,7 +110,7 @@
 **数据与定位**
 - Room 2.7.0 / DataStore 1.1.4
 - Google Play Services Location 21.3.0
-- Open-Meteo（天气，无需客户端 Key）
+- 高德地图 SDK + Web 服务（地图 / 天气 / 逆地理编码）
 - OkHttp 5.3.2 / WorkManager 2.10.0
 
 **领域专用**

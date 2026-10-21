@@ -17,10 +17,11 @@ import java.util.Locale
 /**
  * 天气数据模型。包含实时天气与 4 天预报。
  *
- * 数据来源：Open-Meteo（无需客户端 API Key）
- * - 当前天气与 4 天预报：/v1/forecast
+ * 数据来源：高德 Web 服务（天气 + 逆地理编码）
+ * - 实时天气：/v3/weather/weatherInfo?extensions=base
+ * - 4 天预报：/v3/weather/weatherInfo?extensions=all
  *
- * @param cityName 可选的地址/城市名（来自系统 Geocoder），仅用于展示
+ * @param cityName 城市名（来自高德逆地理编码）
  * @param now 实时天气
  * @param daily 4 天预报列表
  * @param fetchTimeMillis 数据获取时间戳，用于缓存过期判断
@@ -34,7 +35,7 @@ data class WeatherResult(
 )
 
 /**
- * 实时天气（Open-Meteo current 字段）。
+ * 实时天气（高德 lives 字段）。
  *
  * @param temp 当前温度（摄氏度，保留一位小数由 UI 格式化）
  * @param text 天气状况文字（如"晴"、"多云"、"阴"）
@@ -54,7 +55,7 @@ data class WeatherNow(
 )
 
 /**
- * 单日天气预报（Open-Meteo daily 字段）。
+ * 单日天气预报（高德 casts 字段）。
  *
  * @param date 日期（yyyy-MM-dd）
  * @param week 星期几（1-7，1=周一）

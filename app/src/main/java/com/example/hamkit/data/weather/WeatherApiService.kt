@@ -1,29 +1,29 @@
 package com.example.hamkit.data.weather
 
+import com.example.hamkit.BuildConfig
 import com.example.hamkit.data.network.HttpClientProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import org.json.JSONException
 import org.json.JSONObject
-import java.time.LocalDate
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
- * 天气服务（Open-Meteo，无需客户端 API Key）。
+ * 高德天气 API 封装。
  *
- * 以前的实现使用高德 Web 服务 Key（天气 + 逆地理编码），Key 必须随 APK 分发，
- * 任何“三碎片加密”都只是混淆，无法阻止提取。现在：
- * - 天气改用 Open-Meteo 的公开 API，按经纬度查询，不需要 Key；
- * - 逆地理编码地址由系统 [android.location.Geocoder]（见 LocationHelper）提供，
- *   不再调用高德 Web 服务；
- * - 高德只保留 Android 地图 SDK，其 Key 是客户端标识（可提取），按包名/签名限制，
- *   不再把它当秘密。
+ * API 文档：https://lbs.amap.com/api/webservice/guide/api/weatherinfo
  *
- * 数据来源：Open-Meteo（https://open-meteo.com/），数据按 CC BY 4.0 提供，
- * 发布/展示时应保留来源说明。
+ * Key 处理：
+ * - 本项目按需求同时使用高德 Android SDK 与 Web 服务（天气 + 逆地理编码）。
+ * - Web 服务 Key 通过 `AMAP_WEB_KEY` 环境变量或 `local.properties` 的
+ *   `amap.api.key` 在构建时写入 `BuildConfig`；它随 APK 分发，**不是秘密**，
+ *   必须依靠高德侧的配额/用量监控，不能把它当加密资产。
+ * - 缺 Key 时抛 [ApiKeyMissingException]，避免发出必然失败的请求。
  */
 class WeatherApiService {
 
@@ -34,127 +34,145 @@ class WeatherApiService {
         .build()
 
     /**
-     * 获取当前天气与 4 天预报。
+     * 完整天气数据获取流程：
+     * 1. 用经纬度逆地理编码获取 adcode（行政区划代码）和城市名
+     * 2. 用 adcode 查实时天气（extensions=base）
+     * 3. 用 adcode 查 4 天预报（extensions=all）
      *
-     * @param latitude 纬度（WGS84）
-     * @param longitude 经度（WGS84）
-     * @param cityName 可选的地址/城市名，仅用于展示，不参与请求
+     * @throws ApiKeyMissingException Web 服务 Key 未配置
+     * @throws WeatherNetworkException 网络请求失败
+     * @throws WeatherApiException 高德 API 返回业务错误
      */
-    suspend fun fetchWeather(
-        latitude: Double,
-        longitude: Double,
-        cityName: String = "",
-    ): WeatherResult = withContext(Dispatchers.IO) {
+    suspend fun fetchWeather(latitude: Double, longitude: Double): WeatherResult {
         if (!latitude.isFinite() || !longitude.isFinite() ||
             latitude !in -90.0..90.0 || longitude !in -180.0..180.0
         ) {
             throw WeatherApiException("无效坐标: $latitude,$longitude")
         }
+        val key = apiKey()
+        if (key.isBlank()) {
+            throw ApiKeyMissingException()
+        }
 
-        val url = buildUrl(
-            WEATHER_BASE_URL,
-            mapOf(
-                "latitude" to String.format(Locale.US, "%.6f", latitude),
-                "longitude" to String.format(Locale.US, "%.6f", longitude),
-                "current" to "temperature_2m,relative_humidity_2m,weather_code," +
-                    "wind_speed_10m,wind_direction_10m",
-                "daily" to "weather_code,temperature_2m_max,temperature_2m_min",
-                "timezone" to "auto",
-                "forecast_days" to "4",
-            ),
-        )
-        val json = parseJson(executeRequest(url))
+        return withContext(Dispatchers.IO) {
+            // Step 1: 经纬度逆地理编码获取 adcode
+            val locationInfo = fetchAdcode(latitude, longitude, key)
 
-        val current = json.optJSONObject("current")
-            ?: throw WeatherApiException("响应缺少 current 字段")
-        val code = current.optInt("weather_code", -1)
-        if (code < 0) throw WeatherApiException("响应缺少 weather_code")
+            // Step 2 & 3: 并行获取实时天气和预报
+            coroutineScope {
+                val nowDeferred = async { fetchNowWeather(locationInfo.first, key) }
+                val dailyDeferred = async { fetchDailyForecast(locationInfo.first, key) }
+                val now = nowDeferred.await()
+                val daily = dailyDeferred.await()
 
-        val now = WeatherNow(
-            temp = formatTemperature(current.optDouble("temperature_2m", Double.NaN)),
-            text = weatherText(code),
-            windDir = windDirection(current.optDouble("wind_direction_10m", Double.NaN)),
-            windPower = current.optDouble("wind_speed_10m", Double.NaN)
-                .takeIf { it.isFinite() }
-                ?.let { String.format(Locale.US, "%.0f km/h", it) }
-                .orEmpty(),
-            humidity = current.optInt("relative_humidity_2m", -1)
-                .takeIf { it >= 0 }
-                ?.toString()
-                .orEmpty(),
-            reportTime = current.optString("time").replace('T', ' ').trim(),
-        )
+                WeatherResult(
+                    cityName = locationInfo.second,
+                    now = now,
+                    daily = daily
+                )
+            }
+        }
+    }
 
-        WeatherResult(
-            cityName = cityName,
-            now = now,
-            daily = parseDaily(json.optJSONObject("daily")),
+    /**
+     * 逆地理编码：经纬度 → adcode + 城市名。
+     */
+    private suspend fun fetchAdcode(lat: Double, lng: Double, key: String): Pair<String, String> {
+        // 高德 API location 参数格式：经度,纬度（lng,lat）
+        val location = String.format(Locale.US, "%.6f,%.6f", lng, lat)
+        val url = buildUrl(REGEO_BASE_URL, mapOf("location" to location, "key" to key))
+        val response = executeRequest(url)
+        val json = parseJson(response)
+        checkApiStatus(json)
+        val regeocode = json.optJSONObject("regeocode")
+            ?: throw WeatherApiException("regeo 响应缺少 regeocode 字段")
+        val addrComponent = regeocode.optJSONObject("addressComponent")
+            ?: throw WeatherApiException("regeo 响应缺少 addressComponent 字段")
+
+        val adcode = addrComponent.optString("adcode")
+        if (adcode.isEmpty()) throw WeatherApiException("adcode 为空")
+
+        // city 可能为空（直辖市），回退到 province。
+        // 高德 regeo 对直辖市返回 city 为空数组 []，optString 会得到字符串 "[]"，
+        // 需一并视为空，否则城市名会错误显示为 "[]"。
+        val city = addrComponent.optString("city")
+        val province = addrComponent.optString("province")
+        val cityName = if (city.isNotEmpty() && city != "[]") city else province
+
+        if (cityName.isEmpty()) {
+            throw WeatherApiException("城市名为空")
+        }
+        return Pair(adcode, cityName)
+    }
+
+    /**
+     * 获取实时天气（extensions=base）。
+     */
+    private suspend fun fetchNowWeather(adcode: String, key: String): WeatherNow {
+        val url = buildUrl(WEATHER_BASE_URL, mapOf("city" to adcode, "key" to key, "extensions" to "base"))
+        val response = executeRequest(url)
+        val json = parseJson(response)
+        checkApiStatus(json)
+
+        val livesArr = json.optJSONArray("lives")
+            ?: throw WeatherApiException("lives 为空")
+        if (livesArr.length() == 0) throw WeatherApiException("lives 数组为空")
+
+        val live = livesArr.optJSONObject(0)
+            ?: throw WeatherApiException("lives[0] 为空")
+        return WeatherNow(
+            temp = live.optString("temperature"),
+            text = live.optString("weather"),
+            windDir = live.optString("winddirection"),
+            windPower = live.optString("windpower"),
+            humidity = live.optString("humidity"),
+            reportTime = live.optString("reporttime")
         )
     }
 
-    private fun parseDaily(daily: JSONObject?): List<WeatherDay> {
-        if (daily == null) return emptyList()
-        val dates = daily.optJSONArray("time") ?: return emptyList()
-        val codes = daily.optJSONArray("weather_code") ?: return emptyList()
-        val maxTemps = daily.optJSONArray("temperature_2m_max") ?: return emptyList()
-        val minTemps = daily.optJSONArray("temperature_2m_min") ?: return emptyList()
-        val count = minOf(dates.length(), codes.length(), maxTemps.length(), minTemps.length(), 4)
-        return (0 until count).mapNotNull { index ->
-            val date = dates.optString(index)
-            if (date.isBlank()) return@mapNotNull null
-            val text = weatherText(codes.optInt(index, -1))
+    /**
+     * 获取 4 天预报（extensions=all）。
+     */
+    private suspend fun fetchDailyForecast(adcode: String, key: String): List<WeatherDay> {
+        val url = buildUrl(WEATHER_BASE_URL, mapOf("city" to adcode, "key" to key, "extensions" to "all"))
+        val response = executeRequest(url)
+        val json = parseJson(response)
+        checkApiStatus(json)
+
+        val forecastsArr = json.optJSONArray("forecasts")
+            ?: throw WeatherApiException("forecasts 为空")
+        if (forecastsArr.length() == 0) throw WeatherApiException("forecasts 数组为空")
+
+        val forecast = forecastsArr.optJSONObject(0)
+            ?: throw WeatherApiException("forecasts[0] 为空")
+        val castsArr = forecast.optJSONArray("casts")
+            ?: throw WeatherApiException("casts 为空")
+
+        return (0 until castsArr.length()).mapNotNull { idx ->
+            val cast = castsArr.optJSONObject(idx) ?: return@mapNotNull null
             WeatherDay(
-                date = date,
-                week = weekday(date),
-                dayWeather = text,
-                nightWeather = text,
-                dayTemp = formatTemperature(maxTemps.optDouble(index, Double.NaN)),
-                nightTemp = formatTemperature(minTemps.optDouble(index, Double.NaN)),
+                date = cast.optString("date"),
+                week = cast.optString("week"),
+                dayWeather = cast.optString("dayweather"),
+                nightWeather = cast.optString("nightweather"),
+                dayTemp = cast.optString("daytemp"),
+                nightTemp = cast.optString("nighttemp"),
+                dayWind = cast.optString("daywind"),
+                nightWind = cast.optString("nightwind"),
+                dayPower = cast.optString("daypower"),
+                nightPower = cast.optString("nightpower")
             )
         }
     }
 
-    private fun formatTemperature(value: Double): String =
-        if (value.isFinite()) String.format(Locale.US, "%.0f", value) else "--"
-
-    private fun windDirection(degrees: Double): String {
-        if (!degrees.isFinite()) return ""
-        val directions = arrayOf("北", "东北", "东", "东南", "南", "西南", "西", "西北")
-        val index = (((degrees + 22.5) / 45.0).toInt() % 8 + 8) % 8
-        return directions[index]
-    }
-
-    private fun weekday(date: String): String = runCatching {
-        when (LocalDate.parse(date).dayOfWeek.value) {
-            1 -> "周一"
-            2 -> "周二"
-            3 -> "周三"
-            4 -> "周四"
-            5 -> "周五"
-            6 -> "周六"
-            else -> "周日"
-        }
-    }.getOrDefault("")
-
-    /** WMO weather code → 展示文字；中文环境用中文，其他语言用英文。 */
-    private fun weatherText(code: Int): String {
-        val zh = Locale.getDefault().language.startsWith("zh")
-        return when (code) {
-            0 -> if (zh) "晴" else "Clear"
-            1 -> if (zh) "晴间多云" else "Mainly clear"
-            2 -> if (zh) "多云" else "Partly cloudy"
-            3 -> if (zh) "阴" else "Overcast"
-            45, 48 -> if (zh) "雾" else "Fog"
-            51, 53, 55 -> if (zh) "毛毛雨" else "Drizzle"
-            56, 57 -> if (zh) "冻毛毛雨" else "Freezing drizzle"
-            61, 63, 65 -> if (zh) "雨" else "Rain"
-            66, 67 -> if (zh) "冻雨" else "Freezing rain"
-            71, 73, 75, 77 -> if (zh) "雪" else "Snow"
-            80, 81, 82 -> if (zh) "阵雨" else "Rain showers"
-            85, 86 -> if (zh) "阵雪" else "Snow showers"
-            95 -> if (zh) "雷阵雨" else "Thunderstorm"
-            96, 99 -> if (zh) "雷阵雨伴冰雹" else "Thunderstorm with hail"
-            else -> if (zh) "未知" else "Unknown"
+    /**
+     * 校验高德 API 响应状态。status != "1" 时抛出 [WeatherApiException] 携带 info。
+     */
+    private fun checkApiStatus(json: JSONObject) {
+        if (json.optString("status") != "1") {
+            val info = json.optString("info", "未知错误")
+            val infocode = json.optString("infocode", "")
+            throw WeatherApiException("$info(${infocode})")
         }
     }
 
@@ -181,8 +199,6 @@ class WeatherApiService {
 
     /**
      * 执行 HTTP 请求，返回响应体字符串。
-     *
-     * @throws WeatherNetworkException 网络层异常（连接超时、DNS 解析失败、断网等）
      */
     private fun executeRequest(url: String): String {
         return try {
@@ -201,10 +217,21 @@ class WeatherApiService {
         }
     }
 
+    /** 构建时注入的高德 Web 服务 Key（可被反编译提取，不是秘密）。 */
+    private fun apiKey(): String = BuildConfig.AMAP_WEB_KEY
+
     companion object {
-        private const val WEATHER_BASE_URL = "https://api.open-meteo.com/v1/forecast"
+        // 高德 Web 服务 API 基础 URL
+        private const val WEATHER_BASE_URL = "https://restapi.amap.com/v3/weather/weatherInfo"
+        private const val REGEO_BASE_URL = "https://restapi.amap.com/v3/geocode/regeo"
     }
 }
+
+/**
+ * API Key 未配置：构建时未注入 AMAP_WEB_KEY / local.properties amap.api.key。
+ */
+class ApiKeyMissingException :
+    Exception("高德 Web 服务 Key 未配置，请设置 AMAP_WEB_KEY 或 local.properties 的 amap.api.key")
 
 /**
  * 网络层异常：连接超时、DNS 解析失败、断网、HTTP 非 2xx 等。
@@ -212,6 +239,6 @@ class WeatherApiService {
 class WeatherNetworkException(message: String) : Exception(message)
 
 /**
- * 天气 API 业务错误：响应缺少字段、JSON 非法等。
+ * 高德 API 业务错误：status != "1"，如 Key 无效、配额超限、参数错误等。
  */
 class WeatherApiException(message: String) : Exception(message)

@@ -52,7 +52,7 @@
   <ul>
     <li><strong>Data:</strong> latitude/longitude, altitude, speed, bearing, and reverse-geocoded address/region.</li>
     <li><strong>Purpose:</strong> CQ/ITU zones, Maidenhead grid, map display, local weather, satellite pass/Doppler calculations, and APRS position reports when you enable them.</li>
-    <li><strong>How:</strong> positioning is local; weather sends coordinates to Open-Meteo; addresses are resolved by the Android system Geocoder (which may use a device vendor's service); maps are displayed by the Amap Android SDK; APRS reports send your callsign and position to APRS-IS.</li>
+    <li><strong>How:</strong> positioning is local; weather and reverse geocoding send coordinates to the Amap open platform; maps are displayed by the Amap Android SDK; APRS reports send your callsign and position to APRS-IS.</li>
     <li><strong>Legal basis:</strong> your separate consent. You can revoke location permission in system settings or decline the location consent at first launch.</li>
   </ul>
 
@@ -75,9 +75,7 @@
 
   <h2>3. Third parties</h2>
   <ul>
-    <li><strong>Amap (Gaode):</strong> map display only (Android SDK); receives device/network data. See <a href="https://lbs.amap.com/pages/privacy/">Amap privacy policy</a>.</li>
-    <li><strong>Open-Meteo:</strong> weather queries; receives coordinates. See <a href="https://open-meteo.com/en/terms">Open-Meteo terms</a>.</li>
-    <li><strong>Android system Geocoder / device vendor:</strong> reverse-geocoded addresses; processing depends on the OS/vendor.</li>
+    <li><strong>Amap (Gaode):</strong> map display, weather and reverse geocoding; receives coordinates and device/network data. See <a href="https://lbs.amap.com/pages/privacy/">Amap privacy policy</a>.</li>
     <li><strong>APRS-IS:</strong> when you connect and enable reporting, callsign/position/messages enter a public network. Read-only and reporting-off are the defaults.</li>
     <li><strong>CelesTrak / SatNOGS / AMSAT:</strong> satellite TLE, transponder and status data; requests carry IP/User-Agent but not your location.</li>
     <li><strong>GitHub / hamkit.click:</strong> update checks and APK downloads; receive IP/User-Agent.</li>
@@ -93,7 +91,7 @@
   </ul>
 
   <h2>5. Cross-border transfers</h2>
-  <p>APRS-IS is an international amateur-radio network whose servers may be outside China; CelesTrak, SatNOGS, AMSAT, GitHub and Open-Meteo are also outside China. Using those features may transfer IP, callsign, position or messages abroad. Amap services are in China. If you do not want cross-border transfers, disable APRS reporting and avoid features that depend on overseas data sources.</p>
+  <p>APRS-IS is an international amateur-radio network whose servers may be outside China; CelesTrak, SatNOGS, AMSAT and GitHub are also outside China. Using those features may transfer IP, callsign, position or messages abroad. Amap services (including weather/reverse geocoding) are in China. If you do not want cross-border transfers, disable APRS reporting and avoid features that depend on overseas data sources.</p>
 
   <h2>6. Permissions</h2>
   <ul>

@@ -4,7 +4,7 @@
 > 分析时间：2026-10-18
 > 性质：技术—合规风险分析，**不构成正式法律意见**。正式发布、上架、商业化前，建议由熟悉无线电、个人信息保护与互联网信息服务的中文执业律师，结合运营主体、服务器所在地、用户分布出具正式意见。
 >
-> **2026-10-19 已实施（部分）**：App 首启隐私政策/同意、高德 SDK 延后到同意后初始化、`allowBackup=false`；移除 `secrets.dat`/`SecretManager`/三碎片方案，天气改 Open-Meteo、逆地理编码改系统 Geocoder、高德只保留 Android 地图 SDK；官网新增 `/privacy.html` 并从首页/登录/用户中心链接，用户中心支持导出/注销账号；`FIRST_USER_IS_ADMIN` 默认 false、支持 `OIDC_REQUIRE_MFA`；release 构建禁止 debug keystore 兜底；更新链增加 CDN 域名白名单、SHA-256 与 APK 签名/包名/版本号校验；官网发布 API 强制官方 CDN + 64 位 SHA-256。仍需人工完成：轮换高德 Key 并清理 git 历史、App 备案/ICP、FT8 发射门控与执照类别校验。
+> **2026-10-21 已实施（部分）**：App 首启隐私政策/同意、高德 SDK 延后到同意后初始化、`allowBackup=false`；移除 `secrets.dat`/`SecretManager`/三碎片方案，地图 SDK 与 Web 服务（天气/逆地理编码）仍全部使用高德，Web Key 构建时写入 `BuildConfig`；官网新增 `/privacy.html` 并从首页/登录/用户中心链接，用户中心支持导出/注销账号；`FIRST_USER_IS_ADMIN` 默认 false、支持 `OIDC_REQUIRE_MFA`；release 构建禁止 debug keystore 兜底；更新链增加 CDN 域名白名单、SHA-256 与 APK 签名/包名/版本号校验；官网发布 API 强制官方 CDN + 64 位 SHA-256。仍需人工完成：限制/监控高德 Key 并清理 git 历史、App 备案/ICP、FT8 发射门控与执照类别校验。
 
 ---
 
@@ -51,7 +51,7 @@ HamKit 不是“单纯的离线工具软件”。它同时具备以下法律身�
 
 | 功能 | 数据 | 去向 | 风险点 |
 |---|---|---|---|
-| 分区定位 / 网格 / 地图 | 精确 GPS 坐标、地址 | 本地；Open-Meteo 天气（境外）；系统 Geocoder 地址；高德地图 SDK | 行踪轨迹属于敏感个人信息；无隐私政策 |
+| 分区定位 / 网格 / 地图 | 精确 GPS 坐标、地址 | 本地；高德地图 SDK + Web 服务（天气/逆地理编码，境内） | 行踪轨迹属于敏感个人信息；无隐私政策 |
 | 卫星过境预测 | TLE、观测者坐标 | TLE 来自 `tle.hamkit.click`（文档写明 S3 `ap-east-2` 台北）；预测在本地 | TLE 数据再分发许可；境外对象存储 |
 | SatNOGS 转发器库 | 卫星/频率数据 | `db.satnogs.org` API，本地缓存 | CC BY-SA 署名/共享义务 |
 | AMSAT 状态 | 状态网页/API | `amsat.org`，本地缓存 | 网页抓取条款、署名 |
@@ -275,7 +275,7 @@ HamKit 不是“单纯的离线工具软件”。它同时具备以下法律身�
 
 #### 事实
 
-- **旧方案已删除（2026-10-19）**：`secrets.dat`、`SecretManager.kt`、三碎片、`encryptSecrets` 任务均已移除；天气改用 Open-Meteo，逆地理编码改用系统 Geocoder，高德只保留 Android 地图 SDK。
+- **旧方案已删除（2026-10-19）**：`secrets.dat`、`SecretManager.kt`、三碎片、`encryptSecrets` 任务均已移除；地图 SDK 与 Web 服务（天气/逆地理编码）仍全部使用高德，Web Key 构建时写入 `BuildConfig`。
 - 本次改造前，`docs/CRYPTO_DESIGN.md:153` 曾明文列出 `amap.api.key` 与 `amap.sdk.key`；这些值仍可能存在于 git 历史，**必须轮换并清理历史**。
 - `signing/release.keystore` 与 `signing/github-secrets.txt` 仍在工作区（已被 `.gitignore` 忽略）；`release.ps1` 已改为只读环境变量，但文件本身仍需迁移/删除。
 - `app/build.gradle.kts` 已禁止 debug keystore 兜底；release 缺少 `KEYSTORE_*` 时直接失败。
@@ -300,7 +300,7 @@ HamKit 不是“单纯的离线工具软件”。它同时具备以下法律身�
 #### 整改清单
 
 1. **立即轮换**高德 Web 服务 Key 与 Android SDK Key；用 `git filter-repo`/BFG 清理历史；通知所有 fork/协作者。
-2. 不再把 Key 放进仓库；天气已改为无 Key 的 Open-Meteo，逆地理编码改用系统 Geocoder；高德只保留 Android 地图 SDK，其 Key 按包名 + 签名 SHA-1 限制，并接受“客户端 Key 可被提取”的现实。
+2. 不再把 Key 放进仓库；地图 SDK + Web 服务（天气/逆地理编码）仍使用高德；SDK Key 按包名 + 签名 SHA-1 限制，Web Key 无法绑定 Android 包名，只能靠配额/监控，并接受“客户端 Key 可被提取”的现实。
 3. 已删除旧的 `secrets.dat`/三碎片方案；`docs/CRYPTO_DESIGN.md` 已改为“客户端不放秘密”。
 4. release 构建在缺少 release keystore 时**直接失败**，不再回退 debug。
 5. 更新包校验：HTTPS + 固定域名白名单 + SHA-256 + APK 签名证书指纹；校验失败拒绝安装。

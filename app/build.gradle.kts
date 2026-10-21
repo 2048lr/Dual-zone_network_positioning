@@ -4,9 +4,9 @@ import org.gradle.api.GradleException
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import java.util.Properties
 
-// 说明：项目不再在 APK 内“加密”保存高德 Web 服务 Key。
-// 天气已改为 Open-Meteo（无 Key），逆地理编码使用系统 Geocoder；
-// 高德只保留 Android 地图 SDK，其 Key 是客户端标识而非秘密，按包名/签名限制。
+// 说明：地图 SDK 与 Web 服务（天气/逆地理编码）都使用高德。
+// 两个 Key 都随 APK 分发，属于客户端标识而非秘密；不再使用 secrets.dat/三碎片方案。
+// SDK Key 按包名 + 签名 SHA-1 限制；Web Key 只能靠配额/用量监控。
 
 plugins {
     alias(libs.plugins.agp.app)
@@ -71,6 +71,16 @@ android {
         val amapSdkKey = System.getenv("AMAP_SDK_KEY")?.takeIf { it.isNotBlank() }
             ?: localProps.getProperty("amap.sdk.key", "")
         manifestPlaceholders["AMAP_SDK_KEY"] = amapSdkKey
+
+        // 高德 Web 服务 Key（天气/逆地理编码）：本地从 local.properties 读取，
+        // CI 用 AMAP_WEB_KEY。它同样随 APK 分发，可按包名/SHA-1 限制 SDK Key，
+        // 但 Web Key 无法绑定 Android 包名，只能靠配额/用量监控。
+        val amapWebKey = System.getenv("AMAP_WEB_KEY")?.takeIf { it.isNotBlank() }
+            ?: localProps.getProperty("amap.api.key", "")
+        val escapedAmapWebKey = amapWebKey
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+        buildConfigField("String", "AMAP_WEB_KEY", "\"$escapedAmapWebKey\"")
     }
 
     signingConfigs {

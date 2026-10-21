@@ -45,6 +45,7 @@ import com.example.hamkit.data.satellite.removeCategory
 import com.example.hamkit.data.satellite.renameCategory
 import com.example.hamkit.data.satellite.toggleAssignment
 import com.example.hamkit.data.satellite.toggleReminder
+import com.example.hamkit.data.weather.ApiKeyMissingException
 import com.example.hamkit.data.weather.WeatherApiException
 import com.example.hamkit.data.weather.WeatherApiService
 import com.example.hamkit.data.weather.WeatherNetworkException
@@ -312,13 +313,14 @@ class MainViewModel : ViewModel() {
                 val weatherResult = weatherApiService.fetchWeather(
                     latitude = result.latitude,
                     longitude = result.longitude,
-                    cityName = result.address,
                 )
                 weatherStore.save(weatherResult)
                 _weather.value = weatherResult
                 _weatherError.value = null
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: ApiKeyMissingException) {
+                _weatherError.value = "高德 Web 服务 Key 未配置，请设置 AMAP_WEB_KEY 或 local.properties 的 amap.api.key"
             } catch (e: WeatherNetworkException) {
                 // 网络层失败：连接超时、断网、DNS 等
                 _weatherError.value = "网络连接失败：${e.message}，请检查网络后重试"
