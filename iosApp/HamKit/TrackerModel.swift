@@ -32,8 +32,10 @@ final class TrackerModel: ObservableObject {
     @Published private(set) var position: PositionSnapshot?
     /// 雷达图用的轨迹（前后各 45 分钟，60 秒步长）
     @Published private(set) var track: [PositionSnapshot] = []
-    @Published private(set) var nextPass: PassSnapshot?
+    /// 未来 48 小时的前 3 次过境
+    @Published private(set) var passes: [PassSnapshot] = []
     @Published private(set) var isSearchingPass = false
+    @Published private(set) var favorites: Set<Int32> = []
     @Published private(set) var errorText: String?
 
     private var timer: Timer?
@@ -41,9 +43,18 @@ final class TrackerModel: ObservableObject {
     private var trackRequestId = 0
     private var tickCount = 0
 
+    private let cache = TleDiskCache()
+    private static let favoritesKey = "hamkit.favorites"
+
+    var isSelectedFavorite: Bool {
+        guard let norad = selectedNorad else { return false }
+        return favorites.contains(norad)
+    }
+
     init() {
         // 网络实现必须在第一次 fetchTles 之前注入
         HamKitApi.shared.installHttpTransport(transport: URLSessionTransport())
+        favorites = Set((UserDefaults.standard.array(forKey: Self.favoritesKey) as? [Int] ?? []).map { Int32($0) })
     }
 
     // MARK: - 派生状态
@@ -66,10 +77,24 @@ final class TrackerModel: ObservableObject {
     func start() {
         guard timer == nil else { return }
         refreshZone()
+        restoreCachedSatellites()
         loadSatellites(force: false)
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.tickPosition()
         }
+    }
+
+    /// 冷启动先上磁盘缓存，界面立刻有数据；网络结果回来后再替换。
+    private func restoreCachedSatellites() {
+        guard let cached = cache.load() else { return }
+        satellites = cached.records
+        let date = Date(timeIntervalSince1970: Double(cached.fetchedAtMs) / 1000)
+        lastUpdatedText = Self.timeFormatter.string(from: date)
+        dataStatusText = "本地缓存 · \(cached.records.count) 颗（刷新中…）"
+        selectDefaultIfNeeded()
+        tickPosition()
+        refreshTrack()
+        searchNextPass()
     }
 
     func stop() {
@@ -124,6 +149,11 @@ final class TrackerModel: ObservableObject {
                 self.tickPosition()
                 self.refreshTrack()
                 self.searchNextPass()
+
+                // 只有真正来自网络的新数据才写盘
+                if snapshot.error == nil && !snapshot.records.isEmpty {
+                    self.cache.save(records: snapshot.records, fetchedAtMs: snapshot.fetchedAtMs)
+                }
             }
         }
     }
@@ -225,20 +255,32 @@ final class TrackerModel: ObservableObject {
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
-            let result = HamKitApi.shared.nextPass(
+            let result = HamKitApi.shared.nextPasses(
                 tle: tle,
                 latitude: lat,
                 longitude: lon,
                 altitudeM: alt,
                 fromMs: nowMs,
-                searchHours: 48
+                searchHours: 48,
+                maxCount: 3
             )
             DispatchQueue.main.async {
                 guard let self, requestId == self.passRequestId else { return }
-                self.nextPass = result
+                self.passes = result
                 self.isSearchingPass = false
             }
         }
+    }
+
+    // MARK: - 收藏
+
+    func toggleFavorite(_ norad: Int32) {
+        if favorites.contains(norad) {
+            favorites.remove(norad)
+        } else {
+            favorites.insert(norad)
+        }
+        UserDefaults.standard.set(favorites.map { Int($0) }, forKey: Self.favoritesKey)
     }
 
     private static let timeFormatter: DateFormatter = {

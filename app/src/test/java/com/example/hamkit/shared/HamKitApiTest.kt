@@ -120,4 +120,31 @@ class HamKitApiTest {
         )
         assertTrue(HamKitApi.satelliteTrack(listOf("bad"), 0.0, 0.0, 0.0, now, now + 1000, 60).isEmpty())
     }
+
+    @Test
+    fun `nextPasses - 返回按时间升序的多次过境`() {
+        val now = System.currentTimeMillis()
+        val passes = HamKitApi.nextPasses(issTle, 39.9042, 116.4074, 50.0, now, 48, 3)
+
+        assertTrue("48 小时内北京应至少有 2 次 ISS 过境，实际 ${passes.size}", passes.size >= 2)
+        assertTrue("最多返回 3 次", passes.size <= 3)
+        passes.zipWithNext().forEach { (previous, next) ->
+            assertTrue("下一次 AOS 必须晚于上一次 LOS", next.aosMs > previous.losMs)
+        }
+        passes.forEach { pass ->
+            assertTrue("过境时长异常：${pass.durationSeconds}s", pass.durationSeconds in 60L..3600L)
+            assertTrue("最大仰角异常：${pass.maxElevationDeg}", pass.maxElevationDeg in 0.0..90.0)
+        }
+    }
+
+    @Test
+    fun `nextPasses - 与 nextPass 的第一次结果一致`() {
+        val now = System.currentTimeMillis()
+        val first = HamKitApi.nextPass(issTle, 39.9042, 116.4074, 50.0, now, 48)
+        val list = HamKitApi.nextPasses(issTle, 39.9042, 116.4074, 50.0, now, 48, 3)
+        if (first != null) {
+            assertEquals(first.aosMs, list.first().aosMs)
+            assertEquals(first.losMs, list.first().losMs)
+        }
+    }
 }

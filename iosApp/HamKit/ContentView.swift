@@ -4,7 +4,7 @@ import CoreLocation
 import Foundation
 import Shared
 
-/// iOS 端首屏：地面站 → 分区定位 → 卫星数据 → 实时位置（雷达） → 下一次过境。
+/// iOS 端首屏：地面站 → 分区定位 → 卫星数据 → 实时位置（雷达） → 未来过境。
 ///
 /// 所有数值都来自共享 Kotlin 内核（`Shared.framework` 的 `HamKitApi`），
 /// 与 Android 端调用的是同一份实现。
@@ -12,6 +12,9 @@ struct ContentView: View {
 
     @StateObject private var model = TrackerModel()
     @StateObject private var location = LocationProvider()
+
+    @State private var showReminderAlert = false
+    @State private var reminderMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -21,7 +24,7 @@ struct ContentView: View {
                     zoneSection
                     dataSection
                     satelliteSection.id("satellite")
-                    passSection
+                    passSection.id("passes")
 
                     if let error = model.errorText {
                         Section {
@@ -61,16 +64,30 @@ struct ContentView: View {
                     .disabled(model.isSearchingPass)
                 }
             }
+            .alert("过境提醒", isPresented: $showReminderAlert) {
+                Button("好", role: .cancel) {}
+            } message: {
+                Text(reminderMessage)
+            }
         }
     }
 
     /// CI 冒烟测试专用：带 `-smokeScroll` 启动时，等数据就绪后自动滚到卫星区，
     /// 这样截图能覆盖雷达图与过境信息（图形界面无法用 simctl 模拟手指滑动）。
     private func scheduleSmokeScrollIfNeeded(_ proxy: ScrollViewProxy) {
-        guard ProcessInfo.processInfo.arguments.contains("-smokeScroll") else { return }
+        let arguments = ProcessInfo.processInfo.arguments
+        let target: String?
+        if arguments.contains("-smokeScrollPass") {
+            target = "passes"
+        } else if arguments.contains("-smokeScroll") {
+            target = "satellite"
+        } else {
+            target = nil
+        }
+        guard let target else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
             withAnimation(.easeInOut(duration: 0.4)) {
-                proxy.scrollTo("satellite", anchor: .top)
+                proxy.scrollTo(target, anchor: .top)
             }
         }
     }
@@ -127,14 +144,31 @@ struct ContentView: View {
             NavigationLink {
                 SatelliteListView(
                     satellites: model.satellites,
-                    selectedNorad: model.selectedNorad
-                ) { record in
-                    model.selectSatellite(norad: record.norad)
-                }
+                    selectedNorad: model.selectedNorad,
+                    favorites: model.favorites,
+                    onSelect: { record in
+                        model.selectSatellite(norad: record.norad)
+                    },
+                    onToggleFavorite: { norad in
+                        model.toggleFavorite(norad)
+                    }
+                )
             } label: {
                 LabeledContent("当前卫星", value: model.selectedSatelliteName)
             }
             .disabled(model.satellites.isEmpty)
+
+            Button {
+                if let norad = model.selectedNorad {
+                    model.toggleFavorite(norad)
+                }
+            } label: {
+                Label(
+                    model.isSelectedFavorite ? "取消收藏" : "收藏该卫星",
+                    systemImage: model.isSelectedFavorite ? "star.fill" : "star"
+                )
+            }
+            .disabled(model.selectedNorad == nil)
 
             Button {
                 model.loadSatellites(force: true)
@@ -190,37 +224,71 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - 过境
+    // MARK: - 未来过境
 
     private var passSection: some View {
-        Section("下一次过境（48 小时内）") {
+        Section("未来过境（48 小时内）") {
             if model.isSearchingPass {
                 HStack(spacing: 10) {
                     ProgressView()
                     Text("正在用 SGP4 搜索…").foregroundStyle(.secondary)
                 }
-            } else if let pass = model.nextPass {
-                LabeledContent("AOS") { Text(Self.timeFormatter.string(from: pass.aosMs.date)).monospacedDigit() }
-                LabeledContent("LOS") { Text(Self.timeFormatter.string(from: pass.losMs.date)).monospacedDigit() }
-                LabeledContent("最大仰角") {
-                    Text(String(format: "%.1f°", pass.maxElevationDeg)).monospacedDigit()
-                }
-                LabeledContent("过境时长") {
-                    Text("\(pass.durationSeconds / 60) 分 \(pass.durationSeconds % 60) 秒").monospacedDigit()
-                }
-                LabeledContent("方位") {
-                    Text("\(pass.aosAzimuthDeg)° → \(pass.losAzimuthDeg)°").monospacedDigit()
-                }
-                if pass.isCurrentlyVisible {
-                    Text("卫星当前已在境，以上为本次过境的剩余时间")
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                }
-            } else {
+            } else if model.passes.isEmpty {
                 Text("48 小时内没有完整过境（或该卫星对本站不可见）")
                     .foregroundStyle(.secondary)
+            } else {
+                ForEach(model.passes, id: \.aosMs) { pass in
+                    passRow(pass)
+                }
             }
         }
+    }
+
+    private func passRow(_ pass: PassSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(Self.timeFormatter.string(from: pass.aosMs.date))
+                    .font(.headline)
+                    .monospacedDigit()
+                if pass.isCurrentlyVisible {
+                    Text("在境")
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.green.opacity(0.15))
+                        .foregroundStyle(.green)
+                        .clipShape(Capsule())
+                }
+                Spacer()
+                Button {
+                    scheduleReminder(for: pass)
+                } label: {
+                    Image(systemName: "bell")
+                        .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("为这次过境设置提醒")
+            }
+            Text("LOS \(Self.timeFormatter.string(from: pass.losMs.date)) · 最大仰角 \(String(format: "%.1f°", pass.maxElevationDeg)) · \(pass.durationSeconds / 60) 分 \(pass.durationSeconds % 60) 秒")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Text("方位 \(pass.aosAzimuthDeg)° → \(pass.losAzimuthDeg)°")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func scheduleReminder(for pass: PassSnapshot) {
+        NotificationManager.shared.requestAuthorizationIfNeeded()
+        let scheduled = NotificationManager.shared.schedulePassReminder(
+            satelliteName: model.selectedSatelliteName,
+            aosMs: pass.aosMs
+        )
+        reminderMessage = scheduled
+            ? "已安排在 AOS 前 5 分钟提醒（\(Self.timeFormatter.string(from: pass.aosMs.date)) 过境）。"
+            : "这次过境不足 5 分钟就要开始，来不及提醒了。"
+        showReminderAlert = true
     }
 
     // MARK: - 工具

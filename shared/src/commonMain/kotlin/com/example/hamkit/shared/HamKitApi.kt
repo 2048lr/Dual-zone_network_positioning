@@ -241,22 +241,50 @@ object HamKitApi {
         altitudeM: Double,
         fromMs: Long,
         searchHours: Int,
-    ): PassSnapshot? {
-        val elements = parseTleOrNull(tle) ?: return null
-        if (searchHours <= 0) return null
+    ): PassSnapshot? = nextPasses(tle, latitude, longitude, altitudeM, fromMs, searchHours, 1).firstOrNull()
+
+    /**
+     * 计算 [fromMs] 之后 [searchHours] 小时内的前 [maxCount] 次过境。
+     *
+     * 上一次过境的 LOS 之后 1 分钟开始找下一次，避免同一次过境被重复计入。
+     *
+     * @return 按 AOS 升序的过境列表；TLE 非法或参数不合法时为空列表
+     */
+    fun nextPasses(
+        tle: List<String>,
+        latitude: Double,
+        longitude: Double,
+        altitudeM: Double,
+        fromMs: Long,
+        searchHours: Int,
+        maxCount: Int,
+    ): List<PassSnapshot> {
+        val elements = parseTleOrNull(tle) ?: return emptyList()
+        if (searchHours <= 0 || maxCount <= 0) return emptyList()
         val propagator = SatellitePropagator(elements, latitude, longitude, altitudeM)
         val toMs = fromMs + searchHours * 3_600_000L
-        val pass = PassFinder.nextPass(propagator, fromMs, toMs) ?: return null
-        return PassSnapshot(
-            aosMs = pass.aosMs,
-            losMs = pass.losMs,
-            maxElevationDeg = pass.maxElevationDeg,
-            maxElevationMs = pass.maxElevationMs,
-            aosAzimuthDeg = pass.aosAzimuthDeg,
-            losAzimuthDeg = pass.losAzimuthDeg,
-            durationSeconds = pass.durationSeconds,
-            isCurrentlyVisible = pass.isCurrentlyVisible,
-        )
+
+        val result = ArrayList<PassSnapshot>(maxCount)
+        var cursor = fromMs
+        while (result.size < maxCount && cursor < toMs) {
+            val pass = PassFinder.nextPass(propagator, cursor, toMs) ?: break
+            result.add(
+                PassSnapshot(
+                    aosMs = pass.aosMs,
+                    losMs = pass.losMs,
+                    maxElevationDeg = pass.maxElevationDeg,
+                    maxElevationMs = pass.maxElevationMs,
+                    aosAzimuthDeg = pass.aosAzimuthDeg,
+                    losAzimuthDeg = pass.losAzimuthDeg,
+                    durationSeconds = pass.durationSeconds,
+                    isCurrentlyVisible = pass.isCurrentlyVisible,
+                )
+            )
+            // 防御：若传播器给出「零长度」过境，cursor 不前进会死循环
+            if (pass.losMs <= cursor) break
+            cursor = pass.losMs + 60_000L
+        }
+        return result
     }
 
     /**
