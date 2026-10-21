@@ -30,15 +30,18 @@ targets:
       - path: HamKit
         excludes:
           - Info.plist
-    info:
-      path: HamKit/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: click.hamkit.ios
         PRODUCT_NAME: HamKit
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
+        # 用仓库里的 Info.plist 作为唯一来源。
+        # 注意：不要在这里再写 XcodeGen 的 `info:` 块——它会用 properties 重新生成
+        # 一份最小 plist，把 UILaunchScreen / NSLocationWhenInUseUsageDescription
+        # 等键全部冲掉（表现为应用以兼容模式黑边显示、真机请求定位直接崩溃）。
         GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: HamKit/Info.plist
         # 静态 framework 不需要在产物里再嵌入一次
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
     preBuildScripts:

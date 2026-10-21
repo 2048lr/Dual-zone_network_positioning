@@ -56,7 +56,12 @@ struct ContentView: View {
                     showPicker = false
                 }
             }
-            .onAppear { model.start() }
+            .onAppear {
+                model.start()
+                // 首次进入主动要一次定位：定位类 App 的默认预期，
+                // 也让 CI 冒烟测试能验证 CoreLocation 链路
+                location.requestLocation()
+            }
             .onDisappear { model.stop() }
             .onReceive(location.$coordinate.dropFirst()) { coordinate in
                 guard let coordinate else { return }
