@@ -1,6 +1,7 @@
 package com.example.hamkit.shared
 
 import com.example.hamkit.data.satellite.pass.PassFinder
+import com.example.hamkit.data.satellite.predict.PropagatedPosition
 import com.example.hamkit.data.satellite.predict.SatellitePropagator
 import com.example.hamkit.data.satellite.predict.TleElements
 import com.example.hamkit.data.satellite.tle.TleClient
@@ -192,18 +193,39 @@ object HamKitApi {
     ): PositionSnapshot? {
         val elements = parseTleOrNull(tle) ?: return null
         val propagator = SatellitePropagator(elements, latitude, longitude, altitudeM)
-        val position = propagator.getPosition(atMs) ?: return null
-        return PositionSnapshot(
-            timeMs = position.timeMs,
-            azimuthDeg = position.azimuthRad.toDegrees(),
-            elevationDeg = position.elevationRad.toDegrees(),
-            rangeKm = position.rangeKm,
-            rangeRateMps = position.rangeRateKmPerSec * 1000.0,
-            subLatitudeDeg = position.latitudeRad.toDegrees(),
-            subLongitudeDeg = position.longitudeRad.toDegrees(),
-            altitudeKm = position.altitudeKm,
-            isAboveHorizon = position.isAboveHorizon,
-        )
+        return propagator.getPosition(atMs)?.toSnapshot()
+    }
+
+    /**
+     * 计算 [fromMs, toMs] 内的等间隔轨迹采样，供 iOS 雷达图绘制历史/未来轨迹。
+     *
+     * 采样点包含窗口两端；单次窗口最多 2000 个点，超出返回空列表，
+     * 避免误传大窗口把主线程/电量拖垮。
+     *
+     * @return 按时间升序的采样点；TLE 非法或参数不合法时为空列表
+     */
+    fun satelliteTrack(
+        tle: List<String>,
+        latitude: Double,
+        longitude: Double,
+        altitudeM: Double,
+        fromMs: Long,
+        toMs: Long,
+        stepSeconds: Int,
+    ): List<PositionSnapshot> {
+        val elements = parseTleOrNull(tle) ?: return emptyList()
+        if (stepSeconds <= 0 || toMs <= fromMs) return emptyList()
+        val stepMs = stepSeconds * 1000L
+        if ((toMs - fromMs) / stepMs > 2_000L) return emptyList()
+
+        val propagator = SatellitePropagator(elements, latitude, longitude, altitudeM)
+        val result = ArrayList<PositionSnapshot>()
+        var timeMs = fromMs
+        while (timeMs <= toMs) {
+            propagator.getPosition(timeMs)?.let { result.add(it.toSnapshot()) }
+            timeMs += stepMs
+        }
+        return result
     }
 
     /**
@@ -241,6 +263,19 @@ object HamKitApi {
      * 判断 TLE 是否可解析（用于设置页校验用户粘贴的 TLE）。
      */
     fun isValidTle(tle: List<String>): Boolean = parseTleOrNull(tle) != null
+
+    /** 内部工具：把 SGP4 的弧度结果转成 Swift 友好的度/km 快照。 */
+    private fun PropagatedPosition.toSnapshot(): PositionSnapshot = PositionSnapshot(
+        timeMs = timeMs,
+        azimuthDeg = azimuthRad * 180.0 / PI,
+        elevationDeg = elevationRad * 180.0 / PI,
+        rangeKm = rangeKm,
+        rangeRateMps = rangeRateKmPerSec * 1000.0,
+        subLatitudeDeg = latitudeRad * 180.0 / PI,
+        subLongitudeDeg = longitudeRad * 180.0 / PI,
+        altitudeKm = altitudeKm,
+        isAboveHorizon = isAboveHorizon,
+    )
 
     /** 内部工具：把可能非法的三行 TLE 转成元素集，失败返回 null。 */
     private fun parseTleOrNull(tle: List<String>): TleElements? = try {

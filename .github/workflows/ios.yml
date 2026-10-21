@@ -138,6 +138,14 @@ jobs:
           xcrun simctl launch "$UDID" click.hamkit.ios
           sleep 15
           xcrun simctl io "$UDID" screenshot ios-screenshot.png
+
+          # 第二张：带 -smokeScroll 启动，等数据就绪后自动滚到卫星区（雷达图 + 过境）
+          xcrun simctl terminate "$UDID" click.hamkit.ios || true
+          sleep 2
+          xcrun simctl launch "$UDID" click.hamkit.ios -smokeScroll
+          sleep 16
+          xcrun simctl io "$UDID" screenshot ios-screenshot-satellite.png
+
           xcrun simctl spawn "$UDID" log show --last 2m --style compact \
             --predicate 'process == "HamKit"' > ios-app.log || true
           # 应用崩溃时 simctl 仍会返回成功，这里额外检查进程是否还活着
@@ -152,6 +160,7 @@ jobs:
           name: ios-screenshot-${{ github.run_id }}
           path: |
             ios-screenshot.png
+            ios-screenshot-satellite.png
             ios-app.log
           retention-days: 14
           if-no-files-found: warn

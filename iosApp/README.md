@@ -3,10 +3,10 @@
 这里是 HamKit 的 iOS 外壳（SwiftUI），业务计算全部调用仓库根目录的 KMP 模块
 `:shared`（`Shared.framework`），Swift 侧不重复实现任何定位 / 轨道算法。
 
-> 现状：**可运行的演示壳**，已实现「分区定位 + TLE 网络拉取 + 卫星切换 + 实时位置 + 下一次过境」。
+> 现状：**可运行的演示壳**，已实现「分区定位 + TLE 网络拉取 + 卫星列表页 + Look4Sat 风格雷达 + 实时位置 + 下一次过境」。
 > TLE 优先从 `https://tle.hamkit.click/tle/amateur.3le`（与 Android 同源）拉取，
 > 失败自动回落到 CelesTrak 官方；网络全失败时使用内置 ISS TLE 兜底。
-> 尚未接入：AMSAT 状态、收藏、雷达图、提醒。
+> 尚未接入：AMSAT 状态、收藏、提醒。
 > 完整迁移路线见 [docs/IOS_ADAPTATION.md](../docs/IOS_ADAPTATION.md)。
 
 ## 目录
@@ -16,7 +16,9 @@ iosApp/
 ├── project.yml            # XcodeGen 工程描述（不提交 .xcodeproj）
 ├── HamKit/
 │   ├── HamKitApp.swift    # @main
-│   ├── ContentView.swift  # 首屏：地面站 / 分区 / 卫星数据 / 卫星 / 过境
+│   ├── ContentView.swift  # 首屏：地面站 / 分区 / 卫星数据 / 雷达 / 过境
+│   ├── SatelliteListView.swift  # 卫星列表页（可搜索）
+│   ├── RadarView.swift    # 极坐标雷达（Canvas 绘制）
 │   ├── TrackerModel.swift # 调 Shared.framework 的 ViewModel
 │   ├── LocationProvider.swift
 │   ├── Networking.swift   # URLSession 实现共享内核的 HttpTransport

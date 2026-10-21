@@ -12,6 +12,8 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var statusText: String = "尚未请求"
 
     private let manager = CLLocationManager()
+    private var retryCount = 0
+    private let maxRetries = 3
 
     override init() {
         super.init()
@@ -53,11 +55,30 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let last = locations.last else { return }
+        retryCount = 0
         coordinate = last.coordinate
         statusText = String(format: "%.4f, %.4f（±%.0fm）", last.coordinate.latitude, last.coordinate.longitude, last.horizontalAccuracy)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let nsError = error as NSError
+        // kCLErrorLocationUnknown（code 0）：位置暂时不可用。
+        // 模拟器没设位置、或真机刚进室内/隧道时非常常见，属于「预期内的暂时失败」，
+        // 不应该把系统错误直接甩到界面上。静默重试几次，仍失败才提示。
+        if nsError.code == CLError.locationUnknown.rawValue {
+            retryCount += 1
+            if retryCount <= maxRetries {
+                statusText = "定位中…（等待信号 \(retryCount)/\(maxRetries)）"
+                let currentRetry = retryCount
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                    guard let self, self.retryCount == currentRetry else { return }
+                    self.manager.requestLocation()
+                }
+            } else {
+                statusText = "暂时拿不到定位，可稍后重试，或到开阔处再试"
+            }
+            return
+        }
         statusText = "定位失败：\(error.localizedDescription)"
     }
 }

@@ -30,12 +30,16 @@ final class TrackerModel: ObservableObject {
     // MARK: - 实时
 
     @Published private(set) var position: PositionSnapshot?
+    /// 雷达图用的轨迹（前后各 45 分钟，60 秒步长）
+    @Published private(set) var track: [PositionSnapshot] = []
     @Published private(set) var nextPass: PassSnapshot?
     @Published private(set) var isSearchingPass = false
     @Published private(set) var errorText: String?
 
     private var timer: Timer?
     private var passRequestId = 0
+    private var trackRequestId = 0
+    private var tickCount = 0
 
     init() {
         // 网络实现必须在第一次 fetchTles 之前注入
@@ -79,6 +83,7 @@ final class TrackerModel: ObservableObject {
         self.longitude = longitude
         refreshZone()
         tickPosition()
+        refreshTrack()
         searchNextPass()
     }
 
@@ -117,6 +122,7 @@ final class TrackerModel: ObservableObject {
 
                 self.selectDefaultIfNeeded()
                 self.tickPosition()
+                self.refreshTrack()
                 self.searchNextPass()
             }
         }
@@ -126,6 +132,7 @@ final class TrackerModel: ObservableObject {
         guard norad != selectedNorad else { return }
         selectedNorad = norad
         tickPosition()
+        refreshTrack()
         searchNextPass()
     }
 
@@ -164,6 +171,44 @@ final class TrackerModel: ObservableObject {
             altitudeM: altitudeM,
             atMs: nowMs
         )
+
+        // 轨迹不用每秒重算：每 30 秒刷新一次即可
+        tickCount += 1
+        if tickCount % 30 == 0 {
+            refreshTrack()
+        }
+    }
+
+    /// 计算雷达图轨迹（前后各 45 分钟、60 秒步长，约 91 个点）。
+    /// 放在后台队列，避免选星瞬间卡顿。
+    func refreshTrack() {
+        let tle = tleLines
+        guard !tle.isEmpty else {
+            track = []
+            return
+        }
+        trackRequestId += 1
+        let requestId = trackRequestId
+        let lat = latitude
+        let lon = longitude
+        let alt = altitudeM
+
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+            let points = HamKitApi.shared.satelliteTrack(
+                tle: tle,
+                latitude: lat,
+                longitude: lon,
+                altitudeM: alt,
+                fromMs: nowMs - 45 * 60 * 1000,
+                toMs: nowMs + 45 * 60 * 1000,
+                stepSeconds: 60
+            )
+            DispatchQueue.main.async {
+                guard let self, requestId == self.trackRequestId else { return }
+                self.track = points
+            }
+        }
     }
 
     /// 48 小时过境搜索约 600 次传播计算，放到后台队列避免卡住 UI。

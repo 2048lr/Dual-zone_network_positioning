@@ -4,7 +4,7 @@ import CoreLocation
 import Foundation
 import Shared
 
-/// iOS 端首屏：地面站 → 分区定位 → 卫星数据 → 实时位置 → 下一次过境。
+/// iOS 端首屏：地面站 → 分区定位 → 卫星数据 → 实时位置（雷达） → 下一次过境。
 ///
 /// 所有数值都来自共享 Kotlin 内核（`Shared.framework` 的 `HamKitApi`），
 /// 与 Android 端调用的是同一份实现。
@@ -12,34 +12,48 @@ struct ContentView: View {
 
     @StateObject private var model = TrackerModel()
     @StateObject private var location = LocationProvider()
-    @State private var showPicker = false
 
     var body: some View {
         NavigationStack {
-            List {
-                stationSection
-                zoneSection
-                dataSection
-                satelliteSection
-                passSection
+            ScrollViewReader { proxy in
+                List {
+                    stationSection
+                    zoneSection
+                    dataSection
+                    satelliteSection.id("satellite")
+                    passSection
 
-                if let error = model.errorText {
+                    if let error = model.errorText {
+                        Section {
+                            Text(error).foregroundStyle(.red).font(.footnote)
+                        }
+                    }
+
                     Section {
-                        Text(error).foregroundStyle(.red).font(.footnote)
+                        Text("共享内核 v\(HamKitApi.shared.version())")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
-
-                Section {
-                    Text("共享内核 v\(HamKitApi.shared.version())")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                .listStyle(.insetGrouped)
+                .onAppear {
+                    model.start()
+                    // 首次进入主动要一次定位：定位类 App 的默认预期，
+                    // 也让 CI 冒烟测试能验证 CoreLocation 链路
+                    location.requestLocation()
+                    scheduleSmokeScrollIfNeeded(proxy)
+                }
+                .onDisappear { model.stop() }
+                .onReceive(location.$coordinate.dropFirst()) { coordinate in
+                    guard let coordinate else { return }
+                    model.updateStation(latitude: coordinate.latitude, longitude: coordinate.longitude)
                 }
             }
-            .listStyle(.insetGrouped)
             .navigationTitle("HamKit")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        model.refreshTrack()
                         model.searchNextPass()
                     } label: {
                         Image(systemName: "arrow.clockwise")
@@ -47,25 +61,16 @@ struct ContentView: View {
                     .disabled(model.isSearchingPass)
                 }
             }
-            .sheet(isPresented: $showPicker) {
-                SatellitePickerView(
-                    satellites: model.satellites,
-                    selectedNorad: model.selectedNorad
-                ) { norad in
-                    model.selectSatellite(norad: norad)
-                    showPicker = false
-                }
-            }
-            .onAppear {
-                model.start()
-                // 首次进入主动要一次定位：定位类 App 的默认预期，
-                // 也让 CI 冒烟测试能验证 CoreLocation 链路
-                location.requestLocation()
-            }
-            .onDisappear { model.stop() }
-            .onReceive(location.$coordinate.dropFirst()) { coordinate in
-                guard let coordinate else { return }
-                model.updateStation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        }
+    }
+
+    /// CI 冒烟测试专用：带 `-smokeScroll` 启动时，等数据就绪后自动滚到卫星区，
+    /// 这样截图能覆盖雷达图与过境信息（图形界面无法用 simctl 模拟手指滑动）。
+    private func scheduleSmokeScrollIfNeeded(_ proxy: ScrollViewProxy) {
+        guard ProcessInfo.processInfo.arguments.contains("-smokeScroll") else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+            withAnimation(.easeInOut(duration: 0.4)) {
+                proxy.scrollTo("satellite", anchor: .top)
             }
         }
     }
@@ -119,8 +124,13 @@ struct ContentView: View {
             }
             LabeledContent("更新于", value: model.lastUpdatedText)
 
-            Button {
-                showPicker = true
+            NavigationLink {
+                SatelliteListView(
+                    satellites: model.satellites,
+                    selectedNorad: model.selectedNorad
+                ) { record in
+                    model.selectSatellite(norad: record.norad)
+                }
             } label: {
                 LabeledContent("当前卫星", value: model.selectedSatelliteName)
             }
@@ -147,24 +157,17 @@ struct ContentView: View {
     private var satelliteSection: some View {
         Section("卫星 · \(model.selectedSatelliteName)") {
             if let position = model.position {
-                HStack(spacing: 16) {
-                    CompassView(azimuthDeg: position.azimuthDeg)
-                        .frame(width: 76, height: 76)
+                RadarView(current: position, track: model.track)
+                    .frame(height: 240)
+                    .padding(.vertical, 6)
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(String(format: "仰角 %.1f°", position.elevationDeg))
-                            .font(.headline)
-                        Text(String(format: "方位 %.1f°", position.azimuthDeg))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Text(String(format: "斜距 %.0f km", position.rangeKm))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
+                LabeledContent("仰角 / 方位") {
+                    Text(String(format: "%.1f° / %.1f°", position.elevationDeg, position.azimuthDeg))
+                        .monospacedDigit()
                 }
-                .padding(.vertical, 4)
-
+                LabeledContent("斜距") {
+                    Text(String(format: "%.0f km", position.rangeKm)).monospacedDigit()
+                }
                 LabeledContent("多普勒径向速度") {
                     Text(String(format: "%+.0f m/s", position.rangeRateMps)).monospacedDigit()
                 }
@@ -237,74 +240,6 @@ struct ContentView: View {
 
 private extension Int64 {
     var date: Date { Date(timeIntervalSince1970: Double(self) / 1000.0) }
-}
-
-/// 极简罗盘：指针指向卫星方位角（0° = 正北）。
-private struct CompassView: View {
-    let azimuthDeg: Double
-
-    var body: some View {
-        ZStack {
-            Circle().strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1)
-            Circle().fill(Color.secondary.opacity(0.12))
-            Capsule()
-                .fill(Color.accentColor)
-                .frame(width: 3, height: 30)
-                .offset(y: -15)
-                .rotationEffect(.degrees(azimuthDeg))
-            Circle().fill(Color.accentColor).frame(width: 6, height: 6)
-        }
-        .accessibilityLabel("方位角 \(Int(azimuthDeg)) 度")
-    }
-}
-
-/// 卫星选择器：CelesTrak amateur 分组通常有一百多颗，用独立列表比 Menu 稳。
-struct SatellitePickerView: View {
-    let satellites: [TleRecord]
-    let selectedNorad: Int32?
-    let onSelect: (Int32) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
-
-    private var filtered: [TleRecord] {
-        guard !query.isEmpty else { return satellites }
-        return satellites.filter {
-            $0.name.localizedCaseInsensitiveContains(query)
-                || String($0.norad).contains(query)
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            List(filtered, id: \.norad) { record in
-                Button {
-                    onSelect(record.norad)
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(record.name).foregroundStyle(.primary)
-                            Text("NORAD \(record.norad)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if record.norad == selectedNorad {
-                            Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-            .searchable(text: $query, prompt: "搜索名称或 NORAD")
-            .navigationTitle("选择卫星")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("关闭") { dismiss() }
-                }
-            }
-        }
-    }
 }
 
 #Preview {

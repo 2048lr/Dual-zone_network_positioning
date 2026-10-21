@@ -143,9 +143,9 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | Android 全量编译 | `:app:compileDebugKotlin` | 通过 |
 | 单元测试编译 | `:app:compileDebugUnitTestKotlin` | 通过 |
 | 定位 / 卫星用例 | `:app:testDebugUnitTest --tests "*zone.*" "*predict.*" "*PredictorGeo*"` | 57 个用例全绿 |
-| 网络 / TLE 用例 | `:app:testDebugUnitTest --tests "com.example.hamkit.shared.*"` | 19 个用例全绿（解析 / 多源回落 / 缓存 / 入口） |
+| 网络 / TLE 用例 | `:app:testDebugUnitTest --tests "com.example.hamkit.shared.*"` | 21 个用例全绿（解析 / 多源回落 / 缓存 / 轨迹 / 入口） |
 | APK 打包 | `:app:assembleDebug` | 通过（`app/build/outputs/apk/debug/HamKit_4.1.0_17-debug.apk`） |
-| iOS 编译 | GitHub Actions `macos-15`（`.github/workflows/ios.yml`） | 待首次 push 验证 |
+| iOS 编译 + 模拟器冒烟 | GitHub Actions `macos-15`（`.github/workflows/ios.yml`） | 通过：编译 → 装模拟器 → 启动 → 两张截图 |
 
 其中最关键的是 `SatellitePropagatorDifferentialTest`：用 predict4java 作为参考实现，
 在 LEO 与 GEO 两条路径上校验 `Math.* → kotlin.math.*` 改造后数值未漂移
@@ -182,7 +182,7 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | 阶段 | 内容 | 验收标准 |
 |---|---|---|
 | **P0（本次）** | 内核抽取 + iOS 壳骨架 | Android 构建/测试全绿；iOS 工程能在 macOS 上跑通首屏 |
-| P1（进行中） | 定位权限与流程、TLE 网络拉取、卫星选择、过境列表 | 已实现 TLE 拉取（CDN→CelesTrak 回落）+ 6h 缓存 + 卫星切换；待补雷达图/详情与 macOS 实机验证 |
+| P1（进行中） | 定位权限与流程、TLE 网络拉取、卫星列表、雷达图、过境 | 已实现 TLE 拉取（CDN→CelesTrak 回落）+ 6h 缓存 + 卫星列表页 + Look4Sat 风格雷达（轨迹来自 `HamKitApi.satelliteTrack`）+ 定位失败静默重试；待补详情页与 macOS 实机验证 |
 | P2 | 网络层（Ktor）、持久化（DataStore/Room KMP）、设置页 | 重启后设置与收藏不丢 |
 | P3 | 音频：CW 播放、SSTV 解码/编码、FT8、WEFAX | 用真机 + 电台/录音回放验证解码结果与 Android 一致 |
 | P4 | APRS、QSO 日志与 ADIF 导出、地图 | 与 Android 端数据格式互通（ADIF / APRS-IS） |

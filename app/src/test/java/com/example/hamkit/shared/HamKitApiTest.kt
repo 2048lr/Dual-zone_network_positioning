@@ -86,4 +86,38 @@ class HamKitApiTest {
         assertFalse(HamKitApi.isValidTle(bad))
         assertTrue(HamKitApi.isValidTle(issTle))
     }
+
+    @Test
+    fun `satelliteTrack - 等间隔采样且时间单调`() {
+        val base = 1_790_000_000_000L // 固定时间，避免依赖当前时刻
+        val track = HamKitApi.satelliteTrack(
+            tle = issTle,
+            latitude = 39.9042,
+            longitude = 116.4074,
+            altitudeM = 50.0,
+            fromMs = base - 600_000L,
+            toMs = base + 600_000L,
+            stepSeconds = 60
+        )
+
+        assertEquals("±10 分钟、60 秒步长应得到 21 个点", 21, track.size)
+        assertEquals(60_000L, track[1].timeMs - track[0].timeMs)
+        assertTrue("时间必须严格递增", track.zipWithNext().all { (a, b) -> b.timeMs > a.timeMs })
+        track.forEach { point ->
+            assertTrue("方位角越界: ${point.azimuthDeg}", point.azimuthDeg in 0.0..360.0)
+            assertTrue("仰角越界: ${point.elevationDeg}", point.elevationDeg in -90.0..90.0)
+        }
+    }
+
+    @Test
+    fun `satelliteTrack - 非法参数返回空列表`() {
+        val now = System.currentTimeMillis()
+        assertTrue(HamKitApi.satelliteTrack(issTle, 0.0, 0.0, 0.0, now, now - 1, 60).isEmpty())
+        assertTrue(HamKitApi.satelliteTrack(issTle, 0.0, 0.0, 0.0, now - 1000, now + 1000, 0).isEmpty())
+        assertTrue(
+            "超过 2000 个采样点应拒绝，避免拖垮 UI",
+            HamKitApi.satelliteTrack(issTle, 0.0, 0.0, 0.0, 0L, 10_000_000_000L, 1).isEmpty()
+        )
+        assertTrue(HamKitApi.satelliteTrack(listOf("bad"), 0.0, 0.0, 0.0, now, now + 1000, 60).isEmpty())
+    }
 }
