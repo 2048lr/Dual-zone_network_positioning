@@ -63,11 +63,26 @@ cd "$SRCROOT/.."
 真机调试需要：Xcode → Signing & Capabilities → 选择自己的 Team；
 `PRODUCT_BUNDLE_IDENTIFIER` 改成你自己的（默认 `click.hamkit.ios`）。
 
+## 未签名 IPA（没有开发者账号怎么装）
+
+本项目没有 Apple Developer 账号（$99/年，项目无收入），所以**不提供 App Store 或 TestFlight**。
+CI 会额外构建一份**未签名真机 IPA**（artifact：`HamKit-unsigned-ipa-<run_id>`），
+结构是标准的 `Payload/HamKit.app`，附带 SHA-256 校验值。
+
+它**不能双击安装**，需要用工具用自己的 Apple ID 重签：
+
+1. 电脑装 [Sideloadly](https://sideloadly.io/) 或 [AltStore](https://altstore.io/)；
+2. 用自己的 Apple ID 重签并安装 —— 免费账号签名 **7 天有效**，到期重签一次，App 数据不会丢；
+3. 有付费开发者证书的，用它重签一次即可长期使用；
+4. TrollStore 只支持特定系统版本，不保证可用。
+
+> 不要使用来历不明的「企业证书」重签：证书被吊销后 App 会直接打不开。
+> 未签名 IPA 只从本仓库 Releases / Actions artifact 下载。
+
 ## 已知限制
 
 - 只在 Apple Silicon 模拟器与 iOS 16+ 上验证目标；Intel 模拟器（`iosX64`）未配置，
   需要时在 `shared/build.gradle.kts` 里加 `iosX64()`。
-- 首次启动若完全没有网络，会显示内置的 2026-08-09 ISS TLE 示例；
-  SGP4 外推几十天后过境时间会有偏差，这是预期行为，联网刷新后即消失。
-- 尚未实现：定位权限被拒的引导、后台定位、地图、音频（SSTV/FT8/CW）、提醒、设置持久化。
-- TLE 只做了内存缓存（6 小时），冷启动仍要联网；落盘缓存属于 P2。
+- 首次启动若完全没有网络、也没有缓存，会显示内置的 2026-08-09 ISS TLE 示例；
+  SGP4 外推几十天后过境时间会有偏差，联网刷新后即消失。
+- 尚未实现：后台定位、地图、音频（SSTV/FT8/CW/APRS）、设置页与单位切换。

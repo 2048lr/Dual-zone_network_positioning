@@ -172,3 +172,46 @@ jobs:
             ios-app.log
           retention-days: 14
           if-no-files-found: warn
+
+      # ── 未签名真机 IPA ──────────────────────────────────────────────
+      # 没有 Apple Developer 账号（$99/年），无法上架/TestFlight。
+      # 这里构建 device slice（arm64）并打包成标准 IPA 结构：
+      #   Payload/HamKit.app
+      # 用户用自己的 Apple ID 通过 Sideloadly / AltStore 重签安装即可。
+      - name: Build unsigned device IPA
+        if: success()
+        run: |
+          set -euo pipefail
+          cd iosApp
+          xcodebuild \
+            -project HamKit.xcodeproj \
+            -scheme HamKit \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build-device \
+            ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build 2>&1 | tee ../ios-device-build.log
+
+          APP="build-device/Build/Products/Release-iphoneos/HamKit.app"
+          test -d "$APP"
+          rm -rf Payload HamKit-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry HamKit-unsigned.ipa Payload
+          shasum -a 256 HamKit-unsigned.ipa | tee ../HamKit-unsigned.ipa.sha256
+          ls -lh HamKit-unsigned.ipa
+
+      - name: Upload unsigned IPA
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HamKit-unsigned-ipa-${{ github.run_id }}
+          path: |
+            iosApp/HamKit-unsigned.ipa
+            HamKit-unsigned.ipa.sha256
+            ios-device-build.log
+          retention-days: 30
+          if-no-files-found: warn
