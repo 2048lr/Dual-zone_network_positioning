@@ -1,0 +1,51 @@
+name: HamKit
+options:
+  bundleIdPrefix: click.hamkit
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+    # Kotlin/Native 产出的 Shared.framework 由下面的 Run Script 生成到该目录
+    FRAMEWORK_SEARCH_PATHS: "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+    OTHER_LDFLAGS: "$(inherited) -framework Shared"
+
+targets:
+  HamKit:
+    type: application
+    platform: iOS
+    sources:
+      - path: HamKit
+        excludes:
+          - Info.plist
+    info:
+      path: HamKit/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: click.hamkit.ios
+        PRODUCT_NAME: HamKit
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: "NO"
+        # 静态 framework 不需要在产物里再嵌入一次
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+    preBuildScripts:
+      - name: Build Shared.framework (Kotlin Multiplatform)
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          cd "$SRCROOT/.."
+          if [ ! -x "./gradlew" ]; then
+            echo "error: 找不到 gradlew，请确认 iosApp 位于仓库根目录下" >&2
+            exit 1
+          fi
+          ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+    # 显式生成 scheme，否则命令行 xcodebuild -scheme 找不到（Xcode GUI 会自动补）
+    scheme:
+      gatherCoverageData: false

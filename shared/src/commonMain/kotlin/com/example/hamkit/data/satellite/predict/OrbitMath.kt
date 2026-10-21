@@ -1,5 +1,7 @@
 package com.example.hamkit.data.satellite.predict
 
+import kotlin.math.*
+
 /**
  * 轨道计算用时间与坐标数学工具（纯函数，无状态）。
  *
@@ -26,8 +28,8 @@ internal object OrbitMath {
         val monD = mon.toDouble()
         val dayD = day.toDouble()
         return 367.0 * yearD -
-            Math.floor(7.0 * (yearD + Math.floor((monD + 9.0) / 12.0)) * 0.25) +
-            Math.floor(275.0 * monD / 9.0) +
+            floor(7.0 * (yearD + floor((monD + 9.0) / 12.0)) * 0.25) +
+            floor(275.0 * monD / 9.0) +
             dayD +
             1721013.5 +
             ((sec / 60.0 + minute) / 60.0 + hr) / 24.0
@@ -42,7 +44,7 @@ internal object OrbitMath {
             31, if (year % 4 == 0) 29 else 28, 31, 30, 31, 30,
             31, 31, 30, 31, 30, 31
         )
-        val dayofyr = Math.floor(days).toInt()
+        val dayofyr = floor(days).toInt()
         var i = 0
         var inttemp = 0
         // 先判断下标再访问，避免潜在越界
@@ -53,9 +55,9 @@ internal object OrbitMath {
         val mon = i + 1
         val day = dayofyr - inttemp
         var temp = (days - dayofyr) * 24.0
-        val hr = Math.floor(temp).toInt()
+        val hr = floor(temp).toInt()
         temp = (temp - hr) * 60.0
-        val minute = Math.floor(temp).toInt()
+        val minute = floor(temp).toInt()
         // 秒保留小数亚秒精度（截断会丢失 TLE 历元日的小数部分）
         val sec = (temp - minute) * 60.0
         return doubleArrayOf(mon.toDouble(), day.toDouble(), hr.toDouble(), minute.toDouble(), sec)
@@ -73,7 +75,7 @@ internal object OrbitMath {
                 0.093104 * tut1 * tut1 +
                 (876600.0 * 3600 + 8640184.812866) * tut1 +
                 67310.54841 // 秒
-        temp = (temp * Math.PI / 180.0 / 240.0) % TWO_PI // 360/86400 = 1/240
+        temp = (temp * PI / 180.0 / 240.0) % TWO_PI // 360/86400 = 1/240
         if (temp < 0.0) temp += TWO_PI
         return temp
     }
@@ -95,10 +97,10 @@ internal object OrbitMath {
     fun geodeticToEcf(longitudeRad: Double, latitudeRad: Double, heightKm: Double): DoubleArray {
         val f = (WGS84_A - WGS84_B) / WGS84_A
         val e2 = 2.0 * f - f * f
-        val normal = WGS84_A / Math.sqrt(1.0 - e2 * Math.sin(latitudeRad) * Math.sin(latitudeRad))
-        val x = (normal + heightKm) * Math.cos(latitudeRad) * Math.cos(longitudeRad)
-        val y = (normal + heightKm) * Math.cos(latitudeRad) * Math.sin(longitudeRad)
-        val z = (normal * (1.0 - e2) + heightKm) * Math.sin(latitudeRad)
+        val normal = WGS84_A / sqrt(1.0 - e2 * sin(latitudeRad) * sin(latitudeRad))
+        val x = (normal + heightKm) * cos(latitudeRad) * cos(longitudeRad)
+        val y = (normal + heightKm) * cos(latitudeRad) * sin(longitudeRad)
+        val z = (normal * (1.0 - e2) + heightKm) * sin(latitudeRad)
         return doubleArrayOf(x, y, z)
     }
 
@@ -114,19 +116,19 @@ internal object OrbitMath {
         val b = WGS84_B
         val f = (a - b) / a
         val e2 = 2.0 * f - f * f
-        val r = Math.sqrt(eci[0] * eci[0] + eci[1] * eci[1])
-        var longitude = Math.atan2(eci[1], eci[0]) - gmst
-        while (longitude < -Math.PI) longitude += TWO_PI
-        while (longitude > Math.PI) longitude -= TWO_PI
+        val r = sqrt(eci[0] * eci[0] + eci[1] * eci[1])
+        var longitude = atan2(eci[1], eci[0]) - gmst
+        while (longitude < -PI) longitude += TWO_PI
+        while (longitude > PI) longitude -= TWO_PI
 
-        var latitude = Math.atan2(eci[2], r)
+        var latitude = atan2(eci[2], r)
         var c = 0.0
         var k = 0
         while (k++ < 20) {
-            c = 1.0 / Math.sqrt(1.0 - e2 * Math.sin(latitude) * Math.sin(latitude))
-            latitude = Math.atan2(eci[2] + a * c * e2 * Math.sin(latitude), r)
+            c = 1.0 / sqrt(1.0 - e2 * sin(latitude) * sin(latitude))
+            latitude = atan2(eci[2] + a * c * e2 * sin(latitude), r)
         }
-        val height = r / Math.cos(latitude) - a * c
+        val height = r / cos(latitude) - a * c
         return doubleArrayOf(longitude, latitude, height)
     }
 
@@ -150,18 +152,18 @@ internal object OrbitMath {
         val rx = satelliteEcf[0] - obsEcf[0]
         val ry = satelliteEcf[1] - obsEcf[1]
         val rz = satelliteEcf[2] - obsEcf[2]
-        val sinLat = Math.sin(observerLatRad)
-        val cosLat = Math.cos(observerLatRad)
-        val sinLon = Math.sin(observerLonRad)
-        val cosLon = Math.cos(observerLonRad)
+        val sinLat = sin(observerLatRad)
+        val cosLat = cos(observerLatRad)
+        val sinLon = sin(observerLonRad)
+        val cosLon = cos(observerLonRad)
 
         val topS = sinLat * cosLon * rx + sinLat * sinLon * ry - cosLat * rz
         val topE = -sinLon * rx + cosLon * ry
         val topZ = cosLat * cosLon * rx + cosLat * sinLon * ry + sinLat * rz
 
-        val rangeSat = Math.sqrt(topS * topS + topE * topE + topZ * topZ)
-        val el = Math.asin(topZ / rangeSat)
-        val az = Math.atan2(-topE, topS) + Math.PI
+        val rangeSat = sqrt(topS * topS + topE * topE + topZ * topZ)
+        val el = asin(topZ / rangeSat)
+        val az = atan2(-topE, topS) + PI
         return doubleArrayOf(az, el, rangeSat)
     }
 
@@ -174,5 +176,5 @@ internal object OrbitMath {
         return v
     }
 
-    private const val TWO_PI = 2.0 * Math.PI
+    private const val TWO_PI = 2.0 * PI
 }

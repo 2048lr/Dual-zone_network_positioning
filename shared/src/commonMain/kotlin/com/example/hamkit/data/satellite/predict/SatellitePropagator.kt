@@ -1,6 +1,6 @@
 package com.example.hamkit.data.satellite.predict
 
-import java.time.Instant
+import kotlin.math.*
 
 /**
  * 卫星位置传播门面：把自研 SGP4/SDP4 引擎（[Sgp4Satellite]）与坐标转换
@@ -30,8 +30,8 @@ class SatellitePropagator(
         null
     }
 
-    private val observerLatRad = Math.toRadians(latitudeDeg)
-    private val observerLonRad = Math.toRadians(longitudeDeg)
+    private val observerLatRad = (latitudeDeg * PI / 180.0)
+    private val observerLonRad = (longitudeDeg * PI / 180.0)
     private val observerAltKm = altitudeM / 1000.0
 
     /** 卫星名称（与 predict4java TLE.name 语义一致） */
@@ -111,21 +111,21 @@ class SatellitePropagator(
         val rx = satEci[0] - obsEci[0]
         val ry = satEci[1] - obsEci[1]
         val rz = satEci[2] - obsEci[2]
-        val range = Math.sqrt(rx * rx + ry * ry + rz * rz)
+        val range = sqrt(rx * rx + ry * ry + rz * rz)
 
-        val sinLat = Math.sin(observerLatRad)
-        val cosLat = Math.cos(observerLatRad)
+        val sinLat = sin(observerLatRad)
+        val cosLat = cos(observerLatRad)
         val theta = OrbitMath.mod2pi(gmst + observerLonRad)
-        val sinTheta = Math.sin(theta)
-        val cosTheta = Math.cos(theta)
+        val sinTheta = sin(theta)
+        val cosTheta = cos(theta)
 
         val topS = sinLat * cosTheta * rx + sinLat * sinTheta * ry - cosLat * rz
         val topE = -sinTheta * rx + cosTheta * ry
         val topZ = cosLat * cosTheta * rx + cosLat * sinTheta * ry + sinLat * rz
 
-        var azimuth = Math.atan2(-topE, topS) + Math.PI
+        var azimuth = atan2(-topE, topS) + PI
         if (azimuth < 0.0) azimuth += Sgp4Constants.TWO_PI
-        val elevation = Math.asin((topZ / range).coerceIn(-1.0, 1.0))
+        val elevation = asin((topZ / range).coerceIn(-1.0, 1.0))
 
         // 径向速度：相对速度 = 卫星速度 − 地球自转速度（ω × obs）
         val obsVelX = -MFACTOR * obsEci[1]
@@ -159,8 +159,8 @@ class SatellitePropagator(
      * ECF → ECI 旋转（绕 Z 轴旋转 +gmst）。
      */
     private fun rotateEcfToEci(v: DoubleArray, gmst: Double): DoubleArray {
-        val c = Math.cos(gmst)
-        val s = Math.sin(gmst)
+        val c = cos(gmst)
+        val s = sin(gmst)
         return doubleArrayOf(c * v[0] - s * v[1], s * v[0] + c * v[1], v[2])
     }
 
@@ -196,8 +196,4 @@ data class PropagatedPosition(
     val phaseRad: Double,
     /** 是否在地平线以上（仰角 > 0） */
     val isAboveHorizon: Boolean,
-) {
-    /** 采样时刻（UTC） */
-    val time: Instant
-        get() = Instant.ofEpochMilli(timeMs)
-}
+)

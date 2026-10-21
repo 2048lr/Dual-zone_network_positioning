@@ -1,0 +1,214 @@
+import Foundation
+import Combine
+import Shared
+
+/// iOS 壳的 ViewModel：
+/// 地面站 → 分区定位 → CelesTrak TLE 拉取 → 卫星实时位置 → 下一次过境。
+///
+/// 所有计算走共享 Kotlin 内核（`Shared.framework` 的 `HamKitApi`），Swift 只负责
+/// 交互状态与网络实现（见 `Networking.swift`）。
+final class TrackerModel: ObservableObject {
+
+    // MARK: - 地面站
+
+    @Published var latitude: Double = 39.9042
+    @Published var longitude: Double = 116.4074
+    @Published var altitudeM: Double = 50
+
+    // MARK: - 分区
+
+    @Published private(set) var zone: ZoneSnapshot?
+
+    // MARK: - 卫星数据（CelesTrak）
+
+    @Published private(set) var satellites: [TleRecord] = []
+    @Published private(set) var selectedNorad: Int32?
+    @Published private(set) var dataStatusText: String = "尚未加载"
+    @Published private(set) var lastUpdatedText: String = "—"
+    @Published private(set) var isLoadingSatellites = false
+
+    // MARK: - 实时
+
+    @Published private(set) var position: PositionSnapshot?
+    @Published private(set) var nextPass: PassSnapshot?
+    @Published private(set) var isSearchingPass = false
+    @Published private(set) var errorText: String?
+
+    private var timer: Timer?
+    private var passRequestId = 0
+
+    init() {
+        // 网络实现必须在第一次 fetchTles 之前注入
+        HamKitApi.shared.installHttpTransport(transport: URLSessionTransport())
+    }
+
+    // MARK: - 派生状态
+
+    var selectedSatellite: TleRecord? {
+        guard let norad = selectedNorad else { return nil }
+        return satellites.first { $0.norad == norad }
+    }
+
+    var selectedSatelliteName: String {
+        selectedSatellite?.name ?? "未选择卫星"
+    }
+
+    private var tleLines: [String] {
+        selectedSatellite?.lines ?? []
+    }
+
+    // MARK: - 生命周期
+
+    func start() {
+        guard timer == nil else { return }
+        refreshZone()
+        loadSatellites(force: false)
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.tickPosition()
+        }
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    /// 地面站变化后重算全部分区与过境。
+    func updateStation(latitude: Double, longitude: Double) {
+        self.latitude = latitude
+        self.longitude = longitude
+        refreshZone()
+        tickPosition()
+        searchNextPass()
+    }
+
+    // MARK: - TLE 拉取
+
+    /// 拉取 CelesTrak `amateur` 分组；6 小时内命中内核缓存。
+    func loadSatellites(force: Bool) {
+        guard !isLoadingSatellites else { return }
+        isLoadingSatellites = true
+        dataStatusText = force ? "正在从 CelesTrak 拉取…" : "加载中…"
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        HamKitApi.shared.fetchTles(group: "amateur", forceRefresh: force, nowMs: nowMs) { [weak self] snapshot in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isLoadingSatellites = false
+                // 完全离线（首次启动且无网络）时用内置 ISS TLE 兜底，
+                // 保证首屏永远有内容；一旦联网成功就会被真实数据替换。
+                self.satellites = snapshot.records.isEmpty ? [Self.fallbackTle] : snapshot.records
+
+                if snapshot.fetchedAtMs > 0 {
+                    let date = Date(timeIntervalSince1970: Double(snapshot.fetchedAtMs) / 1000)
+                    self.lastUpdatedText = Self.timeFormatter.string(from: date)
+                } else if snapshot.records.isEmpty {
+                    self.lastUpdatedText = "内置示例"
+                }
+
+                if let error = snapshot.error {
+                    self.dataStatusText = snapshot.records.isEmpty
+                        ? "离线 · 内置示例 TLE（\(error)）"
+                        : "离线缓存 · \(snapshot.records.count) 颗（\(error)）"
+                } else {
+                    self.dataStatusText = (snapshot.fromCache ? "缓存" : "已更新")
+                        + " · \(snapshot.records.count) 颗"
+                }
+
+                self.selectDefaultIfNeeded()
+                self.tickPosition()
+                self.searchNextPass()
+            }
+        }
+    }
+
+    func selectSatellite(norad: Int32) {
+        guard norad != selectedNorad else { return }
+        selectedNorad = norad
+        tickPosition()
+        searchNextPass()
+    }
+
+    private func selectDefaultIfNeeded() {
+        if let norad = selectedNorad, satellites.contains(where: { $0.norad == norad }) {
+            return
+        }
+        // 优先 ISS（NORAD 25544），否则第一颗
+        selectedNorad = satellites.first(where: { $0.norad == 25544 })?.norad
+            ?? satellites.first?.norad
+    }
+
+    // MARK: - 共享内核调用
+
+    private func refreshZone() {
+        do {
+            zone = try HamKitApi.shared.zone(latitude: latitude, longitude: longitude)
+            errorText = nil
+        } catch {
+            zone = nil
+            errorText = "坐标非法：\(error.localizedDescription)"
+        }
+    }
+
+    private func tickPosition() {
+        let tle = tleLines
+        guard !tle.isEmpty else {
+            position = nil
+            return
+        }
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        position = HamKitApi.shared.satellitePosition(
+            tle: tle,
+            latitude: latitude,
+            longitude: longitude,
+            altitudeM: altitudeM,
+            atMs: nowMs
+        )
+    }
+
+    /// 48 小时过境搜索约 600 次传播计算，放到后台队列避免卡住 UI。
+    func searchNextPass() {
+        let tle = tleLines
+        guard !tle.isEmpty, !isSearchingPass else { return }
+
+        isSearchingPass = true
+        passRequestId += 1
+        let requestId = passRequestId
+        let lat = latitude
+        let lon = longitude
+        let alt = altitudeM
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+            let result = HamKitApi.shared.nextPass(
+                tle: tle,
+                latitude: lat,
+                longitude: lon,
+                altitudeM: alt,
+                fromMs: nowMs,
+                searchHours: 48
+            )
+            DispatchQueue.main.async {
+                guard let self, requestId == self.passRequestId else { return }
+                self.nextPass = result
+                self.isSearchingPass = false
+            }
+        }
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd HH:mm"
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter
+    }()
+
+    /// 离线兜底：2026-08-09 拉取的 ISS TLE。
+    /// 只在「从未成功联网」时使用，联网后会立刻被 CelesTrak 数据替换。
+    private static let fallbackTle = TleRecord(
+        name: "ISS (ZARYA) · 内置",
+        norad: 25544,
+        line1: "1 25544U 98067A   26220.50489838  .00004539  00000+0  89319-4 0  9991",
+        line2: "2 25544  51.6323  41.1734 0007358  25.6275 334.5077 15.49385107579869"
+    )
+}

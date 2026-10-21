@@ -1,5 +1,7 @@
 package com.example.hamkit.data.satellite.predict
 
+import kotlin.math.*
+
 /**
  * SGP4/SDP4 轨道传播算法使用的 WGS-72 常数。
  *
@@ -21,7 +23,7 @@ internal object Sgp4Constants {
     const val MU = 398600.8
 
     /** XKE = 60 / sqrt(re³/mu)（厄尔特曼常数，单位 1/min） */
-    val XKE: Double = 60.0 / Math.sqrt(EARTH_RADIUS_KM * EARTH_RADIUS_KM * EARTH_RADIUS_KM / MU)
+    val XKE: Double = 60.0 / sqrt(EARTH_RADIUS_KM * EARTH_RADIUS_KM * EARTH_RADIUS_KM / MU)
 
     /** VKMPERSEC = re * xke / 60（把无量纲速度换算为 km/s） */
     val VKM_PER_SEC: Double = EARTH_RADIUS_KM * XKE / 60.0

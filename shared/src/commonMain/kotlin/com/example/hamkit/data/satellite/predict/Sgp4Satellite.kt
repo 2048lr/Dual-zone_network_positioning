@@ -1,9 +1,6 @@
 package com.example.hamkit.data.satellite.predict
 
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+import kotlin.math.*
 
 /**
  * SGP4/SDP4 卫星轨道传播器（自研纯 Kotlin 实现）。
@@ -21,7 +18,7 @@ import kotlin.math.sqrt
  *
  * 线程安全：实例创建后只读，[propagate] 无内部状态修改，可并发调用。
  */
-internal class Sgp4Satellite private constructor(
+class Sgp4Satellite private constructor(
     /** 卫星编号字符串 */
     private val satnum: String,
     /** 历元年（四位数） */
@@ -181,7 +178,7 @@ internal class Sgp4Satellite private constructor(
         val cosio2 = cosio * cosio
 
         var noKozai = no
-        val ak = Math.pow(Sgp4Constants.XKE / noKozai, Sgp4Constants.X2O3)
+        val ak = (Sgp4Constants.XKE / noKozai).pow(Sgp4Constants.X2O3)
         val d1 = (0.75 * Sgp4Constants.J2 * (3.0 * cosio2 - 1.0)) / (rteosq * omeosq)
         var delPrime = d1 / (ak * ak)
         val adel = ak * (1.0 - delPrime * delPrime -
@@ -189,7 +186,7 @@ internal class Sgp4Satellite private constructor(
         delPrime = d1 / (adel * adel)
         noKozai /= 1.0 + delPrime
 
-        val ao = Math.pow(Sgp4Constants.XKE / noKozai, Sgp4Constants.X2O3)
+        val ao = (Sgp4Constants.XKE / noKozai).pow(Sgp4Constants.X2O3)
         val sinio = sin(inclo)
         val po = ao * omeosq
         val con42 = 1.0 - 5.0 * cosio2
@@ -202,7 +199,7 @@ internal class Sgp4Satellite private constructor(
         gsto = OrbitMath.gstime(epoch + 2433281.5)
 
         // a = (no * tumin)^(-2/3)
-        val a = Math.pow(noKozai * Sgp4Constants.TUMIN, -2.0 / 3.0)
+        val a = (noKozai * Sgp4Constants.TUMIN).pow(-2.0 / 3.0)
 
         if (omeosq >= 0.0 || noKozai >= 0.0) {
             isimp = 0
@@ -225,8 +222,8 @@ internal class Sgp4Satellite private constructor(
             val etasq = eta * eta
             val eeta = ecco * eta
             val psisq = abs(1.0 - etasq)
-            val coef = qzms24 * Math.pow(tsi, 4.0)
-            val coef1 = coef / Math.pow(psisq, 3.5)
+            val coef = qzms24 * (tsi).pow(4.0)
+            val coef1 = coef / (psisq).pow(3.5)
             val cc2 = coef1 * noKozai *
                 (ao * (1.0 + 1.5 * etasq + eeta * (4.0 + etasq)) +
                     ((0.375 * Sgp4Constants.J2 * tsi) / psisq) * con41 *
@@ -282,7 +279,7 @@ internal class Sgp4Satellite private constructor(
             x7thm1 = 7.0 * cosio2 - 1.0
 
             // ── 深空初始化（SDP4）──
-            if ((2 * Math.PI) / noKozai >= DEEP_SPACE_PERIOD_MIN) {
+            if ((2 * PI) / noKozai >= DEEP_SPACE_PERIOD_MIN) {
                 method = 'd'
                 isimp = 1
 
@@ -424,8 +421,8 @@ internal class Sgp4Satellite private constructor(
 
         if (nm <= 0.0) return null
 
-        val am = Math.pow(Sgp4Constants.XKE / nm, Sgp4Constants.X2O3) * tempa * tempa
-        nm = Sgp4Constants.XKE / Math.pow(am, 1.5)
+        val am = (Sgp4Constants.XKE / nm).pow(Sgp4Constants.X2O3) * tempa * tempa
+        nm = Sgp4Constants.XKE / (am).pow(1.5)
         em -= tempe
 
         if (em >= 1.0 || em < -0.001) return null
@@ -461,8 +458,8 @@ internal class Sgp4Satellite private constructor(
 
             if (xincp < 0.0) {
                 xincp = -xincp
-                nodep += Math.PI
-                argpp -= Math.PI
+                nodep += PI
+                argpp -= PI
             }
             if (ep < 0.0 || ep > 1.0) return null
         }
@@ -515,7 +512,7 @@ internal class Sgp4Satellite private constructor(
         val tempR = esine / (1.0 + betal)
         val sinu = (am / rl) * (sineo1 - aynl - axnl * tempR)
         val cosu = (am / rl) * (coseo1 - axnl + aynl * tempR)
-        var su = Math.atan2(sinu, cosu)
+        var su = atan2(sinu, cosu)
         val sin2u = (cosu + cosu) * sinu
         val cos2u = 1.0 - 2.0 * sinu * sinu
         val tempP = 1.0 / pl
@@ -618,7 +615,7 @@ internal class Sgp4Satellite private constructor(
         val gam = 5.8351514 + 0.001944368 * day
         var zx = (0.39785416 * stem) / zsinil
         val zy = zcoshl * ctem + 0.91744867 * zsinhl * stem
-        zx = Math.atan2(zx, zy)
+        zx = atan2(zx, zy)
         zx += gam - xnodce
         val zcosgl = cos(zx)
         val zsingl = sin(zx)
@@ -852,9 +849,9 @@ internal class Sgp4Satellite private constructor(
                 val dls = pl + pgh - pinc * nodepR * sinip
                 val xlsR = xls + dls
                 val xnoh = nodepR
-                nodepR = Math.atan2(alfdp, betdp)
+                nodepR = atan2(alfdp, betdp)
                 if (nodepR < 0.0) nodepR += Sgp4Constants.TWO_PI
-                if (abs(xnoh - nodepR) > Math.PI) {
+                if (abs(xnoh - nodepR) > PI) {
                     nodepR = if (nodepR < xnoh) nodepR + Sgp4Constants.TWO_PI
                     else nodepR - Sgp4Constants.TWO_PI
                 }
@@ -913,7 +910,7 @@ internal class Sgp4Satellite private constructor(
         val sls = -zns * ss3 * (sz1 + sz3 - 14.0 - 6.0 * emsq)
         val sghs = ss4 * zns * (sz31 + sz33 - 6.0)
         var shs = -zns * ss2 * (sz21 + sz23)
-        if (inclmR < 5.2359877e-2 || inclmR > Math.PI - 5.2359877e-2) shs = 0.0
+        if (inclmR < 5.2359877e-2 || inclmR > PI - 5.2359877e-2) shs = 0.0
         if (sinim != 0.0) shs /= sinim
         val sgs = sghs - cosim * shs
 
@@ -923,7 +920,7 @@ internal class Sgp4Satellite private constructor(
         var dmdtR = sls - znl * s3 * (z1 + z3 - 14.0 - 6.0 * emsq)
         val sghl = s4 * znl * (z31 + z33 - 6.0)
         var shll = -znl * s2 * (z21 + z23)
-        if (inclmR < 5.2359877e-2 || inclmR > Math.PI - 5.2359877e-2) shll = 0.0
+        if (inclmR < 5.2359877e-2 || inclmR > PI - 5.2359877e-2) shll = 0.0
         var domdtR = sgs + sghl
         var dnodtR = shs
         if (sinim != 0.0) {
@@ -949,7 +946,7 @@ internal class Sgp4Satellite private constructor(
         var d5421R = 0.0; var d5433R = 0.0
 
         if (irezR != 0) {
-            val aonv = Math.pow(nmR / Sgp4Constants.XKE, Sgp4Constants.X2O3)
+            val aonv = (nmR / Sgp4Constants.XKE).pow(Sgp4Constants.X2O3)
 
             if (irezR == 2) {
                 // 半日共振（12h 轨道）
@@ -1210,7 +1207,7 @@ internal class Sgp4Satellite private constructor(
 // ────────────────────────── 中间结果类型 ──────────────────────────
 
 /** TEME 惯性系位置（km）、速度（km/s）与轨道相位（rad） */
-internal data class EciState(
+data class EciState(
     val position: DoubleArray,
     val velocity: DoubleArray,
     val phaseRad: Double,
@@ -1274,7 +1271,7 @@ internal data class Quadruple(
 /**
  * 已解析的 TLE 轨道元素（弧度/rad·min 制，供 [Sgp4Satellite] 使用）。
  */
-internal data class ParsedTleElements(
+data class ParsedTleElements(
     val catalogNumber: Int,
     val epochYear: Int,
     val epochDays: Double,
@@ -1291,5 +1288,5 @@ internal data class ParsedTleElements(
 ) {
     /** 平均运动（转/天） */
     val meanMotionRevPerDay: Double
-        get() = meanMotionRadMin * 1440.0 / (2.0 * Math.PI)
+        get() = meanMotionRadMin * 1440.0 / (2.0 * PI)
 }

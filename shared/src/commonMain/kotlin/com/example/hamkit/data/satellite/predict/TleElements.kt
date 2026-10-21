@@ -1,6 +1,6 @@
 package com.example.hamkit.data.satellite.predict
 
-import java.time.Instant
+import kotlin.math.*
 
 /**
  * 卫星 TLE 元素集（自研解析，替代 predict4java 的 TLE 类）。
@@ -37,35 +37,40 @@ class TleElements private constructor(
     val meanmo: Double
         get() = meanMotion
 
-    /** 历元时刻（UTC） */
-    val epoch: Instant by lazy {
+    /**
+     * 历元时刻（UTC 毫秒）。
+     *
+     * 跨平台内核只用「毫秒时间戳」这一种时间表示，不引用任何平台的日期时间类型：
+     * Android 侧可直接 `Instant.ofEpochMilli(epochMillis)`，iOS 侧可直接
+     * `Date(timeIntervalSince1970: epochMillis / 1000.0)`。
+     */
+    val epochMillis: Long by lazy {
         val mdhms = OrbitMath.days2mdhms(epochYear, epochDays)
         val jd = OrbitMath.jday(epochYear, mdhms[0].toInt(), mdhms[1].toInt(), mdhms[2].toInt(), mdhms[3].toInt(), mdhms[4])
         // 由儒略日重建时间戳（秒级精度，含小数日）
-        val millis = ((jd - 2440587.5) * 86400.0 * 1000.0).toLong()
-        Instant.ofEpochMilli(millis)
+        ((jd - 2440587.5) * 86400.0 * 1000.0).toLong()
     }
 
     /** 是否为深空轨道（周期 ≥ 225 分钟，SGP4/SDP4 分派阈值） */
     val isDeepSpace: Boolean
-        get() = (2.0 * Math.PI) / meanMotionRadMin >= 225.0
+        get() = (2.0 * PI) / meanMotionRadMin >= 225.0
 
     /** 平均运动（rad/min） */
     val meanMotionRadMin: Double
         get() = meanMotion / Sgp4Constants.XP_DOT_P
 
     /** 供 [Sgp4Satellite] 使用的解析元素 */
-    internal fun toParsedElements(): ParsedTleElements = ParsedTleElements(
+    fun toParsedElements(): ParsedTleElements = ParsedTleElements(
         catalogNumber = catalogNumber,
         epochYear = epochYear,
         epochDays = epochDays,
         jdsatepoch = jdsatepoch,
         bstar = bstar,
-        inclinationRad = Math.toRadians(inclinationDeg),
-        raanRad = Math.toRadians(raanDeg),
+        inclinationRad = (inclinationDeg * PI / 180.0),
+        raanRad = (raanDeg * PI / 180.0),
         eccentricity = eccentricity,
-        argPerigeeRad = Math.toRadians(argPerigeeDeg),
-        meanAnomalyRad = Math.toRadians(meanAnomalyDeg),
+        argPerigeeRad = (argPerigeeDeg * PI / 180.0),
+        meanAnomalyRad = (meanAnomalyDeg * PI / 180.0),
         meanMotionRadMin = meanMotionRadMin,
         ndotRadMin2 = ndot / (Sgp4Constants.XP_DOT_P * 1440.0),
         nddotRadMin3 = nddot / (Sgp4Constants.XP_DOT_P * 1440.0 * 1440.0),
@@ -179,7 +184,7 @@ class TleElements private constructor(
             val exponentStr = line.substring(end - 1, end).trim()
             val mantissa = if (mantissaStr.isEmpty()) 0.0 else mantissaStr.toDouble() / 1e5
             val exponent = if (exponentStr.isEmpty()) 0.0 else exponentStr.toDouble()
-            return sign * mantissa / Math.pow(10.0, exponent)
+            return sign * mantissa / (10.0).pow(exponent)
         }
 
         /**
