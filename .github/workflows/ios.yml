@@ -110,3 +110,46 @@ jobs:
           path: iosApp/build/Build/Products/Debug-iphonesimulator/HamKit.app
           retention-days: 14
           if-no-files-found: warn
+
+      # 启动模拟器跑一次冒烟：装上 → 授权定位 → 启动 → 截图。
+      # 没有 Mac 也能通过截图看到真实界面，并据此迭代 UI。
+      - name: Smoke test in iOS Simulator
+        id: smoke
+        if: success()
+        run: |
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          for runtime, devices in data.items():
+              for device in devices:
+                  if device["name"].startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit
+          ')
+          echo "simulator udid: $UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          APP="iosApp/build/Build/Products/Debug-iphonesimulator/HamKit.app"
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl privacy "$UDID" grant location click.hamkit.ios || true
+          xcrun simctl launch "$UDID" click.hamkit.ios
+          sleep 12
+          xcrun simctl io "$UDID" screenshot ios-screenshot.png
+          xcrun simctl spawn "$UDID" log show --last 2m --style compact \
+            --predicate 'process == "HamKit"' > ios-app.log || true
+          # 应用崩溃时 simctl 仍会返回成功，这里额外检查进程是否还活着
+          if ! xcrun simctl spawn "$UDID" launchctl list | grep -q "click.hamkit.ios"; then
+            echo "::warning::HamKit 启动后未存活，可能已崩溃，请查看 ios-app.log"
+          fi
+
+      - name: Upload simulator screenshot
+        if: always() && steps.smoke.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-screenshot-${{ github.run_id }}
+          path: |
+            ios-screenshot.png
+            ios-app.log
+          retention-days: 14
+          if-no-files-found: warn
