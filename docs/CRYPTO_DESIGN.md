@@ -68,12 +68,13 @@ $env:KEY_PASSWORD="..."
 
 如果你之前已经发布过含 `secrets.dat` 的版本：
 
-1. 在高德控制台**轮换**旧 Web 服务 Key 与 Android SDK Key；
-2. 用 `git filter-repo`/BFG 清理历史中的 `secrets.dat`、`docs/CRYPTO_DESIGN.md` 旧内容和
-   `local.properties` 泄露；仅删除当前文件不够；
-3. 配置新的 Android SDK Key 包名/SHA-1 限制；
-4. 重新构建 release（需要 `KEYSTORE_*` 与 `AMAP_SDK_KEY`）；
-5. 检查官网/服务端环境变量中没有把高德 Web Key 下发给客户端。
+1. **可以继续使用现有的 Android SDK Key**：它本来就是客户端标识，不必为了本次改造生成新 Key；
+2. 但必须在高德控制台按 **包名 + release 签名 SHA-1** 限制，并定期检查配额/调用来源；
+3. 旧的 Web 服务 Key 已不再被 App 使用（天气改 Open-Meteo、逆地理编码改系统 Geocoder），
+   不需要为了客户端恢复它；如果它曾在公开仓库出现，建议轮换，或至少确认它没有被其他服务使用；
+4. 用 `git filter-repo`/BFG 清理历史中的 `secrets.dat`、旧文档明文 Key 等内容；
+   如果坚持沿用旧 SDK Key，请接受它已进入历史的事实，并用包名/SHA-1 + 配额监控降低风险；
+5. 重新构建 release（需要 `KEYSTORE_*`；`AMAP_SDK_KEY` 可填现有 Key）。
 
 ## 六、规则
 
