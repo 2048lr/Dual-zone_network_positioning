@@ -75,5 +75,6 @@ buildConfigField("String", "AMAP_WEB_KEY", "\"$escapedAmapWebKey\"")
 
 - `app/build.gradle.kts`：`AMAP_SDK_KEY` / `AMAP_WEB_KEY` 注入、release 签名门槛
 - `app/src/main/java/com/example/hamkit/data/weather/WeatherApiService.kt`：高德天气/逆地理编码
+- `app/src/main/java/com/example/hamkit/data/location/AmapGeocodeService.kt`：地址反向地理编码
 - `app/src/main/java/com/example/hamkit/data/privacy/AmapPrivacyInitializer.kt`：高德隐私合规初始化
 - `.github/workflows/ci.yml`：CI Key/签名注入
