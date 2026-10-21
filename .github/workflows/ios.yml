@@ -16,6 +16,8 @@ on:
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
       - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
       - '.github/workflows/ios.yml'
   pull_request:
     paths:
