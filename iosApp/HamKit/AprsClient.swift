@@ -34,6 +34,8 @@ final class AprsClient {
     private var retryWork: DispatchWorkItem?
     /// 跨分片的行缓冲（字节级，避免 UTF-8 被切坏）
     private var buffer = Data()
+    /// 本次连接累计收到的行数：用来区分「服务器一句话没说就关」和「收了一段时间后关」
+    private var receivedLines = 0
 
     /// 重连退避（秒）
     private static let backoff: [TimeInterval] = [2, 5, 15, 30, 60]
@@ -83,7 +85,13 @@ final class AprsClient {
         guard let connection else { return }
         connection.send(
             content: Data((line + "\r\n").utf8),
-            completion: .contentProcessed { _ in }
+            completion: .contentProcessed { [weak self] error in
+                // 写失败以前被完全吞掉（.contentProcessed { _ in }），
+                // 网络把 14580 拦掉时表现就是「发出去了、然后被断开」。
+                if let error {
+                    self?.onState?("发送失败：\(error.localizedDescription)")
+                }
+            }
         )
     }
 
@@ -110,6 +118,8 @@ final class AprsClient {
         connection?.cancel()
         connection = nil
         buffer = Data()
+        receivedLines = 0
+        onState?("连接 \(host):\(port)…")
 
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
             onState?("端口无效：\(port)")
@@ -164,8 +174,12 @@ final class AprsClient {
                 return
             }
             if isComplete {
-                // 对端关闭（服务器踢线、NAT 超时、切换网络等）
-                self.failAndRetry(reason: "服务器断开连接")
+                // 对端关闭（服务器踢线、NAT 超时、切换网络等）。
+                // 带上「这次收到过几行」：0 行说明服务器连招呼（# aprsc …）都没发就关了，
+                // 基本可以判定是入口站点/网络直接掐断，而不是登录内容有问题。
+                self.failAndRetry(
+                    reason: "服务器关闭连接（本次收到 \(self.receivedLines) 行）"
+                )
                 return
             }
             self.receiveLoop(on: connection)
@@ -179,6 +193,7 @@ final class AprsClient {
             let lineData = buffer.subdata(in: buffer.startIndex..<range.lowerBound)
             buffer.removeSubrange(buffer.startIndex..<range.upperBound)
             if let line = String(data: lineData, encoding: .utf8), !line.isEmpty {
+                receivedLines += 1
                 onLine?(line)
             }
         }
@@ -308,6 +323,7 @@ final class AprsStore: ObservableObject {
         client.onState = { [weak self] text in
             DispatchQueue.main.async {
                 self?.statusText = text
+                self?.appendLog("· \(text)")
             }
         }
         client.onConnectedChange = { [weak self] connected in
