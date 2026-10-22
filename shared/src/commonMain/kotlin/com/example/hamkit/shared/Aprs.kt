@@ -48,8 +48,24 @@ object Aprs {
     fun formatCallSsid(callsign: String, ssid: String): String =
         if (ssid.isNotEmpty()) "$callsign-$ssid" else callsign
 
-    fun formatLogin(callsign: String, ssid: String, passcode: String, version: String): String =
-        "user ${formatCallSsid(callsign, ssid)} pass $passcode vers $version"
+    /**
+     * 登录行。
+     *
+     * APRS-IS 的 `vers` 必须是**两个 token**：`vers <软件名> <版本号>`。
+     * 只给一个 token 时，严格的入口站点（aprsc）会直接判
+     * `# Invalid login: software name and version are not separated by a space`
+     * 并关闭连接 —— iOS 端一直连不上就是这个原因。
+     * 这里兜一层：调用方只传了软件名时补一个默认版本号。
+     */
+    fun formatLogin(callsign: String, ssid: String, passcode: String, version: String): String {
+        val trimmed = version.trim()
+        val vers = when {
+            trimmed.isEmpty() -> "HamKit 1.0"
+            trimmed.any { it.isWhitespace() } -> trimmed
+            else -> "$trimmed 1.0"
+        }
+        return "user ${formatCallSsid(callsign, ssid)} pass $passcode vers $vers"
+    }
 
     /**
      * 位置包。compressed=true 用压缩格式（base-91），否则用未压缩格式。

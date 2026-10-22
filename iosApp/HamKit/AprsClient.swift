@@ -363,12 +363,18 @@ final class AprsStore: ObservableObject {
             statusText = "请先在设置中确认持照与责任声明"
             return
         }
+        // APRS-IS 的 `vers` 必须是**两个 token**：软件名 + 版本号。
+        // 之前传的是 "HamKit-iOS"（一个 token），服务器直接判
+        // `# Invalid login: software name and version are not separated by a space`
+        // 并断连 —— 这就是 iOS 一直连不上的根因。
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+        let softwareVersion = "HamKit \(appVersion)"
         let login = Aprs.shared.formatLogin(
             // APRS-IS 的 login 只接受大写呼号，带空格/小写会被当成非法登录直接断连。
             callsign: config.callsign.trimmingCharacters(in: .whitespaces).uppercased(),
             ssid: config.ssid.trimmingCharacters(in: .whitespaces),
             passcode: config.effectivePasscode,
-            version: "HamKit-iOS"
+            version: softwareVersion
         )
         statusText = "正在连接 \(config.server):\(config.port)…"
         // 登录行与 filter 都交给 client 在每次连接建立后发送：
@@ -380,7 +386,7 @@ final class AprsStore: ObservableObject {
             login: login,
             filter: filter
         )
-        appendLog("> user \(config.fullCallsign) pass *** vers HamKit-iOS")
+        appendLog("> user \(config.fullCallsign) pass *** vers \(softwareVersion)")
         appendLog("> # filter \(filter)")
         startBeaconIfNeeded()
     }
