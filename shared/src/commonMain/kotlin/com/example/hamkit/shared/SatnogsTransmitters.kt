@@ -45,19 +45,24 @@ data class TransmitterSnapshot(
  */
 object SatnogsTransmitters {
 
-    /** SatNOGS DB transmitters API（含全部状态，状态区分在 UI 层） */
+    /**
+     * 兜底源：SatNOGS DB 官方。
+     *
+     * 国内经常超时 / 被 DNS 污染，所以排在自建 CDN 之后（与 TLE 同样的主次关系：
+     * 主 = `tle.hamkit.click`，次 = 上游官方源）。
+     */
     const val URL = "https://db.satnogs.org/api/transmitters/?format=json"
 
     /**
-     * 兜底源：自建 CDN 上的静态快照（同 [URL] 的 JSON 数组）。
+     * **主源**：自建 CDN 上的静态快照（同 [URL] 的 JSON 数组）。
      *
-     * db.satnogs.org 在国内容易被 DNS 污染/超时（Android 侧已在
-     * `SatelliteDataSource` 注释里写明同类问题，只是转发器表没做兜底），
-     * 这里允许把同一份数据镜像到自有 CDN：`scripts/sync_satnogs_transmitters.sh`。
+     * 由 `scripts/sync_satnogs_transmitters.sh` 定时从 SatNOGS 同步，
+     * 国内直连、无 DNS 污染、有 CDN 缓存，和 TLE 的取数策略保持一致。
      */
     const val MIRROR_URL = "https://tle.hamkit.click/transmitters.json"
 
-    private val SOURCES: List<String> = listOf(URL, MIRROR_URL)
+    /** 主 = 自建 CDN；次 = SatNOGS 官方（与 TLE 一致的主次顺序）。 */
+    private val SOURCES: List<String> = listOf(MIRROR_URL, URL)
 
     /** 拉取全部转发器；全部源都失败时回调 [TransmitterSnapshot.error]。 */
     fun fetch(transport: HttpTransport, callback: (TransmitterSnapshot) -> Unit) {

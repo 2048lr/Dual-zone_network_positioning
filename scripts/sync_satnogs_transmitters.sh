@@ -5,8 +5,9 @@
 # 背景：db.satnogs.org 在国内经常超时或被 DNS 污染，Android 侧靠 Room 缓存兜底，
 # iOS 侧（`SatnogsTransmitters.kt`）改造前没有任何兜底 —— 拉不到就永远显示
 # 「暂无转发器 / 数据不可用」。现在客户端按下面的顺序尝试：
-#   1. https://db.satnogs.org/api/transmitters/?format=json
-#   2. https://tle.hamkit.click/transmitters.json   ← 本脚本负责生成这个对象
+#   1. https://tle.hamkit.click/transmitters.json   ← 本脚本负责生成这个对象（主源）
+#   2. https://db.satnogs.org/api/transmitters/?format=json（备源）
+# 与 TLE 一致：主 = 自建 CDN，次 = 上游官方源。
 #
 # 运行环境：需配置 AWS CLI 凭证（有 hamkit-tle bucket 写权限）。
 # 建议 cron：每 24 小时一次（SatNOGS 转发器数据变动很慢）。
