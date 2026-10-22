@@ -1,11 +1,37 @@
 import SwiftUI
 import Shared
 
+/// 过境提醒设置（对应 Android `reminderSettings`：总开关 + 提前量）。
+final class ReminderSettingsStore: ObservableObject {
+
+    static let shared = ReminderSettingsStore()
+
+    static let leadOptions = [5, 10, 15, 30]
+
+    @Published var enabled: Bool {
+        didSet { defaults.set(enabled, forKey: "hamkit.reminder.enabled") }
+    }
+    @Published var leadMinutes: Int {
+        didSet { defaults.set(leadMinutes, forKey: "hamkit.reminder.lead_minutes") }
+    }
+
+    private let defaults = UserDefaults.standard
+
+    private init() {
+        enabled = defaults.object(forKey: "hamkit.reminder.enabled") as? Bool ?? true
+        let stored = defaults.object(forKey: "hamkit.reminder.lead_minutes") as? Int
+        leadMinutes = stored ?? 5
+    }
+
+    var leadSeconds: TimeInterval { TimeInterval(leadMinutes * 60) }
+}
+
 /// 「设置」页：照抄 Android Settings 页结构 ——
 /// 外观 / 隐私 / 关于 三个分组；iOS 端暂无外观项，先落分组骨架。
 struct SettingsView: View {
 
     @ObservedObject var model: TrackerModel
+    @ObservedObject private var reminderSettings = ReminderSettingsStore.shared
 
     var body: some View {
         List {
@@ -16,6 +42,16 @@ struct SettingsView: View {
                 NavigationLink(value: Route.reminderList) {
                     LabeledContent("过境提醒", value: "本地通知")
                 }
+            }
+
+            Section("过境提醒") {
+                Toggle("启用过境提醒", isOn: $reminderSettings.enabled)
+                Picker("提前量", selection: $reminderSettings.leadMinutes) {
+                    ForEach(ReminderSettingsStore.leadOptions, id: \.self) { minutes in
+                        Text("提前 \(minutes) 分钟").tag(minutes)
+                    }
+                }
+                .disabled(!reminderSettings.enabled)
             }
 
             Section("外观") {

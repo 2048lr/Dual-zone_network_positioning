@@ -36,7 +36,7 @@ struct RouteDestination: View {
         case .locationDetail:      LocationDetailView(model: model, location: location)
 
         // APRS
-        case .aprsMain:          AprsMainView()
+        case .aprsMain:          AprsMainView(model: model, location: location)
         case .aprsSettings:      AprsSettingsView()
         case .aprsStations:      AprsStationsView()
         case .aprsMessages:      AprsMessagesView()

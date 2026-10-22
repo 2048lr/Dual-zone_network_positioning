@@ -107,8 +107,8 @@ struct AprsConfig: Codable, Equatable {
 }
 
 /// 收到的 APRS 站点。
-struct AprsStation: Identifiable {
-    let id = UUID()
+struct AprsStation: Identifiable, Codable {
+    var id = UUID()
     let callsign: String
     var latitude: Double
     var longitude: Double
@@ -122,8 +122,8 @@ struct AprsStation: Identifiable {
 }
 
 /// APRS 消息（收发共用）。
-struct AprsChatMessage: Identifiable {
-    let id = UUID()
+struct AprsChatMessage: Identifiable, Codable {
+    var id = UUID()
     let source: String
     let destination: String
     var body: String
@@ -148,6 +148,10 @@ final class AprsStore: ObservableObject {
     private let client = AprsClient()
     private let defaults = UserDefaults.standard
     private static let key = "hamkit.aprs.config"
+    private let dataURL: URL = {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return docs.appendingPathComponent("APRS.json")
+    }()
 
     private init() {
         if let data = defaults.data(forKey: Self.key),
@@ -155,6 +159,12 @@ final class AprsStore: ObservableObject {
             config = decoded
         } else {
             config = AprsConfig()
+        }
+
+        if let data = try? Data(contentsOf: dataURL),
+           let stored = try? JSONDecoder().decode(Persisted.self, from: data) {
+            stations = stored.stations
+            messages = stored.messages
         }
 
         client.onState = { [weak self] text in
@@ -168,9 +178,21 @@ final class AprsStore: ObservableObject {
         }
     }
 
+    private struct Persisted: Codable {
+        var stations: [AprsStation]
+        var messages: [AprsChatMessage]
+    }
+
     private func save() {
         if let data = try? JSONEncoder().encode(config) {
             defaults.set(data, forKey: Self.key)
+        }
+    }
+
+    private func saveData() {
+        let payload = Persisted(stations: stations, messages: messages)
+        if let data = try? JSONEncoder().encode(payload) {
+            try? data.write(to: dataURL, options: .atomic)
         }
     }
 
@@ -218,6 +240,7 @@ final class AprsStore: ObservableObject {
                 isOutgoing: true
             )
         )
+        saveData()
     }
 
     func sendPosition(latitude: Double, longitude: Double) {
@@ -278,6 +301,7 @@ final class AprsStore: ObservableObject {
                     )
                 )
             }
+            self.saveData()
         }
     }
 }

@@ -292,14 +292,16 @@ struct ReminderListView: View {
                             PassRow(pass: pass, satelliteName: model.selectedSatelliteName, onRemind: {})
                             Spacer()
                             Button {
+                                let settings = ReminderSettingsStore.shared
                                 let ok = NotificationManager.shared.schedulePassReminder(
                                     satelliteName: model.selectedSatelliteName,
-                                    aosMs: pass.aosMs
+                                    aosMs: pass.aosMs,
+                                    leadSeconds: settings.leadSeconds
                                 )
                                 if ok {
                                     scheduledIds.insert(pass.aosMs)
                                     NotificationManager.shared.requestAuthorizationIfNeeded()
-                                    message = "已设提醒（AOS 前 5 分钟）"
+                                    message = "已设提醒（AOS 前 \(settings.leadMinutes) 分钟）"
                                 } else {
                                     message = "这次过境来不及提醒"
                                 }

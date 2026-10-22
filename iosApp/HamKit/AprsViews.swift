@@ -5,6 +5,8 @@ import Shared
 /// APRS 主页面：对应 Android `AprsMain` —— 连接状态、收发开关、去各子页。
 struct AprsMainView: View {
 
+    @ObservedObject var model: TrackerModel
+    @ObservedObject var location: LocationProvider
     @ObservedObject var store = AprsStore.shared
 
     var body: some View {
@@ -30,7 +32,7 @@ struct AprsMainView: View {
                 }
                 if store.isConnected {
                     Button("发送当前位置") {
-                        store.sendPosition(latitude: 39.9042, longitude: 116.4074)
+                        store.sendPosition(latitude: model.latitude, longitude: model.longitude)
                     }
                     .disabled(!store.config.enableTransmit || store.config.isReadOnly)
                 }

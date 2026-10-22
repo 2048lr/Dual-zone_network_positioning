@@ -376,12 +376,15 @@ final class TrackerModel: ObservableObject {
     /// 对齐 Android `refreshRemindersFromPrediction`；iOS 只能在 App 运行时刷新，
     /// 后台刷新由系统调度近似（见 docs/IOS_ADAPTATION.md）。
     private func refreshScheduledReminders() {
+        let settings = ReminderSettingsStore.shared
+        guard settings.enabled else { return }
         let flags = SatelliteCategoryManager.shared.snapshot.reminderFlags
         guard !flags.isEmpty else { return }
         for item in nearbyPasses where flags.contains(Int32(item.norad)) {
             NotificationManager.shared.schedulePassReminder(
                 satelliteName: item.name,
-                aosMs: item.pass.aosMs
+                aosMs: item.pass.aosMs,
+                leadSeconds: settings.leadSeconds
             )
         }
     }
