@@ -36,9 +36,9 @@ iosApp/
 ## 构建步骤
 
 ```bash
-# 1. 生成 Xcode 工程（天气需要高德 Web Key；没有可留空，天气会提示未配置）
+# 1. 生成 Xcode 工程
 cd iosApp
-AMAP_WEB_KEY=你的高德WebKey xcodegen generate
+xcodegen generate
 
 # 2. 打开
 open HamKit.xcodeproj
@@ -46,8 +46,8 @@ open HamKit.xcodeproj
 # 3. 选择模拟器（Apple Silicon）后 Cmd+R
 ```
 
-> `AMAP_WEB_KEY` 会写入 Info.plist 的 `AMapWebKey`，用于高德天气与逆地理编码。
-> 它随 App 分发、不是秘密；请在构建环境里注入，不要提交到仓库。
+> 天气与逆地理编码直接走高德 Web 服务，Key 写死在 `HamKit/AmapKey.swift`
+> （与 Android 端同一把；随 App 分发，安全性依赖高德控制台配额/用量监控）。
 
 Xcode 的 Run Script 阶段会自动执行：
 

@@ -241,7 +241,7 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | SSTV | 模式表/VIS/同步/FFT/解调/解码/编码（从 Android 移植） | 接收、音频文件解码、图库（分享/删除）、设置、发射 | ✅ 前台收发；后台接收受系统限制 |
 | HF Fax | `HfFaxDecoder`（WEFAX 解调/解码） | 接收、解码、保存相册 | ✅ 仅前台接收 |
 | QSO 日志 | `QsoRecord`、`QsoExporter`（ADIF 3.1.4 / ADX XML） | 列表、新增/编辑、删除、分享导出 | ✅ 持久化用 JSON 文件（Android 用 Room） |
-| 天气 | WeatherKit（原生）+ `WeatherApi`（高德兜底） | 首页时间卡天气 + 城市 | ✅ 原生优先；无 WeatherKit 权限时回退高德（需 Key） |
+| 天气 | `WeatherApi`（高德 Web 直连，Key 写死在 `AmapKey.swift`） | 首页时间卡天气 + 城市 | ✅ 与 Android 同源；Key 随 App 分发 |
 
 ### iOS 无等价能力的近似方案
 
@@ -265,5 +265,5 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 - FT8：自动 CQ 主叫、多候选择优、重发策略未移植；自动应答仅覆盖「呼叫本台」路径
 - SSTV：滚动预览（`SstvRollingImage`）与「播放捕获」未移植；仅前台接收
 - APRS：无 HTTP 上传器、无消息重试/ack 跟踪、地图仅 MapKit 标注
-- 天气：需构建时注入 `AMAP_WEB_KEY`，否则仅提示未配置
+- 天气：Key 写死在 `iosApp/HamKit/AmapKey.swift`，公开仓库会暴露 Key（用户明确要求）
 - Android 的 WorkManager 后台提醒刷新在 iOS 上退化为「启动/回前台时重建」
