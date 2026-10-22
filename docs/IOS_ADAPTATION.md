@@ -241,7 +241,7 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | SSTV | 模式表/VIS/同步/FFT/解调/解码/编码（从 Android 移植） | 接收、图库、设置、发射（相册选图 → 编码 → 播放） | ✅ 前台收发；后台接收受系统限制 |
 | HF Fax | `HfFaxDecoder`（WEFAX 解调/解码） | 接收、解码、保存相册 | ✅ 仅前台接收 |
 | QSO 日志 | `QsoRecord`、`QsoExporter`（ADIF 3.1.4 / ADX XML） | 列表、新增/编辑、删除、分享导出 | ✅ 持久化用 JSON 文件（Android 用 Room） |
-| 天气 | ⬜ 待移植（高德 Web） | 首页占位 | ⬜ 需高德 Web Key 或改用其他源 |
+| 天气 | `WeatherApi`（高德 Web：逆地理编码 + 实况 + 4 天预报） | 首页时间卡天气 + 城市 | ✅ 需构建时注入 `AMAP_WEB_KEY` |
 
 ### iOS 无等价能力的近似方案
 

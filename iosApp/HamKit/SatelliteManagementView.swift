@@ -12,6 +12,7 @@ struct SatelliteManagementView: View {
     @ObservedObject var location: LocationProvider
     @ObservedObject var categoryManager = SatelliteCategoryManager.shared
     @ObservedObject var filter = SatelliteFilterModel.shared
+    @ObservedObject private var weather = WeatherStore.shared
 
     @State private var now = Date()
     @State private var expanded: Set<Int32> = []
@@ -68,6 +69,9 @@ struct SatelliteManagementView: View {
         .navigationTitle("卫星详情")
         .navigationBarTitleDisplayMode(.large)
         .onReceive(ticker) { now = $0 }
+        .onAppear {
+            WeatherStore.shared.refresh(latitude: model.latitude, longitude: model.longitude)
+        }
     }
 
     // MARK: - 顶部概览
@@ -161,7 +165,7 @@ struct SatelliteManagementView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Self.timeFormatter.string(from: now))
                             .font(.subheadline.monospacedDigit())
-                        Text(location.statusText)
+                        Text(weather.city.isEmpty ? location.statusText : weather.city)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

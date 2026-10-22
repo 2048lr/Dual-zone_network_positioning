@@ -28,6 +28,8 @@
     <string>HamKit 需要使用麦克风接收 CW / FT8 / SSTV / HF Fax 音频并进行本地解码，音频不会上传。</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>HamKit 需要写入相册以保存解码出的 SSTV / HF Fax 图片。</string>
+    <key>AMapWebKey</key>
+    <string>$(AMAP_WEB_KEY)</string>
     <key>UILaunchScreen</key>
     <dict/>
     <key>UIRequiredDeviceCapabilities</key>

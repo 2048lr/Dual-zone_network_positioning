@@ -153,6 +153,24 @@ object HamKitApi {
     }
 
     /**
+     * 拉取天气（高德 Web：逆地理编码 + 实时 + 4 天预报）。
+     * Key 由调用方传入（iOS 从 Info.plist 读取）；未安装网络实现时返回错误。
+     */
+    fun fetchWeather(
+        latitude: Double,
+        longitude: Double,
+        apiKey: String,
+        callback: (WeatherSnapshot) -> Unit,
+    ) {
+        val transport = httpTransport
+        if (transport == null) {
+            callback(WeatherSnapshot(null, "未安装网络实现", 0L))
+            return
+        }
+        WeatherApi.fetch(transport, latitude, longitude, apiKey, callback)
+    }
+
+    /**
      * 拉取 AMSAT 状态摘要（过去 24 小时，每颗卫星一条代表状态）。
      * 与 Android `AmsatStatusApiService.fetchStatusSummaries` 同源。
      */

@@ -52,6 +52,12 @@ struct ContentView: View {
         }
         .background(Color(.systemGroupedBackground))
         .navigationTitle("HamKit")
+        .onAppear {
+            WeatherStore.shared.refresh(latitude: model.latitude, longitude: model.longitude)
+        }
+        .onReceive(model.$latitude.dropFirst()) { _ in
+            WeatherStore.shared.refresh(latitude: model.latitude, longitude: model.longitude)
+        }
     }
 }
 
@@ -61,6 +67,7 @@ struct ContentView: View {
 /// 时钟每秒刷新只在本组件内部持有，避免整个首页跟着每秒重建。
 private struct HomeTimeCard: View {
 
+    @ObservedObject private var weather = WeatherStore.shared
     @State private var now = Date()
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -79,7 +86,10 @@ private struct HomeTimeCard: View {
                 .font(.footnote)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-            Text("天气接入规划中 · 每日一言规划中")
+            Text(weather.summary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(DailyQuote.today())
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }

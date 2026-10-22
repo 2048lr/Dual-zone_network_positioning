@@ -21,6 +21,9 @@ settings:
     # Kotlin/Native 产出的 Shared.framework 由下面的 Run Script 生成到该目录
     FRAMEWORK_SEARCH_PATHS: "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
     OTHER_LDFLAGS: "$(inherited) -framework Shared"
+    # 高德 Web 服务 Key（天气/逆地理编码）：生成工程时从环境变量读取，
+    # 用法：AMAP_WEB_KEY=你的key xcodegen generate。留空则天气页提示未配置。
+    AMAP_WEB_KEY: "${AMAP_WEB_KEY}"
 
 targets:
   HamKit:
