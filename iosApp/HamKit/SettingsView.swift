@@ -36,48 +36,6 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            Section("外观") {
-                Picker("深浅模式", selection: $theme.appearance) {
-                    ForEach(MiuixAppearance.allCases) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("强调色").font(.subheadline)
-                    HStack(spacing: 10) {
-                        ForEach(MiuixAccent.allCases) { accent in
-                            Button {
-                                theme.accent = accent
-                            } label: {
-                                Circle()
-                                    .fill(accent.color)
-                                    .frame(width: 24, height: 24)
-                                    .overlay {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundStyle(.white)
-                                            .opacity(theme.accent == accent ? 1 : 0)
-                                    }
-                                    .overlay {
-                                        Circle()
-                                            .strokeBorder(MiuixTheme.card, lineWidth: 2)
-                                            .opacity(theme.accent == accent ? 1 : 0)
-                                    }
-                            }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel(Text(accent.label))
-                        }
-                    }
-                }
-                .padding(.vertical, 2)
-
-                Text("强调色会应用到按钮、链接与选中态；深浅模式可单独覆盖系统设置。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
             Section("观测") {
                 NavigationLink(value: Route.locationDetail) {
                     Label("定位详情", systemImage: "location")
@@ -99,7 +57,12 @@ struct SettingsView: View {
 
             Section("外观") {
                 NavigationLink(value: Route.colorPalette) {
-                    Label("主题配色", systemImage: "paintpalette")
+                    LabeledContent {
+                        Text(theme.appearance.label + " · " + theme.accent.label)
+                            .foregroundStyle(.secondary)
+                    } label: {
+                        Label("主题配色", systemImage: "paintpalette")
+                    }
                 }
             }
 
@@ -233,18 +196,81 @@ struct PermissionsView: View {
     }
 }
 
-/// 「主题配色」页：对应 Android ColorPalette 页；iOS 端跟随系统深浅色，先落说明页。
+/// 「主题配色」页：对应 Android ColorPalette 页（外观模式 + 主题色）。
+///
+/// Android 用 Miuix 的 `ThemeController`（Monet 动态取色）；iOS 没有对应的取色器，
+/// 这里提供固定的 9 档色板 + 三种外观模式，效果等价于 Android 的「自定义配色」。
 struct ColorPaletteView: View {
+
+    @ObservedObject private var theme = ThemeStore.shared
+
+    private let columns = [GridItem(.adaptive(minimum: 68), spacing: 12)]
+
     var body: some View {
         List {
             Section {
-                LabeledContent("外观", value: "跟随系统")
-                LabeledContent("主题色", value: "系统强调色")
+                Picker("外观", selection: $theme.appearance) {
+                    ForEach(MiuixAppearance.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("外观")
             } footer: {
-                Text("Android 端的自定义配色（Miuix 主题）尚未移植到 iOS；届时会在这里提供选择。")
+                Text("「跟随系统」时深浅色由 iOS 显示设置决定；选浅色/深色则覆盖系统设置。")
+            }
+
+            Section {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(MiuixAccent.allCases) { accent in
+                        Button {
+                            theme.accent = accent
+                        } label: {
+                            VStack(spacing: 6) {
+                                Circle()
+                                    .fill(accent.color)
+                                    .frame(width: 34, height: 34)
+                                    .overlay {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .opacity(theme.accent == accent ? 1 : 0)
+                                    }
+                                    .overlay {
+                                        Circle()
+                                            .strokeBorder(Color.white.opacity(0.85), lineWidth: 2)
+                                            .opacity(theme.accent == accent ? 1 : 0)
+                                    }
+                                Text(accent.label)
+                                    .font(.caption2)
+                                    .foregroundStyle(theme.accent == accent ? MiuixTheme.primary : .secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel(Text(accent.label))
+                    }
+                }
+                .padding(.vertical, 6)
+            } header: {
+                Text("主题色")
+            } footer: {
+                Text("主题色会应用到按钮、链接、选中态与分类高亮。Android 端的动态取色（Monet）在 iOS 上没有对应 API，因此这里用固定色板。")
+            }
+
+            Section {
+                HStack(spacing: 10) {
+                    Image(systemName: "circle.fill").foregroundStyle(MiuixTheme.primary)
+                    Text("示例：导航返回箭头、开关、链接都会跟随主题色")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(MiuixTheme.background)
         .navigationTitle("主题配色")
         .navigationBarTitleDisplayMode(.inline)
     }
