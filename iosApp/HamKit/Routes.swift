@@ -14,6 +14,8 @@ enum Route: Hashable {
     // MARK: 卫星链路（全部做实）
     case satelliteManagement
     case satelliteFilter
+    case satelliteCategoryManager
+    case satelliteAssignment(norad: Int32)
     case satelliteDetail(norad: Int32)
     case satelliteRadar(norad: Int32)
     case satelliteMap(norad: Int32)

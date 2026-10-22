@@ -7,29 +7,62 @@ import Shared
 
 // MARK: - 卫星管理（列表）
 
-/// 卫星管理页：对应 Android SatelliteManagement —— 完整列表 + 筛选入口 + 收藏分组。
+/// 卫星管理页：对应 Android SatelliteManagement —— 分类筛选 + 完整列表 + 收藏分组。
 struct SatelliteManagementView: View {
 
     @ObservedObject var model: TrackerModel
+    @ObservedObject var categoryManager = SatelliteCategoryManager.shared
+    @State private var filterCategoryIds: Set<String> = []
+
+    /// 按分类筛选（命中任一选中分类即通过，OR 语义，与 Android 一致）
+    private var visible: [TleRecord] {
+        guard !filterCategoryIds.isEmpty else { return model.satellites }
+        return model.satellites.filter { record in
+            !categoryManager.snapshot.categoryIds(of: record.norad)
+                .isDisjoint(with: filterCategoryIds)
+        }
+    }
 
     var body: some View {
         List {
             Section {
+                NavigationLink(value: Route.satelliteCategoryManager) {
+                    Label("分类管理", systemImage: "folder.badge.gearshape")
+                }
                 NavigationLink(value: Route.satelliteFilter) {
-                    Label("筛选卫星", systemImage: "line.3.horizontal.decrease.circle")
+                    Label("按名称 / NORAD 筛选", systemImage: "line.3.horizontal.decrease.circle")
+                }
+            }
+
+            if !filterCategoryIds.isEmpty {
+                Section {
+                    ForEach(Array(filterCategoryIds), id: \.self) { id in
+                        HStack {
+                            Text("筛选：\(categoryManager.snapshot.category(byId: id)?.name ?? id)")
+                                .font(.footnote)
+                            Spacer()
+                            Button {
+                                filterCategoryIds.remove(id)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
                 }
             }
 
             if !model.favorites.isEmpty {
-                Section("收藏") {
-                    ForEach(model.satellites.filter { model.favorites.contains($0.norad) }, id: \.norad) { record in
+                Section("我的关注 / 收藏") {
+                    ForEach(visible.filter { model.favorites.contains($0.norad) }, id: \.norad) { record in
                         satelliteRow(record)
                     }
                 }
             }
 
-            Section("全部卫星（\(model.satellites.count)）") {
-                ForEach(model.satellites, id: \.norad) { record in
+            Section("全部卫星（\(visible.count)）") {
+                ForEach(visible, id: \.norad) { record in
                     satelliteRow(record)
                 }
             }
@@ -75,6 +108,10 @@ struct SatelliteManagementView: View {
                 Label("收藏", systemImage: "star")
             }
             .tint(.yellow)
+            NavigationLink(value: Route.satelliteAssignment(norad: record.norad)) {
+                Label("归类", systemImage: "folder.badge.plus")
+            }
+            .tint(.blue)
         }
     }
 }

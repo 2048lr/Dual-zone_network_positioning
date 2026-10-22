@@ -27,6 +27,8 @@ struct RouteDestination: View {
         // 卫星链路
         case .satelliteManagement: SatelliteManagementView(model: model)
         case .satelliteFilter:     SatelliteFilterView(model: model)
+        case .satelliteCategoryManager: SatelliteCategoryManagerView(model: model, filterCategoryIds: .constant([]))
+        case .satelliteAssignment(let norad): SatelliteAssignmentView(model: model, norad: norad)
         case .satelliteDetail:     SatelliteDetailView(model: model, norad: route.noradParam)
         case .satelliteRadar:      SatelliteRadarView(model: model, norad: route.noradParam)
         case .satelliteMap:        SatelliteMapView(model: model, norad: route.noradParam)
