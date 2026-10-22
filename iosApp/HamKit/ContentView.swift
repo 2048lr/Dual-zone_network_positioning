@@ -35,7 +35,7 @@ struct ContentView: View {
                     CwPracticeHomeView()
                 }
                 EntryCard(title: "APRS", summary: "业余无线电位置报告", systemImage: "dot.circle.and.cursorlines.rectangle") {
-                    AprsMainView()
+                    AprsMainView(model: model, location: location)
                 }
                 EntryCard(title: "FT8", summary: "数字模式编解码与通联", systemImage: "waveform.path.ecg") {
                     Ft8MainView()
