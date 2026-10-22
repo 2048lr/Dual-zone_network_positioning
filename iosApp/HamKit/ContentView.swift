@@ -168,9 +168,7 @@ private struct NearbyPassesCard: View {
                 }
             }
 
-            NavigationLink {
-                SatelliteDetailView(model: model)
-            } label: {
+            NavigationLink(value: Route.satelliteDetail(norad: model.selectedNorad ?? 0)) {
                 Text("查看雷达与详情")
                     .font(.subheadline)
             }
