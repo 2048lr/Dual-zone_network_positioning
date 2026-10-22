@@ -34,6 +34,8 @@ final class TrackerModel: ObservableObject {
     @Published private(set) var track: [PositionSnapshot] = []
     /// 未来 48 小时的前 3 次过境
     @Published private(set) var passes: [PassSnapshot] = []
+    /// 附近过境卫星：每颗卫星的下一次过境（在境优先、按 AOS 排序），对齐 Android 逻辑
+    @Published private(set) var nearbyPasses: [Shared.SatelliteNextPass] = []
     @Published private(set) var isSearchingPass = false
     @Published private(set) var favorites: Set<Int32> = []
     @Published private(set) var errorText: String?
@@ -264,9 +266,20 @@ final class TrackerModel: ObservableObject {
                 searchHours: 48,
                 maxCount: 3
             )
+            // 附近过境卫星：跨星预测（对齐 Android SatellitePredictor 逻辑）
+            let nearby = HamKitApi.shared.nextPassesAcrossSatellites(
+                tles: self?.satellites ?? [],
+                latitude: lat,
+                longitude: lon,
+                altitudeM: alt,
+                fromMs: nowMs,
+                searchHours: 48,
+                maxCount: 5
+            )
             DispatchQueue.main.async {
                 guard let self, requestId == self.passRequestId else { return }
                 self.passes = result
+                self.nearbyPasses = nearby
                 self.isSearchingPass = false
             }
         }

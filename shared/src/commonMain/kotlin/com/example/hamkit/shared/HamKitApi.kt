@@ -29,6 +29,17 @@ data class ZoneSnapshot(
 )
 
 /**
+ * 一次过境 + 所属卫星：供「附近过境卫星」跨星预测使用。
+ * 顶层类（非 HamKitApi 嵌套），保证 Swift 侧导出名为 `SatelliteNextPass`。
+ */
+data class SatelliteNextPass(
+    val name: String,
+    val norad: Int,
+    /** 该卫星的下一次过境（含当前在境那一次） */
+    val pass: PassSnapshot,
+)
+
+/**
  * 某一时刻卫星的地平坐标与星下点（角度均为度，距离为 km）。
  */
 data class PositionSnapshot(
@@ -291,6 +302,58 @@ object HamKitApi {
      * 判断 TLE 是否可解析（用于设置页校验用户粘贴的 TLE）。
      */
     fun isValidTle(tle: List<String>): Boolean = parseTleOrNull(tle) != null
+
+    /**
+     * 对多颗卫星分别预测下一次过境（含当前在境），在境优先、按 AOS 升序返回。
+     *
+     * 与 Android 端 `SatellitePredictor.predictUpcomingPasses` 语义一致：
+     * 每颗卫星最多取 1 次过境，isCurrentlyVisible 优先，其次按 AOS 排序。
+     *
+     * @param tles 卫星记录列表（名称 + 两行 TLE）
+     * @param maxCount 最多返回多少颗（如首页 top5 传 5）
+     */
+    fun nextPassesAcrossSatellites(
+        tles: List<TleRecord>,
+        latitude: Double,
+        longitude: Double,
+        altitudeM: Double,
+        fromMs: Long,
+        searchHours: Int = 48,
+        maxCount: Int = 5,
+    ): List<SatelliteNextPass> {
+        if (tles.isEmpty() || maxCount <= 0) return emptyList()
+        val toMs = fromMs + searchHours * 3_600_000L
+        return tles.asSequence()
+            .map { record ->
+                val elements = parseTleOrNull(listOf(record.name, record.line1, record.line2))
+                    ?: return@map null
+                val propagator = SatellitePropagator(elements, latitude, longitude, altitudeM)
+                val pass = PassFinder.nextPass(propagator, fromMs, toMs)
+                    ?: return@map null
+                if (pass.aosMs >= toMs) return@map null
+                SatelliteNextPass(
+                    name = record.name.trim().ifEmpty { record.norad.toString() },
+                    norad = record.norad,
+                    pass = PassSnapshot(
+                        aosMs = pass.aosMs,
+                        losMs = pass.losMs,
+                        maxElevationDeg = pass.maxElevationDeg,
+                        maxElevationMs = pass.maxElevationMs,
+                        aosAzimuthDeg = pass.aosAzimuthDeg,
+                        losAzimuthDeg = pass.losAzimuthDeg,
+                        durationSeconds = pass.durationSeconds,
+                        isCurrentlyVisible = pass.isCurrentlyVisible,
+                    ),
+                )
+            }
+            .filterNotNull()
+            .sortedWith(
+                compareByDescending<SatelliteNextPass> { it.pass.isCurrentlyVisible }
+                    .thenBy { it.pass.aosMs }
+            )
+            .take(maxCount)
+            .toList()
+    }
 
     /** 内部工具：把 SGP4 的弧度结果转成 Swift 友好的度/km 快照。 */
     private fun PropagatedPosition.toSnapshot(): PositionSnapshot = PositionSnapshot(

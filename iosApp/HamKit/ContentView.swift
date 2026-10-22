@@ -140,31 +140,37 @@ private struct NearbyPassesCard: View {
                 }
             }
 
-            if model.isSearchingPass && model.passes.isEmpty {
+            if model.isSearchingPass && model.nearbyPasses.isEmpty {
                 Text("正在计算…").foregroundStyle(.secondary)
-            } else if model.passes.isEmpty {
+            } else if model.nearbyPasses.isEmpty {
                 Text("48 小时内暂无过境").foregroundStyle(.secondary)
             } else {
-                ForEach(model.passes.prefix(5), id: \.aosMs) { pass in
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(model.selectedSatelliteName)
-                                .font(.subheadline.weight(.medium))
-                            Text(pass.isCurrentlyVisible ? "在境" : "即将过境")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("AOS " + Self.timeFormatter.string(from: pass.aosMs.date))
-                                .font(.caption)
-                                .monospacedDigit()
-                            Text("最大仰角 \(String(format: "%.0f", pass.maxElevationDeg))°")
-                                .font(.caption)
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
+                ForEach(Array(model.nearbyPasses.prefix(5).enumerated()), id: \.element.norad) { _, item in
+                    Button {
+                        model.selectSatellite(norad: Int32(item.norad))
+                    } label: {
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.name)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(.primary)
+                                Text(item.pass.isCurrentlyVisible ? "在境" : "即将过境")
+                                    .font(.caption)
+                                    .foregroundStyle(item.pass.isCurrentlyVisible ? Color.green : Color.secondary)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("AOS " + Self.timeFormatter.string(from: item.pass.aosMs.date))
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                Text("最大仰角 \(String(format: "%.0f", item.pass.maxElevationDeg))°")
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
                 }
             }
 
