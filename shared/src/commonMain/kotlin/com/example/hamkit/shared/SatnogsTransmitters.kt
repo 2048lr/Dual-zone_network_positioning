@@ -121,11 +121,15 @@ object SatnogsTransmitters {
 
     private fun parseItem(raw: Any?): Transmitter? {
         val item = raw as? Map<*, *> ?: return null
-        val norad = (item["norad_cat_id"] as? Double)?.toInt() ?: return null
+        // 字段读取一律走「宽松取值」：Android 用的是 org.json 的 optInt / optLong /
+        // optBoolean，数字/数字字符串、布尔/"true" 字符串都接受；MiniJson 只有
+        // Double/String/Boolean 三种标量，这里对齐同样的宽容度，避免 CDN 镜像
+        // 与官方接口在类型上略有差异就整条丢弃。
+        val norad = optDouble(item["norad_cat_id"])?.toInt() ?: return null
         if (norad <= 0) return null
 
-        val uplink = (item["uplink_low"] as? Double)?.toLong() ?: 0L
-        val downlink = (item["downlink_low"] as? Double)?.toLong() ?: 0L
+        val uplink = optDouble(item["uplink_low"])?.toLong() ?: 0L
+        val downlink = optDouble(item["downlink_low"])?.toLong() ?: 0L
         if (uplink <= 0 && downlink <= 0) return null
 
         val mode = cleanField(item["uplink_mode"] as? String)
@@ -147,15 +151,37 @@ object SatnogsTransmitters {
             ?.takeIf { it.isNotBlank() && it != "null" }
             ?: Transmitter.STATUS_UNKNOWN
 
+        // 上游有的版本把极性字段叫 invert，有的叫 inverted，两个都认。
+        val inverted = optBoolean(item["inverted"]) ?: optBoolean(item["invert"]) ?: false
+
         return Transmitter(
             norad = norad,
             name = name,
             mode = mode.trim(),
             uplinkHz = uplink,
             downlinkHz = downlink,
-            inverted = item["inverted"] as? Boolean ?: false,
+            inverted = inverted,
             status = status,
         )
+    }
+
+    /** 等价于 org.json 的 `optDouble`：数字或数字字符串；非法值当 0（返回 null 由调用方兜底）。 */
+    private fun optDouble(value: Any?): Double? = when (value) {
+        is Double -> value
+        is Number -> value.toDouble()
+        is String -> value.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+        else -> null
+    }
+
+    /** 等价于 org.json 的 `optBoolean`：布尔或 "true"/"false" 字符串。 */
+    private fun optBoolean(value: Any?): Boolean? = when (value) {
+        is Boolean -> value
+        is String -> when (value.trim().lowercase()) {
+            "true" -> true
+            "false" -> false
+            else -> null
+        }
+        else -> null
     }
 
     /** 空串/空白/字面量 "null" 视为缺失；剔除中括号（"[Beacon]" → "Beacon"）。 */

@@ -364,7 +364,11 @@ SATNOGS_TRANSMITTERS_URL="https://db.satnogs.org/api/transmitters/?format=json"
 # 刻意放在 DL_DIR 之外：第 5 步的 `aws s3 sync --delete` 只处理 DL_DIR，
 # 这样即使带 --prune 也不可能把 S3 上的 transmitters.json 删掉。
 TX_OUT="${WORK_DIR}/transmitters.json"
+TX_RAW="${WORK_DIR}/transmitters.raw.json"
 TX_STAMP="${WORK_DIR}/transmitters.ts"
+# 与 Android `TransmitterDataSource.parseTransmitterItem` 同规则的裁剪脚本
+# （只保留 App 用得到的 7 个字段，体积约为原始的 1/3～1/5）
+TX_TRIM="/usr/local/bin/trim-transmitters.mjs"
 TX_MIN_INTERVAL_SEC=86400     # 24 小时
 TX_MIN_RECORDS=3000           # 当前 4000+ 条；低于此值视为异常响应
 
@@ -378,25 +382,41 @@ tx_due() {
 }
 
 if tx_due; then
-  tx_tmp="${WORK_DIR}/.transmitters.json.part"
-  tx_code=$(curl -s -o "$tx_tmp" -w '%{http_code}' --max-time 180 --retry 2 --retry-delay 5 \
+  tx_code=$(curl -s -o "$TX_RAW" -w '%{http_code}' --max-time 240 --retry 2 --retry-delay 5 \
               -A 'hamkit-tle-sync/1.0 (+https://hamkit.click)' \
               "$SATNOGS_TRANSMITTERS_URL" 2>/dev/null || echo 000)
-  tx_size="$(stat -c%s "$tx_tmp" 2>/dev/null || echo 0)"
+  tx_raw_size="$(stat -c%s "$TX_RAW" 2>/dev/null || echo 0)"
   tx_count=0
-  [ "$tx_size" -gt 0 ] && tx_count="$(grep -o '"norad_cat_id"' "$tx_tmp" | wc -l | tr -d ' ')"
-  if [ "$tx_code" = "200" ] && [ "$tx_count" -ge "$TX_MIN_RECORDS" ]; then
-    if [ -f "$TX_OUT" ] && cmp -s "$tx_tmp" "$TX_OUT"; then
-      log "  · transmitters.json 内容未变化，跳过替换（省一次上传）"
-      rm -f "$tx_tmp"
-    else
-      mv -f "$tx_tmp" "$TX_OUT"
-      log "  ✓ transmitters.json（${tx_size} B，约 ${tx_count} 条）"
-    fi
-    date +%s > "$TX_STAMP"
+  [ "$tx_raw_size" -gt 0 ] && tx_count="$(grep -o '"norad_cat_id"' "$TX_RAW" | wc -l | tr -d ' ')"
+
+  if [ "$tx_code" != "200" ] || [ "$tx_count" -lt "$TX_MIN_RECORDS" ]; then
+    log "  ✗ transmitters.json 获取失败/异常（HTTP ${tx_code}, ${tx_raw_size} B, ${tx_count} 条），保留 S3 现有文件"
+    rm -f "$TX_RAW"
   else
-    log "  ✗ transmitters.json 获取失败/异常（HTTP ${tx_code}, ${tx_size} B, ${tx_count} 条），保留 S3 现有文件"
-    rm -f "$tx_tmp"
+    # 裁剪（规则照抄 Android）。脚本不存在或失败时退回原始 JSON，功能不受影响。
+    tx_new="${TX_OUT}.new"
+    if [ -x "$TX_TRIM" ] && node "$TX_TRIM" "$TX_RAW" "$tx_new" 2>&1 | sed 's/^/    /' | tee -a "$LOG_FILE"; then
+      :
+    elif [ -x "$TX_TRIM" ]; then
+      log "  ! 裁剪失败，退回原始 JSON（体积更大但可用）"
+      cp -f "$TX_RAW" "$tx_new"
+    else
+      log "  · 未安装 $TX_TRIM，直接镜像原始 JSON"
+      cp -f "$TX_RAW" "$tx_new"
+    fi
+
+    if [ ! -s "$tx_new" ]; then
+      log "  ✗ 裁剪输出为空，保留 S3 现有文件"
+      rm -f "$tx_new"
+    elif [ -f "$TX_OUT" ] && cmp -s "$tx_new" "$TX_OUT"; then
+      log "  · transmitters.json 内容未变化，跳过替换（省一次上传）"
+      rm -f "$tx_new"
+    else
+      mv -f "$tx_new" "$TX_OUT"
+      log "  ✓ transmitters.json（$(stat -c%s "$TX_OUT") B，来自 ${tx_count} 条原始记录）"
+    fi
+    rm -f "$TX_RAW"
+    date +%s > "$TX_STAMP"
   fi
 else
   log "  - transmitters.json 在 24 小时窗口内，跳过"
