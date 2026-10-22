@@ -199,6 +199,21 @@ object HamKitApi {
     }
 
     /**
+     * 拉取每日一言（`https://v1.hitokoto.cn/`），与 Android `HitokotoApiService` 同源。
+     *
+     * 失败时 [DailyQuoteSnapshot.error] 非空、正文为空，iOS 侧据此回退本地文案池
+     * （并保留「今天还没拿到」状态，下次仍会重试）。
+     */
+    fun fetchDailyQuote(callback: (DailyQuoteSnapshot) -> Unit) {
+        val transport = httpTransport
+        if (transport == null) {
+            callback(DailyQuoteSnapshot("", "", "未安装网络实现"))
+            return
+        }
+        Hitokoto.fetch(transport, callback)
+    }
+
+    /**
      * 拉取 AMSAT 状态摘要（过去 24 小时，每颗卫星一条代表状态）。
      * 与 Android `AmsatStatusApiService.fetchStatusSummaries` 同源。
      */

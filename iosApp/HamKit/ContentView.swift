@@ -31,7 +31,8 @@ struct ContentView: View {
                 )
 
                 EntryCard(title: "CW 练习", summary: "自由练习 / 教程 / 摩斯电码编解码", systemImage: "dot.radiowaves.left.and.right", route: .cwPractice)
-                EntryCard(title: "APRS", summary: "业余无线电位置报告", systemImage: "dot.circle.and.cursorlines.rectangle", route: .aprsMain)
+                // 原来的 dot.circle.and.cursorlines.rectangle 不是合法 SF Symbol，图标位是空的
+                EntryCard(title: "APRS", summary: "业余无线电位置报告", systemImage: "antenna.radiowaves.left.and.right", route: .aprsMain)
                 EntryCard(title: "FT8", summary: "数字模式编解码与通联", systemImage: "waveform.path.ecg", route: .ft8Main)
                 EntryCard(title: "SSTV", summary: "慢扫描电视接收与解码", systemImage: "photo.on.rectangle.angled", route: .sstvMain(presetModeName: nil, autoStart: false))
                 EntryCard(title: "QSO 日志", summary: "通联记录与 ADIF 导出", systemImage: "book.closed", route: .qsoLogList)
@@ -57,6 +58,7 @@ struct ContentView: View {
 private struct HomeTimeCard: View {
 
     @ObservedObject private var weather = WeatherStore.shared
+    @ObservedObject private var quote = DailyQuoteStore.shared
     @State private var now = Date()
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -71,22 +73,38 @@ private struct HomeTimeCard: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            Text(Self.utcFormatter.string(from: now) + " UTC")
-                .font(.footnote)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+
+            // UTC 单独给个底色：HAM 习惯按 UTC 记时间，扫一眼就要能定位
+            HStack(spacing: 5) {
+                Image(systemName: "globe")
+                    .font(.caption2)
+                Text(Self.utcFormatter.string(from: now))
+                    .font(.footnote.monospacedDigit())
+                Text("UTC")
+                    .font(.caption2.weight(.semibold))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .foregroundStyle(Color.accentColor)
+            .background(Color.accentColor.opacity(0.14))
+            .clipShape(Capsule())
+
             Text(weather.summary)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text(DailyQuote.today())
+
+            Text(quote.displayText)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+                .lineLimit(2)
+                .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .onReceive(timer) { now = $0 }
+        .onAppear { quote.refreshIfNeeded() }
     }
 
     private static let timeFormatter: DateFormatter = {

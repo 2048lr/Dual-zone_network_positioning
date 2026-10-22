@@ -19,7 +19,9 @@ final class URLSessionTransport: NSObject, HttpTransport {
         request.httpMethod = "GET"
         request.timeoutInterval = TimeInterval(timeoutMs) / 1000.0
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue("text/plain", forHTTPHeaderField: "Accept")
+        // 不写死 Accept: 和 Android 的 OkHttp 一样交给默认值（*/*）。
+        // 之前固定成 text/plain，对 TLE 没影响，但对 JSON 接口（SatNOGS / hitokoto）
+        // 是不必要的内容协商风险。
 
         URLSession.shared.dataTask(with: request) { data, response, error in
             let result: HttpResponse

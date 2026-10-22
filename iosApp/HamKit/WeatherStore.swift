@@ -75,7 +75,9 @@ final class WeatherStore: ObservableObject {
     }
 }
 
-/// 每日一言（本地列表，Android 端为内置文案；iOS 版先内置少量并随机）。
+/// 每日一言的**本地兜底文案池**：网络不可用（或当天还没拉到）时首页展示这些。
+/// 真正的「每日一言」由 `DailyQuoteStore` 从 https://v1.hitokoto.cn/ 获取
+/// （对齐 Android `HitokotoApiService` + `MainViewModel.refreshDailyQuote()`）。
 enum DailyQuote {
     private static let quotes = [
         "73，愿传播常在。",

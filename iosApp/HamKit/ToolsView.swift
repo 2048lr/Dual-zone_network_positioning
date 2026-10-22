@@ -26,7 +26,7 @@ struct ToolsView: View {
                     Label("CW 练习", systemImage: "dot.radiowaves.left.and.right")
                 }
                 NavigationLink(value: Route.aprsMain) {
-                    Label("APRS", systemImage: "dot.circle.and.cursorlines.rectangle")
+                    Label("APRS", systemImage: "antenna.radiowaves.left.and.right")
                 }
                 NavigationLink(value: Route.ft8Main) {
                     Label("FT8", systemImage: "waveform.path.ecg")
