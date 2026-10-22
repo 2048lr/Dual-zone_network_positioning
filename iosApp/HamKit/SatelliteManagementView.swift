@@ -23,6 +23,19 @@ struct SatelliteManagementView: View {
     var body: some View {
         List {
             overviewSection
+
+            // 两个入口必须是**各自独立的行**。
+            // 之前把两个 NavigationLink 并排塞进同一个 HStack（同一行）里，
+            // 一次点击会触发两次 push（分类 + 筛选），返回时顺序就乱了。
+            Section {
+                NavigationLink(value: Route.satelliteFilter) {
+                    Label("筛选卫星", systemImage: "line.3.horizontal.decrease")
+                }
+                NavigationLink(value: Route.satelliteCategoryManager) {
+                    Label("分类", systemImage: "folder")
+                }
+            }
+
             Section {
                 if store.visibleItems.isEmpty {
                     Text(store.filter.isActive ? "没有符合筛选条件的卫星" : "没有卫星数据")
@@ -76,14 +89,10 @@ struct SatelliteManagementView: View {
                 }
 
                 HStack(spacing: 24) {
-                    NavigationLink(value: Route.satelliteFilter) {
-                        Label("筛选卫星", systemImage: "line.3.horizontal.decrease")
-                    }
-                    NavigationLink(value: Route.satelliteCategoryManager) {
-                        Label("分类", systemImage: "folder")
-                    }
+                    Text("筛选与分类入口在下方")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .font(.subheadline)
 
                 if !store.filter.categoryIds.isEmpty {
                     HStack(spacing: 6) {

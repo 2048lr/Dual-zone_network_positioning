@@ -96,9 +96,7 @@ struct SettingsView: View {
         .onChange(of: reminderSettings.leadMinutes) { _ in
             model.applyReminderSettings()
         }
-        .navigationDestination(for: Route.self) { route in
-            RouteDestination(route: route, model: model)
-        }
+        // 路由目标由 AppRootView 统一注册，避免同一 stack 重复注册 for: Route.self
     }
 }
 

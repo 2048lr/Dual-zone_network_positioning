@@ -48,8 +48,7 @@ struct ToolsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("工具")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: Route.self) { route in
-            RouteDestination(route: route, model: model)
-        }
+        // 路由目标由 AppRootView 的 NavigationStack 统一注册；
+        // 这里再注册一次会与根注册冲突（同一 stack 两个 for: Route.self）。
     }
 }
