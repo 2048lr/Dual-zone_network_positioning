@@ -4,259 +4,249 @@ import CoreLocation
 import Foundation
 import Shared
 
-/// iOS 端首屏：地面站 → 分区定位 → 卫星数据 → 实时位置（雷达） → 未来过境。
+/// iOS 端首页：照抄 Android `HomeMiuix.kt` 的卡片结构 ——
+/// 时间卡（本地时间大字 + UTC + 每日一言）→ 附近过境卫星卡（top5 + 管理）→
+/// 定位详情 / CW / APRS / FT8 / SSTV / QSO 入口卡。
 ///
-/// 所有数值都来自共享 Kotlin 内核（`Shared.framework` 的 `HamKitApi`），
-/// 与 Android 端调用的是同一份实现。
+/// 与 Android 的差异（均为 iOS 端尚未实现的能力，保留占位入口）：
+/// - 天气卡：Android 走高德 Web 服务，iOS 内核未接入，显示「规划中」占位；
+/// - 雷达图移到「卫星详情」子页（Android 在 SatelliteDetail 页展示）。
 struct ContentView: View {
 
     @ObservedObject var model: TrackerModel
     @ObservedObject var location: LocationProvider
 
-    @State private var showReminderAlert = false
-    @State private var reminderMessage = ""
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                HomeTimeCard()
+
+                NearbyPassesCard(model: model)
+
+                EntryCard(
+                    title: "定位详情",
+                    summary: "定位状态与地面站坐标",
+                    systemImage: "location.fill"
+                ) {
+                    StationEditView(model: model)
+                }
+
+                EntryCard(title: "CW 练习", summary: "自由练习 / 教程 / 摩斯电码编解码（规划中）", systemImage: "dot.radiowaves.left.and.right") {
+                    PlaceholderView(title: "CW 练习", detail: "iOS 端 CW 音频链路规划中，内核侧摩斯电码能力已就绪。")
+                }
+                EntryCard(title: "APRS", summary: "业余无线电位置报告（规划中）", systemImage: "dot.circle.and.cursorlines.rectangle") {
+                    PlaceholderView(title: "APRS", detail: "APRS iGate / 地图功能规划中。")
+                }
+                EntryCard(title: "FT8", summary: "数字模式编解码与通联（规划中）", systemImage: "waveform.path.ecg") {
+                    PlaceholderView(title: "FT8", detail: "FT8 编解码已由共享内核实现，iOS 音频链路规划中。")
+                }
+                EntryCard(title: "SSTV", summary: "慢扫描电视接收与解码（规划中）", systemImage: "photo.on.rectangle.angled") {
+                    PlaceholderView(title: "SSTV", detail: "SSTV 解码依赖跨帧音频采集，iOS 后台音频链路规划中。")
+                }
+                EntryCard(title: "QSO 日志", summary: "通联记录与 ADIF 导出（规划中）", systemImage: "book.closed") {
+                    PlaceholderView(title: "QSO 日志", detail: "通联日志功能规划中。")
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("HamKit")
+    }
+}
+
+// MARK: - 时间卡
+
+/// 时间 + 日期 + UTC + 每日一言，对应 Android `HomeHeaderMiuix` 的时间卡。
+/// 时钟每秒刷新只在本组件内部持有，避免整个首页跟着每秒重建。
+private struct HomeTimeCard: View {
+
+    @State private var now = Date()
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        ScrollViewReader { proxy in
-            List {
-                stationSection
-                zoneSection
-                dataSection
-                satelliteSection.id("satellite")
-                passSection.id("passes")
-
-                if let error = model.errorText {
-                    Section {
-                        Text(error).foregroundStyle(.red).font(.footnote)
-                    }
-                }
-            }
-            .listStyle(.insetGrouped)
-            .onAppear {
-                // 生命周期由 AppRootView 统一管理；这里只挂 CI 冒烟滚动钩子
-                scheduleSmokeScrollIfNeeded(proxy)
-            }
-        }
-        .navigationTitle("HamKit")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    model.refreshTrack()
-                    model.searchNextPass()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .disabled(model.isSearchingPass)
-            }
-        }
-        .alert("过境提醒", isPresented: $showReminderAlert) {
-            Button("好", role: .cancel) {}
-        } message: {
-            Text(reminderMessage)
-        }
-    }
-
-    /// CI 冒烟测试专用：带 `-smokeScroll` 启动时，等数据就绪后自动滚到卫星区，
-    /// 这样截图能覆盖雷达图与过境信息（图形界面无法用 simctl 模拟手指滑动）。
-    private func scheduleSmokeScrollIfNeeded(_ proxy: ScrollViewProxy) {
-        let arguments = ProcessInfo.processInfo.arguments
-        let target: String?
-        if arguments.contains("-smokeScrollPass") {
-            target = "passes"
-        } else if arguments.contains("-smokeScroll") {
-            target = "satellite"
-        } else {
-            target = nil
-        }
-        guard let target else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
-            withAnimation(.easeInOut(duration: 0.4)) {
-                proxy.scrollTo(target, anchor: .top)
-            }
-        }
-    }
-
-    // MARK: - 地面站
-
-    private var stationSection: some View {
-        Section("地面站") {
-            LabeledContent("纬度") {
-                Text(String(format: "%.4f°", model.latitude)).monospacedDigit()
-            }
-            LabeledContent("经度") {
-                Text(String(format: "%.4f°", model.longitude)).monospacedDigit()
-            }
-            LabeledContent("海拔") {
-                Text(String(format: "%.0f m", model.altitudeM)).monospacedDigit()
-            }
-            Button {
-                location.requestLocation()
-            } label: {
-                Label("使用当前位置", systemImage: "location.fill")
-            }
-            Text(location.statusText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    // MARK: - 分区定位
-
-    private var zoneSection: some View {
-        Section("分区定位") {
-            LabeledContent("Maidenhead") {
-                Text(model.zone?.grid ?? "—")
-                    .monospaced()
-                    .fontWeight(.semibold)
-            }
-            LabeledContent("CQ 分区", value: zoneText(model.zone?.cqZone))
-            LabeledContent("ITU 分区", value: zoneText(model.zone?.ituZone))
-        }
-    }
-
-    // MARK: - 卫星数据
-
-    private var dataSection: some View {
-        Section("卫星数据 · CelesTrak") {
-            LabeledContent("状态") {
-                Text(model.dataStatusText)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(Self.timeFormatter.string(from: now))
+                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                Spacer()
+                Text(Self.dateFormatter.string(from: now))
                     .font(.footnote)
-                    .multilineTextAlignment(.trailing)
-            }
-            LabeledContent("更新于", value: model.lastUpdatedText)
-
-            NavigationLink {
-                SatelliteListView(
-                    satellites: model.satellites,
-                    selectedNorad: model.selectedNorad,
-                    favorites: model.favorites,
-                    onSelect: { record in
-                        model.selectSatellite(norad: record.norad)
-                    },
-                    onToggleFavorite: { norad in
-                        model.toggleFavorite(norad)
-                    }
-                )
-            } label: {
-                LabeledContent("当前卫星", value: model.selectedSatelliteName)
-            }
-            .disabled(model.satellites.isEmpty)
-
-            Button {
-                if let norad = model.selectedNorad {
-                    model.toggleFavorite(norad)
-                }
-            } label: {
-                Label(
-                    model.isSelectedFavorite ? "取消收藏" : "收藏该卫星",
-                    systemImage: model.isSelectedFavorite ? "star.fill" : "star"
-                )
-            }
-            .disabled(model.selectedNorad == nil)
-
-            Button {
-                model.loadSatellites(force: true)
-            } label: {
-                Label("刷新 TLE", systemImage: "arrow.triangle.2.circlepath")
-            }
-            .disabled(model.isLoadingSatellites)
-
-            if model.isLoadingSatellites {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("正在拉取…").foregroundStyle(.secondary).font(.footnote)
-                }
-            }
-        }
-    }
-
-    // MARK: - 卫星实时位置
-
-    private var satelliteSection: some View {
-        Section("卫星 · \(model.selectedSatelliteName)") {
-            if let position = model.position {
-                RadarView(current: position, track: model.track)
-                    .frame(height: 240)
-                    .padding(.vertical, 6)
-
-                LabeledContent("仰角 / 方位") {
-                    Text(String(format: "%.1f° / %.1f°", position.elevationDeg, position.azimuthDeg))
-                        .monospacedDigit()
-                }
-                LabeledContent("斜距") {
-                    Text(String(format: "%.0f km", position.rangeKm)).monospacedDigit()
-                }
-                LabeledContent("多普勒径向速度") {
-                    Text(String(format: "%+.0f m/s", position.rangeRateMps)).monospacedDigit()
-                }
-                LabeledContent("星下点") {
-                    Text(String(format: "%.2f°, %.2f°", position.subLatitudeDeg, position.subLongitudeDeg))
-                        .monospacedDigit()
-                }
-                LabeledContent("轨道高度") {
-                    Text(String(format: "%.0f km", position.altitudeKm)).monospacedDigit()
-                }
-                LabeledContent("状态") {
-                    Text(position.isAboveHorizon ? "在境" : "地平线以下")
-                        .foregroundStyle(position.isAboveHorizon ? Color.green : Color.secondary)
-                }
-            } else if model.selectedSatellite == nil {
-                Text("请先在上方选择一颗卫星").foregroundStyle(.secondary)
-            } else {
-                Text("等待第一次位置解算…").foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    // MARK: - 未来过境
-
-    private var passSection: some View {
-        Section("未来过境（48 小时内）") {
-            if model.isSearchingPass {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("正在用 SGP4 搜索…").foregroundStyle(.secondary)
-                }
-            } else if model.passes.isEmpty {
-                Text("48 小时内没有完整过境（或该卫星对本站不可见）")
                     .foregroundStyle(.secondary)
-            } else {
-                ForEach(model.passes, id: \.aosMs) { pass in
-                    PassRow(
-                        pass: pass,
-                        satelliteName: model.selectedSatelliteName,
-                        onRemind: { scheduleReminder(for: pass) }
-                    )
-                }
             }
+            Text(Self.utcFormatter.string(from: now) + " UTC")
+                .font(.footnote)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Text("天气接入规划中 · 每日一言规划中")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
-    }
-
-    private func scheduleReminder(for pass: PassSnapshot) {
-        NotificationManager.shared.requestAuthorizationIfNeeded()
-        let scheduled = NotificationManager.shared.schedulePassReminder(
-            satelliteName: model.selectedSatelliteName,
-            aosMs: pass.aosMs
-        )
-        reminderMessage = scheduled
-            ? "已安排在 AOS 前 5 分钟提醒（\(Self.timeFormatter.string(from: pass.aosMs.date)) 过境）。"
-            : "这次过境不足 5 分钟就要开始，来不及提醒了。"
-        showReminderAlert = true
-    }
-
-    // MARK: - 工具
-
-    private func zoneText(_ value: Int32?) -> String {
-        guard let value, value > 0 else { return "未知" }
-        return "\(value)"
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .onReceive(timer) { now = $0 }
     }
 
     private static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM-dd HH:mm:ss"
-        formatter.locale = Locale(identifier: "zh_CN")
-        return formatter
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
     }()
+    private static let utcFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE\nyyyy-MM-dd"
+        f.dateFormat = "EEE  yyyy-MM-dd"
+        return f
+    }()
+}
+
+// MARK: - 附近过境卫星卡
+
+/// 附近过境卫星 top5 + 「管理」入口，对应 Android `SatelliteListCardMiuix`。
+private struct NearbyPassesCard: View {
+
+    @ObservedObject var model: TrackerModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("附近过境卫星")
+                    .font(.headline)
+                Spacer()
+                NavigationLink {
+                    SatelliteListView(
+                        satellites: model.satellites,
+                        selectedNorad: model.selectedNorad,
+                        favorites: model.favorites,
+                        onSelect: { record in
+                            model.selectSatellite(norad: record.norad)
+                        },
+                        onToggleFavorite: { norad in
+                            model.toggleFavorite(norad)
+                        }
+                    )
+                } label: {
+                    Text("管理")
+                        .font(.subheadline)
+                }
+            }
+
+            if model.isSearchingPass && model.passes.isEmpty {
+                Text("正在计算…").foregroundStyle(.secondary)
+            } else if model.passes.isEmpty {
+                Text("48 小时内暂无过境").foregroundStyle(.secondary)
+            } else {
+                ForEach(model.passes.prefix(5), id: \.aosMs) { pass in
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(model.selectedSatelliteName)
+                                .font(.subheadline.weight(.medium))
+                            Text(pass.isCurrentlyVisible ? "在境" : "即将过境")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("AOS " + Self.timeFormatter.string(from: pass.aosMs.date))
+                                .font(.caption)
+                                .monospacedDigit()
+                            Text("最大仰角 \(String(format: "%.0f", pass.maxElevationDeg))°")
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            NavigationLink {
+                SatelliteDetailView(model: model)
+            } label: {
+                Text("查看雷达与详情")
+                    .font(.subheadline)
+            }
+        }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM-dd HH:mm"
+        return f
+    }()
+}
+
+// MARK: - 通用入口卡
+
+/// 功能入口卡，对应 Android `BasicComponent` 风格：标题 + 摘要 + 右箭头。
+struct EntryCard<Destination: View>: View {
+
+    let title: String
+    let summary: String
+    let systemImage: String
+    @ViewBuilder let destination: () -> Destination
+
+    var body: some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .frame(width: 28)
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.body)
+                    Text(summary)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// 尚未实现功能的占位子页。
+struct PlaceholderView: View {
+
+    let title: String
+    let detail: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "hammer")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+            Text(title).font(.title3.weight(.semibold))
+            Text(detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
 }
 
 private extension Int64 {
