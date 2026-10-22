@@ -48,27 +48,62 @@ object SatnogsTransmitters {
     /** SatNOGS DB transmitters API（含全部状态，状态区分在 UI 层） */
     const val URL = "https://db.satnogs.org/api/transmitters/?format=json"
 
-    /** 拉取全部转发器；网络/解析失败时回调 [TransmitterSnapshot.error]。 */
+    /**
+     * 兜底源：自建 CDN 上的静态快照（同 [URL] 的 JSON 数组）。
+     *
+     * db.satnogs.org 在国内容易被 DNS 污染/超时（Android 侧已在
+     * `SatelliteDataSource` 注释里写明同类问题，只是转发器表没做兜底），
+     * 这里允许把同一份数据镜像到自有 CDN：`scripts/sync_satnogs_transmitters.sh`。
+     */
+    const val MIRROR_URL = "https://tle.hamkit.click/transmitters.json"
+
+    private val SOURCES: List<String> = listOf(URL, MIRROR_URL)
+
+    /** 拉取全部转发器；全部源都失败时回调 [TransmitterSnapshot.error]。 */
     fun fetch(transport: HttpTransport, callback: (TransmitterSnapshot) -> Unit) {
-        transport.get(URL, 30_000) { response ->
-            if (!response.isSuccess) {
-                callback(
-                    TransmitterSnapshot(
-                        transmitters = emptyList(),
-                        error = response.error ?: "SatNOGS transmitters 请求失败：HTTP ${response.status}",
-                    )
+        fetchFrom(transport, 0, emptyList(), callback)
+    }
+
+    private fun fetchFrom(
+        transport: HttpTransport,
+        index: Int,
+        failures: List<String>,
+        callback: (TransmitterSnapshot) -> Unit,
+    ) {
+        if (index >= SOURCES.size) {
+            callback(
+                TransmitterSnapshot(
+                    transmitters = emptyList(),
+                    error = failures.joinToString("；").ifEmpty { "没有可用的转发器数据源" },
                 )
+            )
+            return
+        }
+        val url = SOURCES[index]
+        // 全量转发器 JSON 有几 MB，30s 在弱网下经常读不完（Android 端同样给了 30s，
+        // 但它有 Room 缓存兜底）；iOS 放宽到 60s，并配合 UI 的一次自动重试。
+        transport.get(url, 60_000) { response ->
+            if (!response.isSuccess) {
+                val reason = response.error ?: "HTTP ${response.status}"
+                fetchFrom(transport, index + 1, failures + "$url → $reason", callback)
                 return@get
             }
-            val body = response.body ?: run {
-                callback(TransmitterSnapshot(emptyList(), "SatNOGS transmitters 响应为空"))
+            val body = response.body
+            if (body.isNullOrBlank()) {
+                fetchFrom(transport, index + 1, failures + "$url → 响应为空", callback)
                 return@get
             }
-            try {
-                callback(TransmitterSnapshot(parse(body), null))
+            val parsed = try {
+                parse(body)
             } catch (e: Exception) {
-                callback(TransmitterSnapshot(emptyList(), "解析失败：${e.message}"))
+                fetchFrom(transport, index + 1, failures + "$url → 解析失败：${e.message}", callback)
+                return@get
             }
+            if (parsed.isEmpty()) {
+                fetchFrom(transport, index + 1, failures + "$url → 解析结果为空", callback)
+                return@get
+            }
+            callback(TransmitterSnapshot(parsed, null))
         }
     }
 

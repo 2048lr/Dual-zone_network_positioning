@@ -74,12 +74,19 @@ struct SettingsView: View {
                 LabeledContent("轨道目录", value: "\(model.satellites.count) 颗")
                 LabeledContent("业余卫星", value: "\(model.amateurSatellites.count) 颗")
                 LabeledContent("更新于", value: model.lastUpdatedText)
+                LabeledContent("转发器（SatNOGS）", value: model.transmitterStatusText)
                 Button {
                     model.loadSatellites(force: true)
                 } label: {
                     Label("立即刷新 TLE", systemImage: "arrow.triangle.2.circlepath")
                 }
                 .disabled(model.isLoadingSatellites)
+                Button {
+                    model.loadTransmitters()
+                } label: {
+                    Label("重新拉取转发器频率", systemImage: "antenna.radiowaves.left.and.right")
+                }
+                .disabled(model.isTransmittersLoading)
             }
 
             Section("关于") {

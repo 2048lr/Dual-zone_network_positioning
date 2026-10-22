@@ -122,6 +122,11 @@ struct SatelliteDetailScreen: View {
             if model.selectedNorad != norad {
                 model.selectSatellite(norad: norad)
             }
+            // 转发器是全量几 MB 的 JSON：启动时若没拉到（超时/弱网），
+            // 进详情页时补一次，而不是让用户看到「暂无转发器」以为这颗星没有频率。
+            if model.transmittersByNorad.isEmpty && !model.isTransmittersLoading {
+                model.loadTransmitters()
+            }
         }
     }
 
@@ -205,9 +210,24 @@ struct SatelliteDetailScreen: View {
             row("转发器（\(radios.filter { $0.isActive }.count)/\(radios.count) 活跃）", "")
             if radios.isEmpty {
                 divider
-                Text("暂无转发器数据")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                if model.isTransmittersLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("正在从 SatNOGS 拉取转发器…")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        Text(model.transmitterError.map { "转发器加载失败：\($0)" } ?? "该卫星暂无转发器记录")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("重试") { model.loadTransmitters() }
+                            .font(.footnote)
+                            .buttonStyle(.borderless)
+                    }
+                }
             } else {
                 ForEach(Array(radios.enumerated()), id: \.offset) { _, radio in
                     divider

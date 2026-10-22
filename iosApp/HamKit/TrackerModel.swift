@@ -48,6 +48,9 @@ final class TrackerModel: ObservableObject {
     @Published private(set) var favorites: Set<Int32> = []
     /// SatNOGS 转发器：NORAD → 该星全部转发器（含 inactive）
     @Published private(set) var transmittersByNorad: [Int32: [Transmitter]] = [:]
+    @Published private(set) var isTransmittersLoading = false
+    /// 转发器拉取失败的原因（非空时详情页给出「重试」入口）
+    @Published private(set) var transmitterError: String?
     /// AMSAT 状态：AMSAT 名称（如 "AO-91_[FM]"）→ 状态值
     @Published private(set) var amsatStatusByName: [String: String] = [:]
     @Published private(set) var errorText: String?
@@ -62,6 +65,7 @@ final class TrackerModel: ObservableObject {
 
     private let cache = TleDiskCache()
     private let amateurCache = TleDiskCache(filename: "tle-cache-amateur.json")
+    private let transmitterCache = TransmitterDiskCache()
     private static let favoritesKey = "hamkit.favorites"
 
     var isSelectedFavorite: Bool {
@@ -117,11 +121,27 @@ final class TrackerModel: ObservableObject {
         refreshZone()
         restoreCachedSatellites()
         loadSatellites(force: false)
+        // 先上磁盘缓存：SatNOGS 全量几 MB，弱网/被墙时不该让详情页空着。
+        restoreCachedTransmitters()
         loadTransmitters()
         loadAmsatStatus()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.tickPosition()
         }
+    }
+
+    /// 冷启动先恢复上次的转发器（频率），网络刷新回来后再覆盖。
+    private func restoreCachedTransmitters() {
+        guard let cached = transmitterCache.load() else { return }
+        transmittersByNorad = Self.group(cached)
+    }
+
+    /// 设置页展示用：转发器数据处于什么状态（拉取中 / 失败原因 / 已就绪）。
+    var transmitterStatusText: String {
+        if isTransmittersLoading { return "正在拉取…" }
+        if let error = transmitterError { return "失败：\(error)" }
+        if transmittersByNorad.isEmpty { return "暂无数据" }
+        return "\(Self.countText(transmittersByNorad.count)) 颗卫星有频率"
     }
 
     /// 拉取 AMSAT 状态摘要（每颗卫星一条代表状态），失败静默降级。
@@ -145,19 +165,58 @@ final class TrackerModel: ObservableObject {
         return amsatStatusByName[name]
     }
 
-    /// 拉取 SatNOGS 转发器（列表卡片的模式/数量徽章与展开区依赖它）。
-    /// 与 Android 一致：失败静默降级，不影响卫星列表。
+    /// 拉取 SatNOGS 转发器（列表卡片的模式/数量徽章、详情页的上下行频率依赖它）。
+    ///
+    /// 这份数据是几 MB 的全量 JSON，弱网下容易超时；之前失败是「静默 return」，
+    /// 结果就是详情页永远显示「暂无转发器数据 / 数据不可用」，用户完全不知道
+    /// 是没拉到还是这颗星真的没有。现在：保留错误文案 + 自动重试一次 + 详情页
+    /// 可以手动重试。
     func loadTransmitters() {
+        guard !isTransmittersLoading else { return }
+        isTransmittersLoading = true
+        fetchTransmitters(attempt: 0)
+    }
+
+    private func fetchTransmitters(attempt: Int) {
         HamKitApi.shared.fetchTransmitters { [weak self] snapshot in
-            guard let self, snapshot.error == nil else { return }
-            var grouped: [Int32: [Transmitter]] = [:]
-            for transmitter in snapshot.transmitters {
-                grouped[Int32(transmitter.norad), default: []].append(transmitter)
-            }
+            guard let self else { return }
+            NSLog(
+                "[HamKit] transmitters attempt=\(attempt) count=\(snapshot.transmitters.count) error=\(snapshot.error ?? "-")"
+            )
+            let grouped = Self.group(snapshot.transmitters)
             DispatchQueue.main.async {
-                self.transmittersByNorad = grouped
+                self.isTransmittersLoading = false
+                if grouped.isEmpty, let error = snapshot.error {
+                    self.transmitterError = error
+                    // SatNOGS 偶发超时/被限流：等 5s 自动再试一次，
+                    // 用户不该为了几 MB 的转发器表反复重进 App。
+                    if attempt < 1 {
+                        self.isTransmittersLoading = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                            self.fetchTransmitters(attempt: attempt + 1)
+                        }
+                    }
+                    return
+                }
+                self.transmitterError = nil
+                if !grouped.isEmpty {
+                    self.transmittersByNorad = grouped
+                    // 几 MB 的 JSON 编码放到后台，别卡住主线程
+                    let records = snapshot.transmitters
+                    DispatchQueue.global(qos: .utility).async { [weak self] in
+                        self?.transmitterCache.save(records)
+                    }
+                }
             }
         }
+    }
+
+    private static func group(_ transmitters: [Transmitter]) -> [Int32: [Transmitter]] {
+        var grouped: [Int32: [Transmitter]] = [:]
+        for transmitter in transmitters {
+            grouped[Int32(transmitter.norad), default: []].append(transmitter)
+        }
+        return grouped
     }
 
     /// 冷启动先上磁盘缓存，界面立刻有数据；网络结果回来后再替换。

@@ -8,7 +8,7 @@
 > `amateur.3le` + `satnogs.3le` + `active.3le`（1.6 万+ 颗）按 NORAD 合并去重，
 > 失败自动回落到 CelesTrak 官方；网络全失败时使用内置 ISS TLE 兜底。
 > 「附近过境」只对业余子集（amateur + satnogs）预测，全量目录用于卫星管理与筛选。
-> 尚未接入：AMSAT 状态、收藏、提醒。
+> 已接入：AMSAT 状态、收藏、本地过境提醒（`UNUserNotificationCenter` + `BGTaskScheduler`）。
 > 完整迁移路线见 [docs/IOS_ADAPTATION.md](../docs/IOS_ADAPTATION.md)。
 
 ## 目录
