@@ -327,6 +327,20 @@ object HamKitApi {
             .map { record ->
                 val elements = parseTleOrNull(listOf(record.name, record.line1, record.line2))
                     ?: return@map null
+                // 几何可达性预检（对齐 Android SatellitePredictor）：
+                // 远地点+倾角覆盖不到观测者纬度 → 本站永不可见，跳过；
+                // meanMotion≈0 的已衰变/无效 TLE 也在此过滤。
+                // 全量 1.6 万颗时能把无效 SGP4 计算砍掉大半。
+                if (!PassFinder.isGeoPeriod(elements.meanMotion) &&
+                    !PassFinder.willBeSeenAt(
+                        elements.meanMotion,
+                        elements.eccentricity,
+                        elements.inclinationDeg,
+                        latitude,
+                    )
+                ) {
+                    return@map null
+                }
                 val propagator = SatellitePropagator(elements, latitude, longitude, altitudeM)
                 val pass = PassFinder.nextPass(propagator, fromMs, toMs)
                     ?: return@map null
