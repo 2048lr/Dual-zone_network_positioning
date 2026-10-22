@@ -120,17 +120,24 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | `HttpTransport` | `commonMain/net` | 只定义 `get(url, timeoutMs, callback)`，用值表达失败，不抛异常 |
 | `TleClient` | `commonMain/tle` | 按顺序尝试 **自建 CDN → CelesTrak 官方**，任一成功即返回 |
 | `TleTextParser` | `commonMain/tle` | 解析 3 行 TLE（含空行、缺名称、重复 NORAD、坏行跳过） |
-| `TleRepository` | `commonMain/tle` | 6 小时内存缓存；失败回退上次成功数据（离线可用） |
+| `TleRepository` | `commonMain/tle` | **按分组**缓存（amateur / satnogs / active 各自驻留）6 小时；失败回退上次成功数据（离线可用）；active 单独 90s 超时 |
 | `URLSessionTransport` | `iosMain`（Swift） | 唯一平台实现：`URLSession` + 主线程回调 |
-| `HamKitApi.fetchTles` | `commonMain` | 对外入口，Swift 直接调用 |
+| `HamKitApi.fetchCatalog` | `commonMain` | 对外入口：三源合并（amateur → satnogs → active），分段回调 |
+| `HamKitApi.fetchTles` | `commonMain` | 只拉单个分组（调试/备用入口） |
 
 几条设计约定：
 
 - **不用 Ktor**：只发一个 GET，平台原生网络栈更贴合 ATS/代理/证书策略，也避免多一份依赖；
 - **不让 commonMain 直接发请求**：`HttpTransport` 由平台注入（`installHttpTransport`），
   这样 iOS 的网络行为完全由系统控制；
-- **CDN 优先**：`https://tle.hamkit.click/tle/amateur.3le` 与 Android 端同源，国内访问更快；
-  CelesTrak 官方仅作兜底；
+- **数据源与 Android 一致**：`amateur.3le` + `satnogs.3le` + `active.3le`（1.6 万+ 颗）
+  按 NORAD 合并去重，先到者优先、active 只补全缺失项；active 解析结果低于 1 万条
+  视为源被截断，直接丢弃（对齐 Android `MIN_ACTIVE_TLE_COUNT`）；
+- **分段回调**：业余源到手就先回调一次（`catalogComplete = false`），首页「附近过境」
+  立刻可用；active 合并完再回调一次全量，卫星管理页才需要它；
+- **过境只算业余星**：`SatelliteStore` 展示全量目录，但 `searchNearbyPasses` 只对
+  `TrackerModel.amateurSatellites` 计算——既与 Android 语义一致，也避免 1.6 万颗 ×
+  48 小时把首页拖到几十秒；
 - **失败可读**：任何一层都不抛异常，UI 拿到的永远是「数据 + 可选错误文案」。
 
 ## 3. 验证结果（本次）
