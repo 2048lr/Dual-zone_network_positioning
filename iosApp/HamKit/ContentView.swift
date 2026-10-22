@@ -146,14 +146,11 @@ private struct NearbyPassesCard: View {
                 Text("48 小时内暂无过境").foregroundStyle(.secondary)
             } else {
                 ForEach(Array(model.nearbyPasses.prefix(5).enumerated()), id: \.element.norad) { _, item in
-                    Button {
-                        model.selectSatellite(norad: Int32(item.norad))
-                    } label: {
+                    NavigationLink(value: Route.satelliteDetail(norad: Int32(item.norad))) {
                         HStack(alignment: .firstTextBaseline) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.name)
                                     .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(.primary)
                                 Text(item.pass.isCurrentlyVisible ? "在境" : "即将过境")
                                     .font(.caption)
                                     .foregroundStyle(item.pass.isCurrentlyVisible ? Color.green : Color.secondary)
@@ -170,7 +167,6 @@ private struct NearbyPassesCard: View {
                             }
                         }
                     }
-                    .buttonStyle(.plain)
                 }
             }
 

@@ -142,9 +142,22 @@ struct SatelliteDetailView: View {
     @State private var reminderMessage: String?
 
     var body: some View {
+        // 路由带进来的 norad 是唯一事实来源：进入页面即切换当前卫星，
+        // 详情数值（仰角/方位/星下点…）全部读 model.position，切换后自动重算。
+        let record = model.satellites.first { $0.norad == norad }
         List {
             Section {
-                if let position = model.position {
+                if let record {
+                    LabeledContent("NORAD", value: "\(record.norad)")
+                    if !record.lines.isEmpty {
+                        LabeledContent("TLE 历元") {
+                            Text(Self.epochFormatter.string(from: Self.epoch(fromLine1: record.line1) ?? Date()))
+                                .monospacedDigit()
+                        }
+                    }
+                }
+
+                if let position = model.position, model.selectedNorad == norad {
                     LabeledContent("仰角 / 方位") {
                         Text(String(format: "%.1f° / %.1f°", position.elevationDeg, position.azimuthDeg)).monospacedDigit()
                     }
@@ -156,13 +169,14 @@ struct SatelliteDetailView: View {
                         Text(position.isAboveHorizon ? "在境" : "地平线以下")
                             .foregroundStyle(position.isAboveHorizon ? Color.green : Color.secondary)
                     }
-                } else {
+                } else if record != nil {
                     Text("等待位置解算…").foregroundStyle(.secondary)
+                } else {
+                    Text("TLE 未加载或该星不在当前数据源中").foregroundStyle(.secondary)
                 }
             } header: {
-                Text(model.selectedSatelliteName)
+                Text(record?.name ?? "NORAD \(norad)")
             }
-
             Section("入口") {
                 NavigationLink(value: Route.satelliteRadar(norad: norad)) {
                     Label("雷达图", systemImage: "dot.scope")
@@ -179,14 +193,42 @@ struct SatelliteDetailView: View {
                 Button {
                     model.toggleFavorite(norad)
                 } label: {
-                    Label(model.isSelectedFavorite ? "取消收藏" : "收藏该卫星",
-                          systemImage: model.isSelectedFavorite ? "star.fill" : "star")
+                    Label(
+                        model.favorites.contains(norad) ? "取消收藏" : "收藏该卫星",
+                        systemImage: model.favorites.contains(norad) ? "star.fill" : "star"
+                    )
                 }
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("卫星详情")
+        .navigationTitle(record?.name ?? "卫星详情")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            // 路由进入：把当前卫星切到本页 norad，触发位置/轨迹/过境全量重算
+            if model.selectedNorad != norad {
+                model.selectSatellite(norad: norad)
+            }
+        }
+        .onReceive(model.$selectedNorad) { _ in }
+    }
+
+    // TLE line1 的历元：列 19-32（YYDDD.DDDD…），两行制。
+    private static let epochFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    private static func epoch(fromLine1 line1: String) -> Date? {
+        let chars = Array(line1)
+        guard chars.count >= 32 else { return nil }
+        let yy = Int(String(chars[18...19])) ?? 0
+        let year = yy < 57 ? 2000 + yy : 1900 + yy
+        guard let dayOfYear = Double(String(chars[20...31])) else { return nil }
+        return Calendar(identifier: .gregorian)
+            .date(from: DateComponents(timeZone: TimeZone(identifier: "UTC"), year: year))?
+            .addingTimeInterval((dayOfYear - 1) * 86_400)
     }
 }
 
@@ -200,7 +242,7 @@ struct SatelliteRadarView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            if let position = model.position {
+            if let position = model.position, model.selectedNorad == norad {
                 RadarView(current: position, track: model.track)
                     .frame(maxHeight: 360)
                     .padding()
@@ -217,6 +259,11 @@ struct SatelliteRadarView: View {
         }
         .navigationTitle("雷达图")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if model.selectedNorad != norad {
+                model.selectSatellite(norad: norad)
+            }
+        }
     }
 }
 
@@ -236,7 +283,8 @@ struct SatelliteMapView: View {
     }
 
     private var subpoint: CLLocationCoordinate2D? {
-        model.position.map {
+        guard model.selectedNorad == norad else { return nil }
+        return model.position.map {
             CLLocationCoordinate2D(latitude: $0.subLatitudeDeg, longitude: $0.subLongitudeDeg)
         }
     }
@@ -278,6 +326,11 @@ struct SatelliteMapView: View {
         }
         .navigationTitle("轨道地图")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if model.selectedNorad != norad {
+                model.selectSatellite(norad: norad)
+            }
+        }
     }
 }
 

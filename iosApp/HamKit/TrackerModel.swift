@@ -36,12 +36,13 @@ final class TrackerModel: ObservableObject {
     @Published private(set) var passes: [PassSnapshot] = []
     /// 附近过境卫星：每颗卫星的下一次过境（在境优先、按 AOS 排序），对齐 Android 逻辑
     @Published private(set) var nearbyPasses: [Shared.SatelliteNextPass] = []
-    @Published private(set) var isSearchingPass = false
-    @Published private(set) var favorites: Set<Int32> = []
+    @Published private(set) var isSearchingPass = false    @Published private(set) var favorites: Set<Int32> = []
     @Published private(set) var errorText: String?
 
     private var timer: Timer?
     private var passRequestId = 0
+    private var nearbyRequestId = 0
+    private var nearbyFingerprint = ""
     private var trackRequestId = 0
     private var tickCount = 0
 
@@ -116,14 +117,17 @@ final class TrackerModel: ObservableObject {
 
     // MARK: - TLE 拉取
 
-    /// 拉取 CelesTrak `amateur` 分组；6 小时内命中内核缓存。
+    /// 拉取 CelesTrak `active` 全量源（1.6 万+ 颗）；6 小时内命中内核缓存。
     func loadSatellites(force: Bool) {
         guard !isLoadingSatellites else { return }
         isLoadingSatellites = true
         dataStatusText = force ? "正在从 CelesTrak 拉取…" : "加载中…"
 
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
-        HamKitApi.shared.fetchTles(group: "amateur", forceRefresh: force, nowMs: nowMs) { [weak self] snapshot in
+        // 与 Android 对齐：用 CelesTrak `active` 全量源（1.6 万+ 颗），
+        // 而不是 amateur 分组（约 100 颗）。跨星过境预测在后台队列，
+        // 每颗只算 1 次下一次过境，全量也算得动。
+        HamKitApi.shared.fetchTles(group: "active", forceRefresh: force, nowMs: nowMs) { [weak self] snapshot in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isLoadingSatellites = false
@@ -244,9 +248,11 @@ final class TrackerModel: ObservableObject {
     }
 
     /// 48 小时过境搜索约 600 次传播计算，放到后台队列避免卡住 UI。
+    /// 用请求序号而不是布尔守卫：快速连续切星时，旧请求结果按序号丢弃，
+    /// 新星总能拿到属于自己的搜索。
     func searchNextPass() {
         let tle = tleLines
-        guard !tle.isEmpty, !isSearchingPass else { return }
+        guard !tle.isEmpty else { return }
 
         isSearchingPass = true
         passRequestId += 1
@@ -266,9 +272,35 @@ final class TrackerModel: ObservableObject {
                 searchHours: 48,
                 maxCount: 3
             )
-            // 附近过境卫星：跨星预测（对齐 Android SatellitePredictor 逻辑）
+            DispatchQueue.main.async {
+                guard let self, requestId == self.passRequestId else { return }
+                self.passes = result
+                self.isSearchingPass = false
+            }
+        }
+        // 跨星预测独立跑（结果与当前选中星无关），不阻塞单星过境
+        searchNearbyPasses()
+    }
+
+    /// 附近过境卫星：跨星各算下一次过境（对齐 Android SatellitePredictor）。
+    /// 数据源或地面站没变时跳过；有新请求时旧结果按序号丢弃。
+    func searchNearbyPasses() {
+        let snapshot = satellites
+        guard !snapshot.isEmpty else { return }
+        let fingerprint = "\(snapshot.count)-\(snapshot.first?.norad ?? 0)-\(Int(latitude * 100))-\(Int(longitude * 100))"
+        if fingerprint == nearbyFingerprint { return }
+        nearbyFingerprint = fingerprint
+
+        nearbyRequestId += 1
+        let requestId = nearbyRequestId
+        let lat = latitude
+        let lon = longitude
+        let alt = altitudeM
+
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
             let nearby = HamKitApi.shared.nextPassesAcrossSatellites(
-                tles: self?.satellites ?? [],
+                tles: snapshot,
                 latitude: lat,
                 longitude: lon,
                 altitudeM: alt,
@@ -277,10 +309,8 @@ final class TrackerModel: ObservableObject {
                 maxCount: 5
             )
             DispatchQueue.main.async {
-                guard let self, requestId == self.passRequestId else { return }
-                self.passes = result
+                guard let self, requestId == self.nearbyRequestId else { return }
                 self.nearbyPasses = nearby
-                self.isSearchingPass = false
             }
         }
     }
