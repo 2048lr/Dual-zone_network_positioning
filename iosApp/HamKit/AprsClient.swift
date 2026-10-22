@@ -305,8 +305,8 @@ final class AprsStore: ObservableObject {
                     symbolCode: parsed.symbolCode,
                     comment: parsed.comment,
                     altitudeMeters: parsed.altitudeMeters,
-                    course: parsed.course,
-                    speedKnots: parsed.speedKnots
+                    course: Int(parsed.course),
+                    speedKnots: Int(parsed.speedKnots)
                 )
                 if let index = self.stations.firstIndex(where: { $0.callsign == station.callsign }) {
                     self.stations[index] = station
