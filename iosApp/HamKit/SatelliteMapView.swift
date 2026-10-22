@@ -6,21 +6,19 @@ import Shared
 /// 苹果原生 MapKit 实现（不依赖高德 iOS SDK——那需要按 Bundle ID 重新申请 Key）：
 /// - 地面轨迹折线（前后各 45 分钟，来自共享内核 satelliteTrack）
 /// - 当前星下点标注（卫星图标 + 名称）
-/// - 地面站位置（绿点）与覆盖圈（0° 仰角可见范围，按轨道高度估算半径）
-/// - 星下点坐标浮层
+/// - 星下点坐标/覆盖半径浮层 + 「回到卫星」按钮
 ///
-/// 地图区域固定覆盖全球（卫星轨迹跨 180° 经线时折线会横穿，这里用
-/// 「经差 >180 段断开」处理，视觉上与 Look4Sat 一致）。
+/// **手势**：整页只有一个真正的 `MKMapView`，拖动/双指缩放/旋转都是原生行为。
+/// 之前用的是 SwiftUI `Map(coordinateRegion: .constant(...))` 再叠一个透明
+/// `MKMapView` 画折线——两处都会吃掉手势：`.constant` 让拖动后立刻弹回，
+/// 叠加层则挡住了底下的地图。现在改成单个 `MKMapView`，折线用 delegate 渲染。
 struct SatelliteMapView: View {
 
     @ObservedObject var model: TrackerModel
     let norad: Int32
 
-    /// 全球视野；轨迹横跨日期变更线时 MapKit 会自动处理经度环绕
-    private static let worldRegion = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
-        span: MKCoordinateSpan(latitudeDelta: 160, longitudeDelta: 360)
-    )
+    /// 每次点「回到卫星」+1，作为重新居中的信号
+    @State private var recenterToken = 0
 
     /// 轨迹分段：经差超过 180° 的相邻点断开（日期变更线），避免横穿地图的直线
     private var trackSegments: [[CLLocationCoordinate2D]] {
@@ -50,7 +48,6 @@ struct SatelliteMapView: View {
         guard let pos = model.position else { return 0 }
         let earthRadiusKm = 6371.0
         let h = max(pos.altitudeKm, 1)
-        // acos(Re/(Re+h)) 为地心角（弧度），× Re 得地表大圆距离
         return acos(earthRadiusKm / (earthRadiusKm + h)) * earthRadiusKm
     }
 
@@ -58,27 +55,13 @@ struct SatelliteMapView: View {
         Group {
             if let sub = subpoint {
                 ZStack(alignment: .bottomLeading) {
-                    Map(coordinateRegion: .constant(Self.worldRegion),
-                        interactionModes: .all,
-                        showsUserLocation: false,
-                        userTrackingMode: .none,
-                        annotationItems: [SubpointAnnotation(coordinate: sub)]) { item in
-                        MapAnnotation(coordinate: item.coordinate) {
-                            VStack(spacing: 2) {
-                                Image(systemName: "satellite")
-                                    .font(.title3)
-                                    .foregroundStyle(Color.accentColor)
-                                Text(model.selectedSatelliteName)
-                                    .font(.caption2)
-                                    .padding(.horizontal, 6)
-                                    .background(.thinMaterial)
-                                    .clipShape(Capsule())
-                            }
-                        }
-                    }
-                    .overlay {
-                        MapPolylineOverlay(segments: trackSegments)
-                    }
+                    SatelliteMapCanvas(
+                        segments: trackSegments,
+                        subpoint: sub,
+                        name: model.selectedSatelliteName,
+                        recenterToken: recenterToken
+                    )
+                    .ignoresSafeArea(edges: .bottom)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(String(format: "星下点 %.2f°, %.2f°", sub.latitude, sub.longitude))
@@ -90,6 +73,19 @@ struct SatelliteMapView: View {
                     .padding(10)
                     .background(.thinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding()
+                }
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        recenterToken += 1
+                    } label: {
+                        Label("回到卫星", systemImage: "location.fill")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 15, weight: .semibold))
+                            .padding(10)
+                            .background(.thinMaterial)
+                            .clipShape(Circle())
+                    }
                     .padding()
                 }
             } else {
@@ -109,48 +105,118 @@ struct SatelliteMapView: View {
     }
 }
 
-/// 轨迹折线 overlay：iOS 16 `Map` 视图没有原生 polyline API，
-/// 用 `MKPolylineRenderer` 的 `UIViewRepresentable` 叠加（iOS 17 的 MapPolygon 也不支持折线）。
-private struct MapPolylineOverlay: UIViewRepresentable {
+/// 单个 `MKMapView` 包一层：原生手势 + 折线 + 星下点标注。
+private struct SatelliteMapCanvas: UIViewRepresentable {
 
     let segments: [[CLLocationCoordinate2D]]
+    let subpoint: CLLocationCoordinate2D
+    let name: String
+    let recenterToken: Int
+
+    /// 世界视野：轨迹横跨日期变更线也能一眼看全
+    private static let worldRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
+        span: MKCoordinateSpan(latitudeDelta: 150, longitudeDelta: 360)
+    )
 
     func makeUIView(context: Context) -> MKMapView {
-        let view = MKMapView(frame: .zero)
-        view.isUserInteractionEnabled = false   // 手势透传给底层 SwiftUI Map
-        view.backgroundColor = .clear
-        view.overrideUserInterfaceStyle = context.environment.colorScheme == .dark ? .dark : .light
-        return view
+        let map = MKMapView(frame: .zero)
+        map.delegate = context.coordinator
+        map.isPitchEnabled = false
+        map.isRotateEnabled = true
+        map.isZoomEnabled = true
+        map.isScrollEnabled = true
+        map.showsCompass = true
+        map.pointOfInterestFilter = .excludingAll
+        map.setRegion(Self.worldRegion, animated: false)
+        return map
     }
 
-    func updateUIView(_ view: MKMapView, context: Context) {
-        context.coordinator.apply(segments: segments, to: view)
+    func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.update(
+            map: map,
+            segments: segments,
+            subpoint: subpoint,
+            name: name,
+            recenterToken: recenterToken
+        )
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    final class Coordinator {
-        private var rendered: [MKPolyline] = []
+    final class Coordinator: NSObject, MKMapViewDelegate {
 
-        func apply(segments: [[CLLocationCoordinate2D]], to view: MKMapView) {
-            rendered.forEach(view.removeOverlay)
-            rendered = segments.map { pts in
-                let line = MKPolyline(coordinates: pts, count: pts.count)
-                view.addOverlay(line)
-                return line
+        private var polylines: [MKPolyline] = []
+        private var lastSegmentCount = -1
+        private var lastPointCount = -1
+        private var marker: MKPointAnnotation?
+        private var lastRecenterToken = -1
+
+        func update(
+            map: MKMapView,
+            segments: [[CLLocationCoordinate2D]],
+            subpoint: CLLocationCoordinate2D,
+            name: String,
+            recenterToken: Int
+        ) {
+            let pointCount = segments.reduce(0) { $0 + $1.count }
+            if segments.count != lastSegmentCount || pointCount != lastPointCount {
+                lastSegmentCount = segments.count
+                lastPointCount = pointCount
+                map.removeOverlays(polylines)
+                polylines = segments
+                    .filter { $0.count >= 2 }
+                    .map { MKPolyline(coordinates: $0, count: $0.count) }
+                map.addOverlays(polylines)
             }
-            if let first = view.overlays.first as? MKPolyline {
-                view.renderer(for: first)
+
+            // 星下点标注：原地更新坐标，避免每秒重建 annotation 导致闪烁
+            if let marker {
+                marker.coordinate = subpoint
+                marker.title = name
+            } else {
+                let newMarker = MKPointAnnotation()
+                newMarker.coordinate = subpoint
+                newMarker.title = name
+                map.addAnnotation(newMarker)
+                marker = newMarker
+            }
+
+            // 首次进入或点「回到卫星」时居中；其余时候不动视野，用户拖到哪就是哪
+            if lastRecenterToken != recenterToken {
+                lastRecenterToken = recenterToken
+                let region = MKCoordinateRegion(
+                    center: subpoint,
+                    span: MKCoordinateSpan(latitudeDelta: 60, longitudeDelta: 80)
+                )
+                map.setRegion(region, animated: recenterToken != 0)
             }
         }
-    }
-}
 
-// MKMapView 需要 delegate 提供 renderer；这里用扩展 + 关联对象太重，
-// 直接在 overlay 容器里用子类渲染。为简洁起见，delegate 由 overlay 自身实现：
-extension MapPolylineOverlay {
-    // MKMapView delegate 方法通过 Coordinator 不便（delegate 归 SwiftUI 管理），
-    // 改用静态 renderer：MKMapView 默认渲染 polyline 为蓝色细线，可接受。
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            guard let line = overlay as? MKPolyline else {
+                return MKOverlayRenderer(overlay: overlay)
+            }
+            let renderer = MKPolylineRenderer(polyline: line)
+            renderer.strokeColor = .systemOrange
+            renderer.lineWidth = 3
+            renderer.lineCap = .round
+            return renderer
+        }
+
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard !(annotation is MKUserLocation) else { return nil }
+            let identifier = "subpoint"
+            let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier)
+                as? MKMarkerAnnotationView
+                ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+            view.annotation = annotation
+            view.markerTintColor = .systemBlue
+            view.glyphImage = UIImage(systemName: "satellite")
+            view.canShowCallout = true
+            return view
+        }
+    }
 }
 
 /// 兼容 iOS 16 的「无数据」占位（iOS 17 才有 ContentUnavailableView）。
@@ -172,9 +238,4 @@ struct ContentUnavailableCompatView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-}
-
-private struct SubpointAnnotation: Identifiable {
-    let coordinate: CLLocationCoordinate2D
-    var id: String { "\(coordinate.latitude),\(coordinate.longitude)" }
 }

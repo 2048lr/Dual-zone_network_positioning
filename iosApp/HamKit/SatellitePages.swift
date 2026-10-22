@@ -228,6 +228,13 @@ struct LocationDetailView: View {
     @ObservedObject var model: TrackerModel
     @ObservedObject var location: LocationProvider
 
+    /// 地图视野用 @State：`.constant(...)` 会让拖动后立刻弹回（看起来像拖不动）
+    @State private var mapRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 39.9042, longitude: 116.4074),
+        span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
+    )
+    @State private var didCenterMap = false
+
     var body: some View {
         List {
             Section("当前定位") {
@@ -257,13 +264,34 @@ struct LocationDetailView: View {
             }
 
             Section {
-                Map(coordinateRegion: .constant(MKCoordinateRegion(
-                    center: CLLocationCoordinate2D(latitude: model.latitude, longitude: model.longitude),
-                    span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
-                )))
+                Map(coordinateRegion: $mapRegion, interactionModes: .all)
                 .frame(height: 220)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .listRowInsets(EdgeInsets())
+                .overlay(alignment: .bottomTrailing) {
+                    Button {
+                        mapRegion.center = CLLocationCoordinate2D(
+                            latitude: model.latitude,
+                            longitude: model.longitude
+                        )
+                    } label: {
+                        Image(systemName: "scope")
+                            .font(.system(size: 13, weight: .semibold))
+                            .padding(8)
+                            .background(.thinMaterial)
+                            .clipShape(Circle())
+                    }
+                    .padding(10)
+                }
+                .onAppear {
+                    // 只在第一次进入时把视野放到当前地面站，之后完全交给用户拖
+                    guard !didCenterMap else { return }
+                    didCenterMap = true
+                    mapRegion.center = CLLocationCoordinate2D(
+                        latitude: model.latitude,
+                        longitude: model.longitude
+                    )
+                }
             } header: {
                 Text("位置地图（MapKit）")
             }

@@ -238,16 +238,26 @@ struct AprsMessagesView: View {
 }
 
 /// 站点地图：对应 Android `AprsMap`，用 MapKit 标注站点。
+///
+/// 区域用 `@State` 而不是 `.constant(...)`：后者会让用户每次拖动后立刻弹回
+/// 原视野（看起来像「地图拖不动」）。现在默认自动框住所有站点，之后完全交给用户，
+/// 右上角「框选全部」可以把视野再拉回来。
 struct AprsMapView: View {
 
     @ObservedObject var store = AprsStore.shared
+
+    @State private var region = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 35, longitude: 105),
+        span: MKCoordinateSpan(latitudeDelta: 40, longitudeDelta: 60)
+    )
+    @State private var didFit = false
 
     var body: some View {
         Group {
             if store.stations.isEmpty {
                 Text("暂无站点可显示").foregroundStyle(.secondary)
             } else {
-                Map(coordinateRegion: .constant(region), annotationItems: store.stations) { station in
+                Map(coordinateRegion: $region, interactionModes: .all, annotationItems: store.stations) { station in
                     MapAnnotation(coordinate: CLLocationCoordinate2D(
                         latitude: station.latitude,
                         longitude: station.longitude
@@ -266,23 +276,45 @@ struct AprsMapView: View {
                         }
                     }
                 }
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        fitStations()
+                    } label: {
+                        Image(systemName: "scope")
+                            .font(.system(size: 15, weight: .semibold))
+                            .padding(10)
+                            .background(.thinMaterial)
+                            .clipShape(Circle())
+                    }
+                    .padding()
+                }
+                .onAppear {
+                    if !didFit { fitStations() }
+                }
             }
         }
         .navigationTitle("APRS 地图")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var region: MKCoordinateRegion {
-        guard let first = store.stations.first else {
-            return MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: 35, longitude: 105),
-                span: MKCoordinateSpan(latitudeDelta: 30, longitudeDelta: 40)
+    /// 把视野框到所有站点（单个站点时给一个合理的最小跨度）。
+    private func fitStations() {
+        guard !store.stations.isEmpty else { return }
+        let lats = store.stations.map { $0.latitude }
+        let lons = store.stations.map { $0.longitude }
+        let minLat = lats.min() ?? 0, maxLat = lats.max() ?? 0
+        let minLon = lons.min() ?? 0, maxLon = lons.max() ?? 0
+        region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: (minLat + maxLat) / 2,
+                longitude: (minLon + maxLon) / 2
+            ),
+            span: MKCoordinateSpan(
+                latitudeDelta: max(0.5, (maxLat - minLat) * 1.4),
+                longitudeDelta: max(0.5, (maxLon - minLon) * 1.4)
             )
-        }
-        return MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: first.latitude, longitude: first.longitude),
-            span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
         )
+        didFit = true
     }
 }
 
