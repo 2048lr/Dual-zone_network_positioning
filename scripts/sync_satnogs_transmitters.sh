@@ -5,7 +5,7 @@
 # 背景：db.satnogs.org 在国内经常超时或被 DNS 污染，Android 侧靠 Room 缓存兜底，
 # iOS 侧（`SatnogsTransmitters.kt`）改造前没有任何兜底 —— 拉不到就永远显示
 # 「暂无转发器 / 数据不可用」。现在客户端按下面的顺序尝试：
-#   1. https://tle.hamkit.click/transmitters.json   ← 本脚本负责生成这个对象（主源）
+#   1. https://tle.hamkit.click/tle/transmitters.json   ← 本脚本负责生成这个对象（主源）
 #   2. https://db.satnogs.org/api/transmitters/?format=json（备源）
 # 与 TLE 一致：主 = 自建 CDN，次 = 上游官方源。
 #
@@ -17,9 +17,10 @@
 
 set -uo pipefail
 
-BUCKET="hamkit-tle"
+BUCKET="hamkit-tle-tpe"          # 与 website/deploy/hamkit-tle-sync.sh 的生产桶一致
+REGION="ap-east-2"
 SRC_URL="https://db.satnogs.org/api/transmitters/?format=json"
-S3_KEY="transmitters.json"
+S3_KEY="tle/transmitters.json"   # 与 satnogs.3le 等同目录，客户端 URL 即 tle.hamkit.click/tle/transmitters.json
 TMP="/tmp/satnogs_transmitters_$$.json"
 MIN_RECORDS="${MIN_RECORDS:-3000}"
 
@@ -48,7 +49,7 @@ if [ "$count" -lt "$MIN_RECORDS" ]; then
   exit 1
 fi
 
-if aws s3 cp "$TMP" "s3://${BUCKET}/${S3_KEY}" \
+if aws --region "$REGION" s3 cp "$TMP" "s3://${BUCKET}/${S3_KEY}" \
      --content-type "application/json" \
      --cache-control "public, max-age=21600" \
      --only-show-errors; then

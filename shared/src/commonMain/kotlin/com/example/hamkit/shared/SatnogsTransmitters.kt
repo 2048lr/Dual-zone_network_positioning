@@ -56,10 +56,11 @@ object SatnogsTransmitters {
     /**
      * **主源**：自建 CDN 上的静态快照（同 [URL] 的 JSON 数组）。
      *
-     * 由 `scripts/sync_satnogs_transmitters.sh` 定时从 SatNOGS 同步，
-     * 国内直连、无 DNS 污染、有 CDN 缓存，和 TLE 的取数策略保持一致。
+     * 放在 `tle/` 前缀下，和 `satnogs.3le` / `amateur.3le` 等文件同一目录
+     * （由 `website/deploy/hamkit-tle-sync.sh` 每 24 小时同步），国内直连、
+     * 无 DNS 污染、有 CDN 缓存，与 TLE 的主次策略保持一致。
      */
-    const val MIRROR_URL = "https://tle.hamkit.click/transmitters.json"
+    const val MIRROR_URL = "https://tle.hamkit.click/tle/transmitters.json"
 
     /** 主 = 自建 CDN；次 = SatNOGS 官方（与 TLE 一致的主次顺序）。 */
     private val SOURCES: List<String> = listOf(MIRROR_URL, URL)
