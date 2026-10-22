@@ -258,3 +258,12 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 - [iosApp/README.md](../iosApp/README.md)：macOS 上的构建步骤
 - [shared/build.gradle.kts](../shared/build.gradle.kts)：KMP 目标与 framework 配置
 - [docs/COMPETITIVE_DEFECT_ANALYSIS_AND_FIX_PLAN.md](./COMPETITIVE_DEFECT_ANALYSIS_AND_FIX_PLAN.md)：当时对「是否维护 iOS 原生」的评估
+
+### 已知缺口（截至本轮）
+
+- 卫星：BJT 分段状态时间线未移植（`SatelliteStatusSegmenter` 依赖 java.time）
+- FT8：自动 CQ 主叫、多候选择优、重发策略未移植；自动应答仅覆盖「呼叫本台」路径
+- SSTV：滚动预览（`SstvRollingImage`）与「播放捕获」未移植；仅前台接收
+- APRS：无 HTTP 上传器、无消息重试/ack 跟踪、地图仅 MapKit 标注
+- 天气：需构建时注入 `AMAP_WEB_KEY`，否则仅提示未配置
+- Android 的 WorkManager 后台提醒刷新在 iOS 上退化为「启动/回前台时重建」

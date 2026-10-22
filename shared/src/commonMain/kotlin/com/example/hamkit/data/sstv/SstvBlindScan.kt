@@ -216,7 +216,7 @@ object SstvBlindScan {
      *  1. 绝对量足够：至少 [SHIFT_MIN_MS] 毫秒的音调落进该箱；
      *  2. 相对量足够：至少是全部箱均值的 [SHIFT_PEAK_RATIO] 倍，避免在纯噪声上瞎猜。
      */
-    internal fun estimateSyncShift(freqs: FloatArray, sampleRate: Int, from: Int): Double {
+    public fun estimateSyncShift(freqs: FloatArray, sampleRate: Int, from: Int): Double {
         val bins = IntArray(SHIFT_BINS)
         val start = from.coerceIn(0, freqs.size)
         var counted = 0
@@ -268,7 +268,7 @@ object SstvBlindScan {
      *
      * @return 命中比例（0–1）；模型没有间隙时给中性值 0.5，避免该项变成惩罚
      */
-    internal fun gapStructureScore(
+    public fun gapStructureScore(
         freqs: FloatArray,
         mode: SstvMode,
         fit: SstvSync.SyncFit,
@@ -332,7 +332,7 @@ object SstvBlindScan {
      * 边界错位、行配对错误）会在行内插入大量高频跳变，该指标随之显著变大。
      * 只在 [decodedLines] 行内统计，避免把未解码的全黑区域算进来。
      */
-    internal fun horizontalRoughness(
+    public fun horizontalRoughness(
         pixels: IntArray,
         width: Int,
         height: Int,
@@ -393,7 +393,7 @@ object SstvBlindScan {
     private const val SHIFT_PEAK_RATIO = 3.0
 
     /** 粗糙度的参考上限（亮度差均值）。达到此值即认为「完全不成图像」。 */
-    internal const val MAX_SMOOTHNESS = 48.0
+    public const val MAX_SMOOTHNESS = 48.0
 
     /** 结构一致性判据的参与行数（够用即可，越多越慢）。 */
     private const val STRUCTURE_LINES = 40

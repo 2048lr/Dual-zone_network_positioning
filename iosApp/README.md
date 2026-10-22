@@ -36,15 +36,18 @@ iosApp/
 ## 构建步骤
 
 ```bash
-# 1. 生成 Xcode 工程
+# 1. 生成 Xcode 工程（天气需要高德 Web Key；没有可留空，天气会提示未配置）
 cd iosApp
-xcodegen generate
+AMAP_WEB_KEY=你的高德WebKey xcodegen generate
 
 # 2. 打开
 open HamKit.xcodeproj
 
 # 3. 选择模拟器（Apple Silicon）后 Cmd+R
 ```
+
+> `AMAP_WEB_KEY` 会写入 Info.plist 的 `AMapWebKey`，用于高德天气与逆地理编码。
+> 它随 App 分发、不是秘密；请在构建环境里注入，不要提交到仓库。
 
 Xcode 的 Run Script 阶段会自动执行：
 
@@ -62,6 +65,16 @@ cd "$SRCROOT/.."
 
 真机调试需要：Xcode → Signing & Capabilities → 选择自己的 Team；
 `PRODUCT_BUNDLE_IDENTIFIER` 改成你自己的（默认 `click.hamkit.ios`）。
+
+### 权限
+
+`Info.plist` 已声明：
+
+- `NSLocationWhenInUseUsageDescription`：分区定位与卫星过境
+- `NSMicrophoneUsageDescription`：CW / FT8 / SSTV / HF Fax 接收解码
+- `NSPhotoLibraryAddUsageDescription`：保存解码出的 SSTV / HF Fax 图片
+
+首次使用对应功能时系统会弹窗请求权限；音频只在本机解码，不上传。
 
 ## 未签名 IPA（没有开发者账号怎么装）
 

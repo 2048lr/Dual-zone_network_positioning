@@ -279,7 +279,7 @@ object SstvSync {
      * 三期 `SstvStreamDecoder` 判定某行是否「命中实测脉冲」（`LineEvent.locked`）
      * 时复用同一常量，保证两者对「命中」的定义严格一致。
      */
-    internal const val LINE_REFINE_TOLERANCE = 0.2
+    public const val LINE_REFINE_TOLERANCE = 0.2
 
     /** 同步频率容差（Hz）。 */
     private const val SYNC_TOLERANCE_HZ = 60.0

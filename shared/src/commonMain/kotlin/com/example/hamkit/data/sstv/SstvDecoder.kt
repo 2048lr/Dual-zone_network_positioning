@@ -197,7 +197,7 @@ class SstvDecoder(
      * 会污染这一段 —— 虽然行奇偶标记本身会立刻纠正，但第一行仍会带错色度。
      * 三期的 [SstvStreamDecoder.finalize] 复用一个解码器实例重解时也要调用它。
      */
-    internal fun resetFrameState() {
+    public fun resetFrameState() {
         lastEvenParity = true
         chromaCr = IntArray(0)
         chromaCb = IntArray(0)
@@ -213,7 +213,7 @@ class SstvDecoder(
      *
      * @return 该行是否完整落在音频范围内；false 表示同步已丢失，调用方应停止。
      */
-    internal fun decodeRadioLine(
+    public fun decodeRadioLine(
         freqs: FloatArray,
         fit: SstvSync.SyncFit,
         mode: SstvMode,
@@ -441,7 +441,7 @@ class SstvDecoder(
      * 取窗平均而非单点采样是抗噪的关键；窗宽取像素时长的 60%，避免跨越相邻像素。
      * 频率映射前先减去 `hedrShiftHz`，否则整幅图像会偏亮或偏暗。
      */
-    internal fun sampleLevel(
+    public fun sampleLevel(
         freqs: FloatArray,
         centerSample: Double,
         pixelSamples: Double,

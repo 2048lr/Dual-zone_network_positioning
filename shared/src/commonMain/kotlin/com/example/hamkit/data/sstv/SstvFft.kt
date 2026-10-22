@@ -16,7 +16,7 @@ import kotlin.math.sin
  *
  * @param size 变换长度，必须是 2 的幂
  */
-internal class SstvFft(val size: Int) {
+public class SstvFft(val size: Int) {
 
     init {
         require(size >= 2 && (size and (size - 1)) == 0) {
