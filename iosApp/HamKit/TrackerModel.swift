@@ -396,16 +396,24 @@ final class TrackerModel: ObservableObject {
         nearbyWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.performNearbySearch() }
         nearbyWorkItem = work
+        // 先去点亮加载态：防抖的 0.8s 里首页不该闪一下「暂无过境」。
+        isSearchingNearby = !nearbySatellites.isEmpty
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
     }
 
     private func performNearbySearch() {
         // 只对业余星算过境：与 Android 一致，也避免 1.6 万颗 × 48 小时跑几十秒。
         let snapshot = nearbySatellites
-        guard !snapshot.isEmpty else { return }
+        guard !snapshot.isEmpty else {
+            isSearchingNearby = false
+            return
+        }
         let fingerprint = "\(snapshot.count)-\(snapshot.first?.norad ?? 0)-\(snapshot.last?.norad ?? 0)"
             + "-\(Int(latitude * 100))-\(Int(longitude * 100))"
-        if fingerprint == nearbyFingerprint { return }
+        if fingerprint == nearbyFingerprint {
+            isSearchingNearby = false
+            return
+        }
         nearbyFingerprint = fingerprint
 
         nearbyRequestId += 1
