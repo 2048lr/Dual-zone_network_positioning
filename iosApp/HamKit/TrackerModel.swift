@@ -72,6 +72,19 @@ final class TrackerModel: ObservableObject {
         selectedSatellite?.name ?? "未选择卫星"
     }
 
+    /// 列表页用：NORAD → 下一次过境（来自跨星预测，含当前在境）
+    var passByNorad: [Int32: PassSnapshot] {
+        var map: [Int32: PassSnapshot] = [:]
+        for item in nearbyPasses {
+            map[Int32(item.norad)] = item.pass
+        }
+        // 当前选中卫星的单星三次过境以 model.passes 为准（更精确）
+        if let norad = selectedNorad, let first = passes.first {
+            map[norad] = first
+        }
+        return map
+    }
+
     private var tleLines: [String] {
         selectedSatellite?.lines ?? []
     }
@@ -307,7 +320,7 @@ final class TrackerModel: ObservableObject {
                 altitudeM: alt,
                 fromMs: nowMs,
                 searchHours: 48,
-                maxCount: 5
+                maxCount: 300
             )
             DispatchQueue.main.async {
                 guard let self, requestId == self.nearbyRequestId else { return }

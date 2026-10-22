@@ -25,7 +25,7 @@ struct RouteDestination: View {
         case .permissions:       PermissionsView(location: location)
 
         // 卫星链路
-        case .satelliteManagement: SatelliteManagementView(model: model)
+        case .satelliteManagement: SatelliteManagementView(model: model, location: location)
         case .satelliteFilter:     SatelliteFilterView(model: model)
         case .satelliteCategoryManager: SatelliteCategoryManagerView(model: model, filterCategoryIds: .constant([]))
         case .satelliteAssignment(let norad): SatelliteAssignmentView(model: model, norad: norad)

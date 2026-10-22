@@ -416,6 +416,17 @@ object HamKitApi {
     /** 分类配置快照转 JSON（iOS 持久化时直接存这个字符串）。 */
     fun categoryConfigToJson(configJson: String): String = withConfig(configJson) { it }.let { configJson }
 
+    /**
+     * 卫星工作模式（逗号分隔，如 "FM,SSTV"）；未知卫星返回空串。
+     *
+     * 数据来自共享目录 [com.example.hamkit.data.satellite.SatelliteCatalog]，
+     * 与 Android 列表卡片上的模式 chip 同源。
+     */
+    fun satelliteModes(norad: Int): String =
+        com.example.hamkit.data.satellite.SatelliteCatalog.MODES_BY_CATALOG_NUMBER[norad]
+            .orEmpty()
+            .joinToString(",")
+
     private fun resolveCategoryId(id: String): String =
         if (id.isBlank()) {
             "user-" + TimeSource.Monotonic.markNow().elapsedNow().inWholeMilliseconds.toString(36) + "-" +
