@@ -36,7 +36,8 @@ final class TrackerModel: ObservableObject {
     @Published private(set) var passes: [PassSnapshot] = []
     /// 附近过境卫星：每颗卫星的下一次过境（在境优先、按 AOS 排序），对齐 Android 逻辑
     @Published private(set) var nearbyPasses: [Shared.SatelliteNextPass] = []
-    @Published private(set) var isSearchingPass = false    @Published private(set) var favorites: Set<Int32> = []
+    @Published private(set) var isSearchingPass = false
+    @Published private(set) var favorites: Set<Int32> = []
     @Published private(set) var errorText: String?
 
     private var timer: Timer?
