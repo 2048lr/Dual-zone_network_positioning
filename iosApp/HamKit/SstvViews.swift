@@ -52,7 +52,7 @@ final class SstvAudio: ObservableObject {
 
     /// 不中断录音，取当前缓冲的 PCM 快照（用于边收边预览）。
     func snapshotData() -> Data? {
-        guard isRecording, samples.count > inputRate else { return nil }
+        guard isRecording, Double(samples.count) > inputRate else { return nil }
         let target = Double(SstvBridge.shared.sampleRate)
         let resampled = Self.resample(samples, from: inputRate, to: target)
         var data = Data(capacity: resampled.count * 2)
