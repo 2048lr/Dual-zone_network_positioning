@@ -139,18 +139,19 @@ jobs:
           sleep 15
           xcrun simctl io "$UDID" screenshot ios-screenshot.png
 
-          # 第二张：带 -smokeScroll 启动，等数据就绪后自动滚到卫星区（雷达图 + 过境）
+          # 第二张：带 -smokeManage 启动，等 TLE 就绪后自动进「卫星管理」页
+          # （验证轨道目录 1.6 万+ / 业余卫星两个计数、列表首屏）
           xcrun simctl terminate "$UDID" click.hamkit.ios || true
           sleep 2
-          xcrun simctl launch "$UDID" click.hamkit.ios -smokeScroll
-          sleep 16
+          xcrun simctl launch "$UDID" click.hamkit.ios -smokeManage
+          sleep 20
           xcrun simctl io "$UDID" screenshot ios-screenshot-satellite.png
 
-          # 第三张：滚到未来过境列表（含收藏与提醒按钮）
+          # 第三张：-smokeDetail 再进一层卫星详情（验证点卫星直接进详情、不再先跳归类页）
           xcrun simctl terminate "$UDID" click.hamkit.ios || true
           sleep 2
-          xcrun simctl launch "$UDID" click.hamkit.ios -smokeScrollPass
-          sleep 16
+          xcrun simctl launch "$UDID" click.hamkit.ios -smokeDetail
+          sleep 22
           xcrun simctl io "$UDID" screenshot ios-screenshot-passes.png
 
           xcrun simctl spawn "$UDID" log show --last 2m --style compact \

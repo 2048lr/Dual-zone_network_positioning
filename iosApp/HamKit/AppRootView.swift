@@ -11,10 +11,14 @@ struct AppRootView: View {
     @StateObject private var model = TrackerModel()
     @StateObject private var location = LocationProvider()
     @Environment(\.scenePhase) private var scenePhase
+    /// 首页的导航栈。平时由 `NavigationLink(value:)` 驱动；
+    /// CI 冒烟场景（`-smokeManage` / `-smokeDetail`）需要代码里主动入栈，
+    /// 所以把它提成可写的 path。
+    @State private var homePath = NavigationPath()
 
     var body: some View {
         TabView {
-            NavigationStack {
+            NavigationStack(path: $homePath) {
                 ContentView(model: model, location: location)
                     .navigationDestination(for: Route.self) { route in
                         RouteDestination(route: route, model: model, location: location)
@@ -53,6 +57,7 @@ struct AppRootView: View {
             // 首次进入主动要一次定位：定位类 App 的默认预期，
             // 也让 CI 冒烟测试能验证 CoreLocation 链路
             location.requestLocation()
+            runSmokeScenarioIfNeeded()
         }
         .onReceive(location.$coordinate.dropFirst()) { coordinate in
             guard let coordinate else { return }
@@ -68,6 +73,27 @@ struct AppRootView: View {
                 BackgroundReminderScheduler.shared.schedule()
             default:
                 break
+            }
+        }
+    }
+
+    /// CI 冒烟场景：没有 Mac 的机器上只能靠截图验证。
+    ///
+    /// - `-smokeManage`：等 TLE 拉取完成后自动进入「卫星管理」页（截图里能看到
+    ///   轨道目录 / 业余卫星两个计数）；
+    /// - `-smokeDetail`：再进一层卫星详情，验证「点卫星直接进详情」。
+    ///
+    /// 正常启动时这两个分支都不会命中，对用户零影响。
+    private func runSmokeScenarioIfNeeded() {
+        let args = ProcessInfo.processInfo.arguments
+        let wantsManage = args.contains("-smokeManage") || args.contains("-smokeDetail")
+        guard wantsManage else { return }
+        // 给 TLE（业余源 + 全量目录）留出下载与解析时间
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+            homePath.append(Route.satelliteManagement)
+            guard args.contains("-smokeDetail") else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                homePath.append(Route.satelliteDetail(norad: 25544))
             }
         }
     }
