@@ -305,9 +305,9 @@ final class SstvStore: ObservableObject {
         var rgba = [UInt8](repeating: 0, count: width * height * 4)
         for i in 0..<(width * height) {
             let rgb = pixels.get(index: Int32(i))
-            rgba[i * 4] = UInt8((rgb shr 16) and 0xFF)
-            rgba[i * 4 + 1] = UInt8((rgb shr 8) and 0xFF)
-            rgba[i * 4 + 2] = UInt8(rgb and 0xFF)
+            rgba[i * 4] = UInt8((rgb >> 16) & 0xFF)
+            rgba[i * 4 + 1] = UInt8((rgb >> 8) & 0xFF)
+            rgba[i * 4 + 2] = UInt8(rgb & 0xFF)
             rgba[i * 4 + 3] = 255
         }
         guard let provider = CGDataProvider(data: Data(rgba) as CFData),
