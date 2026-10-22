@@ -238,7 +238,7 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | CW | `MorseCode`（编解码、训练文本、节拍时间线） | 练习首页、自由练习、教程、编解码 | ✅ 音频用 AVAudioEngine；无「后台持续收听」 |
 | APRS | `Aprs`（包格式化/解析） | 主页面、设置、站点、消息、MapKit 地图、符号选择 | ✅ 原始 TCP 用 Network.framework；站点/消息存 JSON 文件 |
 | FT8 | `Ft8Protocol` / `Ft8Ldpc` / `Ft8Encoder` / `Ft8Decoder` / `Ft8Bridge` | 主页面、设置；AVAudioEngine 收发 | ⚠️ 编解码与收发已通；自动通联状态机未移植，手动发消息/解码后记 QSO |
-| SSTV | 模式表/VIS/同步/FFT/解调/解码/编码（从 Android 移植） | 接收、图库、设置、发射（相册选图 → 编码 → 播放） | ✅ 前台收发；后台接收受系统限制 |
+| SSTV | 模式表/VIS/同步/FFT/解调/解码/编码（从 Android 移植） | 接收、音频文件解码、图库（分享/删除）、设置、发射 | ✅ 前台收发；后台接收受系统限制 |
 | HF Fax | `HfFaxDecoder`（WEFAX 解调/解码） | 接收、解码、保存相册 | ✅ 仅前台接收 |
 | QSO 日志 | `QsoRecord`、`QsoExporter`（ADIF 3.1.4 / ADX XML） | 列表、新增/编辑、删除、分享导出 | ✅ 持久化用 JSON 文件（Android 用 Room） |
 | 天气 | `WeatherApi`（高德 Web：逆地理编码 + 实况 + 4 天预报） | 首页时间卡天气 + 城市 | ✅ 需构建时注入 `AMAP_WEB_KEY` |

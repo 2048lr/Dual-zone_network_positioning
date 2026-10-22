@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import AVFoundation
 import PhotosUI
+import UniformTypeIdentifiers
 import Combine
 import Shared
 
@@ -111,6 +112,12 @@ struct SstvImage: Identifiable, Codable {
     let height: Int
 }
 
+/// 解码结果（String 不能作为 Result 的 Failure，故用自定义枚举）。
+enum SstvDecodeOutcome {
+    case success(SstvImage)
+    case failure(String)
+}
+
 final class SstvStore: ObservableObject {
 
     static let shared = SstvStore()
@@ -134,8 +141,74 @@ final class SstvStore: ObservableObject {
         SstvBridge.shared.modes()
     }
 
+    /// 解码音频文件（WAV/MP3/M4A 等，AVAudioFile 支持的格式）。
+    /// 自动重采样到内核采样率；返回与实时接收相同的保存结果。
+    func decodeFile(url: URL) -> SstvDecodeOutcome {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+
+        guard let data = Self.pcm16(from: url, targetRate: Double(SstvBridge.shared.sampleRate)) else {
+            return .failure("无法读取音频文件")
+        }
+        return decode(data: data)
+    }
+
+    /// 用 AVAudioFile + AVAudioConverter 读成目标采样率、单声道、PCM16。
+    private static func pcm16(from url: URL, targetRate: Double) -> Data? {
+        guard let file = try? AVAudioFile(forReading: url) else { return nil }
+        let sourceFormat = file.processingFormat
+        let frameCount = AVAudioFrameCount(file.length)
+        guard frameCount > 0,
+              let sourceBuffer = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: frameCount),
+              (try? file.read(into: sourceBuffer)) != nil else {
+            return nil
+        }
+
+        guard let targetFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: targetRate,
+            channels: 1,
+            interleaved: false
+        ) else { return nil }
+
+        var output: AVAudioPCMBuffer?
+        if abs(sourceFormat.sampleRate - targetRate) < 1 && sourceFormat.channelCount == 1 {
+            output = sourceBuffer
+        } else {
+            guard let converter = AVAudioConverter(from: sourceFormat, to: targetFormat) else { return nil }
+            let ratio = targetRate / sourceFormat.sampleRate
+            let capacity = AVAudioFrameCount(Double(frameCount) * ratio + 1024)
+            guard let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else {
+                return nil
+            }
+            var error: NSError?
+            var supplied = false
+            converter.convert(to: converted, error: &error) { _, status in
+                if supplied {
+                    status.pointee = .endOfStream
+                    return nil
+                }
+                supplied = true
+                status.pointee = .haveData
+                return sourceBuffer
+            }
+            if error != nil { return nil }
+            output = converted
+        }
+
+        guard let buffer = output,
+              let channel = buffer.floatChannelData?[0] else { return nil }
+        var data = Data(capacity: Int(buffer.frameLength) * 2)
+        for i in 0..<Int(buffer.frameLength) {
+            let clamped = max(-1.0, min(1.0, channel[i]))
+            let v = Int16(clamped * 32767.0)
+            withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) }
+        }
+        return data
+    }
+
     /// 解码 PCM 数据为图片；失败返回错误文本。
-    func decode(data: Data) -> Result<SstvImage, String> {
+    func decode(data: Data) -> SstvDecodeOutcome {
         let bytes = KotlinByteArray(size: Int32(data.count))
         for (index, byte) in data.enumerated() {
             bytes.set(index: Int32(index), value: Int8(bitPattern: byte))
@@ -177,6 +250,10 @@ final class SstvStore: ObservableObject {
 
     func image(for record: SstvImage) -> UIImage? {
         UIImage(contentsOfFile: dir.appendingPathComponent(record.fileName).path)
+    }
+
+    func fileURL(for record: SstvImage) -> URL {
+        dir.appendingPathComponent(record.fileName)
     }
 
     func delete(_ record: SstvImage) {
@@ -235,6 +312,7 @@ struct SstvMainView: View {
 
     @State private var status = "空闲"
     @State private var lastImage: UIImage?
+    @State private var showAudioImporter = false
 
     var body: some View {
         List {
@@ -283,6 +361,17 @@ struct SstvMainView: View {
                 }
             }
 
+            Section("音频文件") {
+                Button {
+                    showAudioImporter = true
+                } label: {
+                    Label("从音频文件解码", systemImage: "doc.badge.plus")
+                }
+                Text("支持 WAV / M4A / MP3 等；自动重采样到 SSTV 解码采样率。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("图库") {
                 NavigationLink(value: Route.sstvGallery(pickForTx: false)) {
                     LabeledContent("已保存图片", value: "\(store.images.count)")
@@ -314,6 +403,26 @@ struct SstvMainView: View {
             }
         }
         .onDisappear { audio.cancel() }
+        .fileImporter(
+            isPresented: $showAudioImporter,
+            allowedContentTypes: [.audio],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            status = "正在读取音频文件…"
+            DispatchQueue.global(qos: .userInitiated).async {
+                let decoded = store.decodeFile(url: url)
+                DispatchQueue.main.async {
+                    switch decoded {
+                    case .success(let image):
+                        status = "解码成功：\(image.modeName) \(image.width)×\(image.height)"
+                        lastImage = store.image(for: image)
+                    case .failure(let error):
+                        status = "解码失败：\(error)"
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -365,6 +474,8 @@ struct SstvGalleryView: View {
 struct SstvImageDetailView: View {
     @ObservedObject var store = SstvStore.shared
     let record: SstvImage
+    @Environment(\.dismiss) private var dismiss
+    @State private var shareURL: URL?
 
     var body: some View {
         Group {
@@ -382,14 +493,32 @@ struct SstvImageDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    shareURL = store.fileURL(for: record)
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .disabled(store.image(for: record) == nil)
                 Button(role: .destructive) {
                     store.delete(record)
+                    dismiss()
                 } label: {
                     Image(systemName: "trash")
                 }
             }
         }
+        .sheet(item: Binding(
+            get: { shareURL.map { SharedSstvFile(url: $0) } },
+            set: { if $0 == nil { shareURL = nil } }
+        )) { file in
+            ShareSheet(url: file.url)
+        }
     }
+}
+
+private struct SharedSstvFile: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
 }
 
 /// SSTV 设置页。
