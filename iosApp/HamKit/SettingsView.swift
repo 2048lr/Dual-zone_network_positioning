@@ -1,4 +1,5 @@
 import SwiftUI
+import Shared
 
 /// 「设置」页：照抄 Android Settings 页结构 ——
 /// 外观 / 隐私 / 关于 三个分组；iOS 端暂无外观项，先落分组骨架。
