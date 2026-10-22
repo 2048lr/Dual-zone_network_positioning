@@ -48,6 +48,10 @@ struct SatelliteManagementView: View {
             let lhsVisible = passes[lhs.norad]?.isCurrentlyVisible ?? false
             let rhsVisible = passes[rhs.norad]?.isCurrentlyVisible ?? false
             if lhsVisible != rhsVisible { return lhsVisible }
+            // 与 Android 一致：在境之后优先有活跃转发器的卫星
+            let lhsActive = (model.transmittersByNorad[lhs.norad] ?? []).contains { $0.isActive }
+            let rhsActive = (model.transmittersByNorad[rhs.norad] ?? []).contains { $0.isActive }
+            if lhsActive != rhsActive { return lhsActive }
             return (passes[lhs.norad]?.aosMs ?? Int64.max) < (passes[rhs.norad]?.aosMs ?? Int64.max)
         }
     }
@@ -280,6 +284,7 @@ struct SatelliteManagementView: View {
             }
             if !modes.isEmpty || hasCategory || !radios.isEmpty {
                 HStack(spacing: 6) {
+                    chip("CelesTrak", color: .blue)
                     ForEach(modes.prefix(4), id: \.self) { mode in
                         chip(mode, color: .secondary)
                     }
