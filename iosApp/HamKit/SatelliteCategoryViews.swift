@@ -2,20 +2,23 @@ import SwiftUI
 import Shared
 
 /// 卫星分类管理页：对应 Android `SatelliteCategoryManagerDialogMiuix`。
-/// 新建 / 重命名 / 删除分类；内置「我的关注」不可删除；点分类行按该分类筛选卫星。
+/// 新建 / 重命名 / 删除分类；内置「我的关注」不可删除；菜单里可按分类筛选卫星。
 struct SatelliteCategoryManagerView: View {
 
     @ObservedObject var manager = SatelliteCategoryManager.shared
     @ObservedObject var model: TrackerModel
-
-    /// 当前筛选选中的分类 id（空 = 不筛选）。
-    @Binding var filterCategoryIds: Set<String>
+    /// 筛选条件只有一份真相：直接读写 SatelliteStore.filter。
+    /// 之前这里用 `.constant([])` 传入 Binding，菜单里「按此分类筛选」写进去是空操作，
+    /// 分类筛选看起来完全没反应——这是「分类乱套」的直接原因之一。
+    @ObservedObject private var store = SatelliteStore.shared
+    @Environment(\.dismiss) private var dismiss
 
     @State private var newCategoryName = ""
     @State private var editingId: String?
     @State private var editingName = ""
     @State private var pendingDelete: SatelliteCategoryManager.Snapshot.Category?
-    @State private var navigationTarget: String?
+
+    private var selectedCategoryIds: Set<String> { store.filter.categoryIds }
 
     var body: some View {
         List {
@@ -58,7 +61,8 @@ struct SatelliteCategoryManagerView: View {
             Button("删除", role: .destructive) {
                 if let target = pendingDelete {
                     manager.removeCategory(id: target.id)
-                    filterCategoryIds.remove(target.id)
+                    // 同步清掉可能残留的筛选条件，否则列表会被一个已不存在的分类筛成空
+                    store.filter.categoryIds.remove(target.id)
                 }
                 pendingDelete = nil
             }
@@ -97,16 +101,23 @@ struct SatelliteCategoryManagerView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if filterCategoryIds.contains(category.id) {
+                if selectedCategoryIds.contains(category.id) {
                     Image(systemName: "line.3.horizontal.decrease.circle.fill")
                         .foregroundStyle(Color.accentColor)
                 }
                 Menu {
                     Button {
-                        filterCategoryIds = [category.id]
+                        store.filter.categoryIds = [category.id]
+                        dismiss()
                     } label: {
                         Label("按此分类筛选", systemImage: "line.3.horizontal.decrease.circle")
                     }
+                    Button {
+                        store.filter.categoryIds.removeAll()
+                    } label: {
+                        Label("取消分类筛选", systemImage: "xmark.circle")
+                    }
+                    .disabled(selectedCategoryIds.isEmpty)
                     Button {
                         editingId = category.id
                         editingName = category.name

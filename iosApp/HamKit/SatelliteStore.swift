@@ -88,6 +88,14 @@ final class SatelliteStore: ObservableObject {
     private func rebuild() {
         let passes = passMap
         let snapshot = categoryManager.snapshot
+
+        // 分类被删除后，筛选条件里可能还留着它的 id；不清掉的话列表会被
+        // 一个不存在的分类筛成空，看起来就像「筛选/分类乱套」。
+        let knownCategoryIds = Set(snapshot.categories.map { $0.id })
+        if !filter.categoryIds.isSubset(of: knownCategoryIds) {
+            filter.categoryIds = filter.categoryIds.intersection(knownCategoryIds)
+        }
+
         let newItems = satellites.map { record in
             let radios = radiosFor[record.norad] ?? []
             // 模式：优先转发器实际模式，其次共享目录里的静态模式
