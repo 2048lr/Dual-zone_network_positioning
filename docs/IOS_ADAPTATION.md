@@ -241,7 +241,7 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | SSTV | 模式表/VIS/同步/FFT/解调/解码/编码（从 Android 移植） | 接收、音频文件解码、图库（分享/删除）、设置、发射 | ✅ 前台收发；后台接收受系统限制 |
 | HF Fax | `HfFaxDecoder`（WEFAX 解调/解码） | 接收、解码、保存相册 | ✅ 仅前台接收 |
 | QSO 日志 | `QsoRecord`、`QsoExporter`（ADIF 3.1.4 / ADX XML） | 列表、新增/编辑、删除、分享导出 | ✅ 持久化用 JSON 文件（Android 用 Room） |
-| 天气 | `WeatherApi`（高德 Web：逆地理编码 + 实况 + 4 天预报） | 首页时间卡天气 + 城市 | ✅ 需构建时注入 `AMAP_WEB_KEY` |
+| 天气 | WeatherKit（原生）+ `WeatherApi`（高德兜底） | 首页时间卡天气 + 城市 | ✅ 原生优先；无 WeatherKit 权限时回退高德（需 Key） |
 
 ### iOS 无等价能力的近似方案
 
@@ -249,7 +249,7 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 |---|---|
 | 前台服务 + 后台持续音频接收 | 仅前台接收；锁屏后由系统决定是否继续 |
 | 「播放捕获」录其他 App 音频 | 仅麦克风 / 音频文件导入 |
-| WorkManager 定时刷新过境提醒 | App 启动/回前台时重建本地通知；后台刷新依赖 BGTaskScheduler（系统调度） |
+| WorkManager 定时刷新过境提醒 | `BGAppRefreshTask` + 启动/回前台重建；系统调度不保证准点 |
 | 高德 Android SDK 地图 | MapKit；如需高德需按 Bundle ID 申请 iOS Key |
 | 应用内下载 APK 更新 | 不适用，iOS 走 App Store / TestFlight / 自签 |
 

@@ -37,34 +37,68 @@ final class WeatherStore: ObservableObject {
         guard !isLoading else { return }
         isLoading = true
         error = nil
-        let key = apiKey
-        if key.isEmpty {
-            isLoading = false
-            error = "未配置高德 Web 服务 Key"
-            return
-        }
-        HamKitApi.shared.fetchWeather(
-            latitude: latitude,
-            longitude: longitude,
-            apiKey: key
-        ) { [weak self] snapshot in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.isLoading = false
-                if let info = snapshot.info {
-                    self.city = info.cityName
-                    self.now = info.now
-                    self.daily = info.daily
+
+        // 优先 Apple 原生 WeatherKit + CLGeocoder；未授权/失败再回退高德 Web。
+        Task {
+            if let native = await NativeWeather.current(latitude: latitude, longitude: longitude) {
+                let cityName = await NativeWeather.cityName(latitude: latitude, longitude: longitude)
+                await MainActor.run {
+                    self.city = cityName ?? self.city
+                    self.now = WeatherNow(
+                        temp: String(format: "%.1f", native.temperatureC),
+                        text: native.condition,
+                        windDir: native.windDirection,
+                        windPower: String(format: "%.0f", native.windKph),
+                        humidity: "\(native.humidityPercent)",
+                        reportTime: Self.reportFormatter.string(from: Date())
+                    )
+                    self.daily = []
                     self.error = nil
+                    self.isLoading = false
                     self.lastFetch = Date()
                     self.lastLatitude = latitude
                     self.lastLongitude = longitude
-                } else {
-                    self.error = snapshot.error ?? "天气获取失败"
+                }
+                return
+            }
+
+            let key = apiKey
+            guard !key.isEmpty else {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.error = "WeatherKit 不可用，且未配置高德 Web 服务 Key"
+                }
+                return
+            }
+            HamKitApi.shared.fetchWeather(
+                latitude: latitude,
+                longitude: longitude,
+                apiKey: key
+            ) { [weak self] snapshot in
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.isLoading = false
+                    if let info = snapshot.info {
+                        self.city = info.cityName
+                        self.now = info.now
+                        self.daily = info.daily
+                        self.error = nil
+                        self.lastFetch = Date()
+                        self.lastLatitude = latitude
+                        self.lastLongitude = longitude
+                    } else {
+                        self.error = snapshot.error ?? "天气获取失败"
+                    }
                 }
             }
         }
     }
+
+    private static let reportFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f
+    }()
 
     /// 首页展示用的一行摘要。
     var summary: String {

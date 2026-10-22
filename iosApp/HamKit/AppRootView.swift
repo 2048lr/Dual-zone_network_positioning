@@ -10,6 +10,7 @@ struct AppRootView: View {
 
     @StateObject private var model = TrackerModel()
     @StateObject private var location = LocationProvider()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView {
@@ -52,6 +53,18 @@ struct AppRootView: View {
         .onReceive(location.$coordinate.dropFirst()) { coordinate in
             guard let coordinate else { return }
             model.updateStation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        }
+        .onChange(of: scenePhase) { phase in
+            switch phase {
+            case .background:
+                // 申请后台提醒刷新；音频会话保持激活以尽量延续接收
+                BackgroundReminderScheduler.shared.schedule()
+            case .active:
+                AudioSession.refreshIfNeeded()
+                BackgroundReminderScheduler.shared.schedule()
+            default:
+                break
+            }
         }
     }
 }

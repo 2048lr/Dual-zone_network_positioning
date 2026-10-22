@@ -380,13 +380,25 @@ final class TrackerModel: ObservableObject {
         guard settings.enabled else { return }
         let flags = SatelliteCategoryManager.shared.snapshot.reminderFlags
         guard !flags.isEmpty else { return }
+
+        var plans: [BackgroundReminderScheduler.Plan] = []
         for item in nearbyPasses where flags.contains(Int32(item.norad)) {
+            plans.append(
+                BackgroundReminderScheduler.Plan(
+                    satelliteName: item.name,
+                    aosMs: item.pass.aosMs,
+                    norad: Int32(item.norad)
+                )
+            )
             NotificationManager.shared.schedulePassReminder(
                 satelliteName: item.name,
                 aosMs: item.pass.aosMs,
                 leadSeconds: settings.leadSeconds
             )
         }
+        // 交给 BGAppRefreshTask 在后台重建通知
+        BackgroundReminderScheduler.shared.updatePlans(plans)
+        BackgroundReminderScheduler.shared.schedule()
     }
 
     // MARK: - 收藏

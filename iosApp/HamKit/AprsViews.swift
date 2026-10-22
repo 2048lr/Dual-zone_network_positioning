@@ -62,6 +62,12 @@ struct AprsMainView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("APRS")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            store.updatePosition(latitude: model.latitude, longitude: model.longitude)
+        }
+        .onReceive(model.$latitude.dropFirst()) { _ in
+            store.updatePosition(latitude: model.latitude, longitude: model.longitude)
+        }
     }
 }
 

@@ -22,9 +22,7 @@ final class SstvAudio: ObservableObject {
         guard !isRecording else { return }
         samples = []
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
-            try session.setActive(true)
+            try AudioSession.activateRecording()
         } catch {
             return
         }
@@ -50,6 +48,20 @@ final class SstvAudio: ObservableObject {
             guard let self else { return }
             self.elapsed = Date().timeIntervalSince(self.startTime)
         }
+    }
+
+    /// 不中断录音，取当前缓冲的 PCM 快照（用于边收边预览）。
+    func snapshotData() -> Data? {
+        guard isRecording, samples.count > inputRate else { return nil }
+        let target = Double(SstvBridge.shared.sampleRate)
+        let resampled = Self.resample(samples, from: inputRate, to: target)
+        var data = Data(capacity: resampled.count * 2)
+        for sample in resampled {
+            let clamped = max(-1.0, min(1.0, sample))
+            let v = Int16(clamped * 32767.0)
+            withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) }
+        }
+        return data
     }
 
     /// 停止并返回目标采样率的 PCM16 数据。
@@ -207,6 +219,21 @@ final class SstvStore: ObservableObject {
         return data
     }
 
+    /// 边收边预览：解码当前缓冲但**不落盘**。
+    func previewImage(data: Data) -> UIImage? {
+        let bytes = KotlinByteArray(size: Int32(data.count))
+        for (index, byte) in data.enumerated() {
+            bytes.set(index: Int32(index), value: Int8(bitPattern: byte))
+        }
+        let outcome = SstvBridge.shared.decodePcm(bytes: bytes, forcedVis: Int32(forcedVis))
+        guard outcome.success else { return nil }
+        return Self.makeImage(
+            pixels: outcome.pixels,
+            width: Int(outcome.width),
+            height: Int(outcome.height)
+        )
+    }
+
     /// 解码 PCM 数据为图片；失败返回错误文本。
     func decode(data: Data) -> SstvDecodeOutcome {
         let bytes = KotlinByteArray(size: Int32(data.count))
@@ -313,6 +340,7 @@ struct SstvMainView: View {
     @State private var status = "空闲"
     @State private var lastImage: UIImage?
     @State private var showAudioImporter = false
+    @State private var previewTimer: Timer?
 
     var body: some View {
         List {
@@ -325,6 +353,8 @@ struct SstvMainView: View {
                 }
                 Button(audio.isRecording ? "停止并解码" : "开始接收") {
                     if audio.isRecording {
+                        previewTimer?.invalidate()
+                        previewTimer = nil
                         let data = audio.stop()
                         status = "解码中…"
                         DispatchQueue.global(qos: .userInitiated).async {
@@ -341,7 +371,8 @@ struct SstvMainView: View {
                         }
                     } else {
                         audio.start()
-                        status = "正在接收…"
+                        status = "正在接收…（每 12 秒预览一次）"
+                        startPreviewTimer()
                     }
                 }
                 if audio.isRecording {
@@ -399,10 +430,15 @@ struct SstvMainView: View {
             }
             if autoStart && !audio.isRecording {
                 audio.start()
-                status = "正在接收…"
+                status = "正在接收…（每 12 秒预览一次）"
+                startPreviewTimer()
             }
         }
-        .onDisappear { audio.cancel() }
+        .onDisappear {
+            previewTimer?.invalidate()
+            previewTimer = nil
+            audio.cancel()
+        }
         .fileImporter(
             isPresented: $showAudioImporter,
             allowedContentTypes: [.audio],
@@ -419,6 +455,23 @@ struct SstvMainView: View {
                         lastImage = store.image(for: image)
                     case .failure(let error):
                         status = "解码失败：\(error)"
+                    }
+                }
+            }
+        }
+    }
+
+    /// 边收边预览：每 12 秒对当前录音缓冲尝试解码一帧，不落盘。
+    private func startPreviewTimer() {
+        previewTimer?.invalidate()
+        previewTimer = Timer.scheduledTimer(withTimeInterval: 12, repeats: true) { _ in
+            guard let data = audio.snapshotData() else { return }
+            DispatchQueue.global(qos: .utility).async {
+                let image = store.previewImage(data: data)
+                DispatchQueue.main.async {
+                    if let image {
+                        lastImage = image
+                        status = "接收中，已预览当前进度"
                     }
                 }
             }
@@ -729,9 +782,7 @@ final class SstvPlayer: ObservableObject {
         }
         engine.connect(player, to: engine.mainMixerNode, format: format)
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
-            try session.setActive(true)
+            try AudioSession.activateRecording()
             try engine.start()
         } catch {
             return

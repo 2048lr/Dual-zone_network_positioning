@@ -63,9 +63,7 @@ final class MorsePlayer: ObservableObject {
         }
 
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default)
-            try session.setActive(true)
+            try AudioSession.activatePlayback()
             try engine.start()
         } catch {
             onComplete?()

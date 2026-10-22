@@ -45,9 +45,7 @@ final class Ft8Audio: ObservableObject {
             }
         }
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
-            try session.setActive(true)
+            try AudioSession.activateRecording()
             try engine.start()
         } catch {
             return
@@ -77,9 +75,7 @@ final class Ft8Audio: ObservableObject {
         isRecording = true
 
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
-            try session.setActive(true)
+            try AudioSession.activateRecording()
         } catch {
             isRecording = false
             return

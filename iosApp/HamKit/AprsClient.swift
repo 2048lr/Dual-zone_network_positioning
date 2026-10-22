@@ -148,6 +148,9 @@ final class AprsStore: ObservableObject {
     private let client = AprsClient()
     private let defaults = UserDefaults.standard
     private static let key = "hamkit.aprs.config"
+    private var beaconTimer: Timer?
+    private var currentLatitude: Double = 0
+    private var currentLongitude: Double = 0
     private let dataURL: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return docs.appendingPathComponent("APRS.json")
@@ -216,9 +219,12 @@ final class AprsStore: ObservableObject {
         if !config.filter.isEmpty {
             client.send("#filter \(config.filter)")
         }
+        startBeaconIfNeeded()
     }
 
     func disconnect() {
+        beaconTimer?.invalidate()
+        beaconTimer = nil
         client.disconnect()
         isConnected = false
         statusText = "未连接"
@@ -241,6 +247,23 @@ final class AprsStore: ObservableObject {
             )
         )
         saveData()
+    }
+
+    /// 供页面同步当前坐标，Beacon 定时器使用。
+    func updatePosition(latitude: Double, longitude: Double) {
+        currentLatitude = latitude
+        currentLongitude = longitude
+    }
+
+    private func startBeaconIfNeeded() {
+        beaconTimer?.invalidate()
+        beaconTimer = nil
+        guard config.enableTransmit, !config.isReadOnly else { return }
+        let interval = TimeInterval(max(30, config.transmitInterval))
+        beaconTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            guard let self, self.isConnected else { return }
+            self.sendPosition(latitude: self.currentLatitude, longitude: self.currentLongitude)
+        }
     }
 
     func sendPosition(latitude: Double, longitude: Double) {

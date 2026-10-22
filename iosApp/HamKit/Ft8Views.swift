@@ -70,6 +70,8 @@ struct Ft8MainView: View {
 
     @State private var message = ""
     @State private var autoReply = false
+    @State private var autoCq = false
+    @State private var cqTimer: Timer?
     @State private var decoded: [Ft8DecodedMessage] = []
     @State private var status = "空闲"
     @State private var qsoSeed: Ft8DecodedMessage?
@@ -100,6 +102,10 @@ struct Ft8MainView: View {
 
             Section("发射 / 接收") {
                 Toggle("自动应答（听到呼叫本台时）", isOn: $autoReply)
+                Toggle("自动 CQ（每 30 秒主叫）", isOn: $autoCq)
+                    .onChange(of: autoCq) { enabled in
+                        if enabled { startAutoCq() } else { stopAutoCq() }
+                    }
                 Button(audio.isPlaying ? "停止发射" : "发射（15 秒）") {
                     if audio.isPlaying {
                         audio.stopPlayback()
@@ -151,9 +157,36 @@ struct Ft8MainView: View {
             }
         }
         .onDisappear {
+            stopAutoCq()
             audio.stopPlayback()
             audio.cancelRecording()
         }
+    }
+
+    private func startAutoCq() {
+        guard !store.callsign.isEmpty else {
+            autoCq = false
+            status = "自动 CQ 需要先填呼号"
+            return
+        }
+        stopAutoCq()
+        status = "自动 CQ 已开启"
+        cqTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            // 只有在没有进行中的自动通联、且空闲时才发 CQ
+            guard sequencer.stage == .idle, !audio.isPlaying, !audio.isRecording else { return }
+            let grid = store.grid
+            let call = store.callsign
+            let text = grid.isEmpty ? "CQ \(call)" : "CQ \(call) \(grid)"
+            DispatchQueue.main.async {
+                transmit(text)
+            }
+        }
+    }
+
+    private func stopAutoCq() {
+        cqTimer?.invalidate()
+        cqTimer = nil
+        if autoCq { status = "自动 CQ 已关闭" }
     }
 
     private func transmit(_ text: String) {
