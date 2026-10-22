@@ -123,7 +123,7 @@ final class TrackerModel: ObservableObject {
 
     /// 某颗卫星的 AMSAT 状态；目录中没有该星或未拉取到状态时返回 nil。
     func amsatStatus(norad: Int32) -> String? {
-        let name = HamKitApi.shared.amsatStatusName(norad: Int(norad))
+        let name = HamKitApi.shared.amsatStatusName(norad: norad)
         guard !name.isEmpty else { return nil }
         return amsatStatusByName[name]
     }
