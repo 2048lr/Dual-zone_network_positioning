@@ -4,38 +4,6 @@ import SwiftUI
 /// 页面结构和 Android 同名路由一致，但功能体依赖 iOS 原生音频/网络栈，逐个移植。
 /// 每页都写清「Android 有什么 / iOS 卡在哪」，便于后续逐个替换成真实现。
 
-// MARK: - FT8
-
-struct Ft8MainView: View {
-    var body: some View {
-        List {
-            Section {
-                NavigationLink(value: Route.ft8Settings) { Label("设置", systemImage: "gearshape") }
-            } footer: {
-                Text("FT8 编解码已在共享内核实现；iOS 需要原生音频采集/播放（AudioEngine），正在移植。")
-            }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("FT8")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-struct Ft8SettingsView: View {
-    var body: some View {
-        Form {
-            Section("电台") {
-                TextField("频率（Hz）", text: .constant(""))
-            }
-            Section {
-                Text("FT8 设置尚未生效。").font(.footnote).foregroundStyle(.secondary)
-            }
-        }
-        .navigationTitle("FT8 设置")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 // MARK: - SSTV
 
 struct SstvMainView: View {

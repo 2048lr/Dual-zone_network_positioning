@@ -237,7 +237,7 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | 设置 / 隐私 / 权限 / 关于 | — | 全部页面 | ✅ |
 | CW | `MorseCode`（编解码、训练文本、节拍时间线） | 练习首页、自由练习、教程、编解码 | ✅ 音频用 AVAudioEngine；无「后台持续收听」 |
 | APRS | `Aprs`（包格式化/解析） | 主页面、设置、站点、消息、MapKit 地图、符号选择 | ✅ 原始 TCP 用 Network.framework；消息仅内存保存（Android 用 Room） |
-| FT8 | ⬜ 待移植 | 骨架页 | ⬜ |
+| FT8 | `Ft8Protocol` / `Ft8Ldpc` / `Ft8Encoder` / `Ft8Decoder` / `Ft8Bridge` | 主页面、设置；AVAudioEngine 收发 | ⚠️ 编解码与收发已通；自动通联状态机未移植，手动发消息/解码后记 QSO |
 | SSTV | ⬜ 待移植（Android 端 31 文件 / 9.6k 行） | 骨架页 | ⬜；无「录其他 App 音频」 |
 | HF Fax | ⬜ 待移植 | 骨架页 | ⬜ |
 | QSO 日志 | `QsoRecord`、`QsoExporter`（ADIF 3.1.4 / ADX XML） | 列表、新增/编辑、删除、分享导出 | ✅ 持久化用 JSON 文件（Android 用 Room） |
