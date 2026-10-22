@@ -212,7 +212,7 @@ private struct SatelliteMapCanvas: UIViewRepresentable {
                 ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
             view.annotation = annotation
             view.markerTintColor = .systemBlue
-            view.glyphImage = UIImage(systemName: "satellite")
+            view.glyphImage = UIImage(systemName: "antenna.radiowaves.left.and.right")
             view.canShowCallout = true
             return view
         }
@@ -226,7 +226,7 @@ struct ContentUnavailableCompatView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "satellite")
+            Image(systemName: "scope")
                 .font(.system(size: 36))
                 .foregroundStyle(.secondary)
             Text(title).font(.headline)

@@ -11,7 +11,9 @@ struct ToolsView: View {
         List {
             Section("卫星") {
                 NavigationLink(value: Route.satelliteManagement) {
-                    Label("卫星管理", systemImage: "satellite")
+                    // `satellite` 这个 SF Symbol 在部分系统版本上取不到，会渲染成「没图标」
+                    // （截图里那行文字直接顶到了图标位）。改用一定有、语义也贴的 scope。
+                    Label("卫星管理", systemImage: "scope")
                 }
                 NavigationLink(value: Route.reminderList) {
                     Label("过境提醒", systemImage: "bell")
