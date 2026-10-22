@@ -48,6 +48,9 @@ struct AprsMainView: View {
                 NavigationLink(value: Route.aprsMap) {
                     Label("站点地图", systemImage: "map")
                 }
+                NavigationLink(value: Route.aprsSymbolPicker) {
+                    LabeledContent("APRS 符号", value: store.config.symbolTable + store.config.symbolCode)
+                }
             }
 
             Section {

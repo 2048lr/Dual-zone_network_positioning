@@ -193,4 +193,23 @@ final class Ft8Store: ObservableObject {
     var bandFreqHz: Int64 {
         Self.bands.first { $0.id == band }?.freqHz ?? 7_074_000
     }
+
+    /// 自动通联完成后写入 QSO 日志（标记完成，报告使用默认 -05）。
+    func recordAutoQso(target: String, text: String, grid: String) {
+        let entry = QsoEntry(
+            callsign: target,
+            grid: "",
+            reportSent: "-05",
+            reportReceived: "-05",
+            bandName: band,
+            freqHz: bandFreqHz,
+            mode: "FT8",
+            qsoTime: Date(),
+            isComplete: true,
+            operatorCallsign: callsign,
+            myGrid: grid,
+            comment: "auto: \(text)"
+        )
+        QsoStore.shared.upsert(entry)
+    }
 }

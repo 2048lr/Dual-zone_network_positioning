@@ -1,13 +1,75 @@
 import SwiftUI
 import Shared
 
+/// FT8 自动应答状态机（简化版，对齐 Android 自动通联的核心路径）：
+/// 听到呼叫本台 → 回报告 → 收到报告回 RR73 → 记 QSO。
+/// 自动 CQ 呼叫与多候选择优暂未移植。
+final class Ft8Sequencer: ObservableObject {
+
+    enum Stage {
+        case idle
+        case reportSent
+        case rr73Sent
+        case completed
+    }
+
+    @Published private(set) var stage: Stage = .idle
+    @Published private(set) var target: String = ""
+
+    /// 处理一条解码消息；返回需要自动发射的文本（nil 表示不动作）。
+    func handle(message: String, myCallsign: String) -> String? {
+        let my = myCallsign.uppercased()
+        guard !my.isEmpty else { return nil }
+        let tokens = message.uppercased().split(separator: " ").map(String.init)
+        guard tokens.contains(my) else { return nil }
+
+        // 识别对方呼号：排除 CQ / 本台 / 报告 / 修饰词
+        let modifiers: Set<String> = ["CQ", "DE", "RR73", "RR", "73", "TU", "R", "K", "BK"]
+        let other = tokens.first { token in
+            token != my && !modifiers.contains(token) && !token.hasPrefix("+") && !token.hasPrefix("-")
+                && token.rangeOfCharacter(from: .decimalDigits) != nil
+        } ?? tokens.first { $0 != my && !modifiers.contains($0) }
+        guard let other, !other.isEmpty else { return nil }
+
+        switch stage {
+        case .idle, .completed:
+            target = other
+            stage = .reportSent
+            return "\(other) \(my) -05"
+        case .reportSent:
+            if tokens.contains("RR73") || tokens.contains("73") || tokens.contains("RR") {
+                stage = .completed
+                return "\(other) \(my) 73"
+            }
+            if tokens.contains(where: { $0.hasPrefix("+") || $0.hasPrefix("-") }) {
+                stage = .rr73Sent
+                return "\(other) \(my) R-05"
+            }
+            return nil
+        case .rr73Sent:
+            if tokens.contains("RR73") || tokens.contains("73") || tokens.contains("RR") {
+                stage = .completed
+                return nil
+            }
+            return nil
+        }
+    }
+
+    func reset() {
+        stage = .idle
+        target = ""
+    }
+}
+
 /// FT8 主页面：对应 Android `Ft8Main` —— 设置摘要、消息编辑、发射/接收、解码结果。
 struct Ft8MainView: View {
 
     @ObservedObject var store = Ft8Store.shared
     @StateObject private var audio = Ft8Audio()
+    @StateObject private var sequencer = Ft8Sequencer()
 
     @State private var message = ""
+    @State private var autoReply = false
     @State private var decoded: [Ft8DecodedMessage] = []
     @State private var status = "空闲"
     @State private var qsoSeed: Ft8DecodedMessage?
@@ -37,12 +99,13 @@ struct Ft8MainView: View {
             }
 
             Section("发射 / 接收") {
+                Toggle("自动应答（听到呼叫本台时）", isOn: $autoReply)
                 Button(audio.isPlaying ? "停止发射" : "发射（15 秒）") {
                     if audio.isPlaying {
                         audio.stopPlayback()
                         status = "已停止"
                     } else {
-                        transmit()
+                        transmit(message)
                     }
                 }
                 .disabled(message.isEmpty)
@@ -93,9 +156,9 @@ struct Ft8MainView: View {
         }
     }
 
-    private func transmit() {
+    private func transmit(_ text: String) {
         let pcmBytes = Ft8Bridge.shared.encodeToPcm(
-            message: message,
+            message: text,
             callsign: store.callsign,
             grid: store.grid
         )
@@ -107,8 +170,20 @@ struct Ft8MainView: View {
         for i in 0..<Int(pcmBytes.size) {
             data[i] = UInt8(bitPattern: pcmBytes.get(index: Int32(i)))
         }
-        status = "正在发射…"
+        status = "正在发射：\(text)"
         audio.play(pcm: data)
+    }
+
+    /// 自动应答：等到下一个 15 秒偶数时隙再发射，避免与接收窗口重叠。
+    private func scheduleAutoTransmit(_ text: String) {
+        let now = Date().timeIntervalSince1970
+        let slot = 15.0
+        let nextSlot = ceil(now / slot) * slot
+        let delay = max(0.5, nextSlot - now)
+        status = "自动应答已排队：\(text)"
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            transmit(text)
+        }
     }
 
     private func receive() {
@@ -123,6 +198,19 @@ struct Ft8MainView: View {
                 if let result {
                     decoded.insert(result, at: 0)
                     status = "解码成功：\(result.message)"
+                    if autoReply,
+                       let reply = sequencer.handle(message: result.message, myCallsign: store.callsign) {
+                        scheduleAutoTransmit(reply)
+                    }
+                    if sequencer.stage == .completed, !sequencer.target.isEmpty {
+                        // 自动通联完成：记入 QSO 日志（未完成标记，等用户确认）
+                        store.recordAutoQso(
+                            target: sequencer.target,
+                            text: result.message,
+                            grid: store.grid
+                        )
+                        sequencer.reset()
+                    }
                 } else {
                     status = "本时隙没有解出消息"
                 }
