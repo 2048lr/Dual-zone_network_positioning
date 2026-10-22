@@ -45,5 +45,8 @@ enum Route: Hashable {
 
     // MARK: CW / QSO（占位）
     case cwPractice
+    case cwFreePractice
+    case cwTutorial
+    case cwMorseCodec
     case qsoLogList
 }

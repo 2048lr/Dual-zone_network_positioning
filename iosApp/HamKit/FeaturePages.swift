@@ -200,24 +200,6 @@ struct HfFaxView: View {
 }
 
 // MARK: - CW
-
-struct CwPracticeView: View {
-    var body: some View {
-        List {
-            Section {
-                Label("自由练习", systemImage: "metronome")
-                Label("教程练习", systemImage: "book")
-                Label("摩斯电码编解码", systemImage: "textformat.123")
-            } footer: {
-                Text("摩斯编解码已在共享内核；iOS 音频侧（振荡器/键控）正在移植。")
-            }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("CW 练习")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 // MARK: - QSO 日志
 
 struct QsoLogListView: View {

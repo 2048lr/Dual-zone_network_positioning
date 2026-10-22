@@ -32,7 +32,7 @@ struct ContentView: View {
                 }
 
                 EntryCard(title: "CW 练习", summary: "自由练习 / 教程 / 摩斯电码编解码", systemImage: "dot.radiowaves.left.and.right") {
-                    CwPracticeView()
+                    CwPracticeHomeView()
                 }
                 EntryCard(title: "APRS", summary: "业余无线电位置报告", systemImage: "dot.circle.and.cursorlines.rectangle") {
                     AprsMainView()

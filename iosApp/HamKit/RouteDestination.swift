@@ -55,7 +55,10 @@ struct RouteDestination: View {
 
         // 其他
         case .hfFax:             HfFaxView()
-        case .cwPractice:        CwPracticeView()
+        case .cwPractice:        CwPracticeHomeView()
+        case .cwFreePractice:    CwPracticeView()
+        case .cwTutorial:        CwTutorialView()
+        case .cwMorseCodec:      CwMorseCodecView()
         case .qsoLogList:        QsoLogListView()
         }
     }
