@@ -1,71 +1,36 @@
 import SwiftUI
 import Shared
 
-/// 卫星管理页：照抄 Android `SatelliteManagementScreen`。
-///
-/// 结构：搜索 → 说明 → 统计（总数/已分类/分类数）→ 筛选与分类入口 →
-/// 获取定位 / 更新卫星源状态 → 卫星卡片列表（模式、分类徽章、俯仰角、
-/// 提醒铃铛、LOS/AOS 时间与倒计时）。
+/// 卫星管理页：对应 Android `SatelliteManagementScreen`。
+/// 所有筛选/排序/组装都交给 `SatelliteStore`，本视图只负责渲染。
 struct SatelliteManagementView: View {
 
     @ObservedObject var model: TrackerModel
     @ObservedObject var location: LocationProvider
     @ObservedObject var categoryManager = SatelliteCategoryManager.shared
-    @ObservedObject var filter = SatelliteFilterModel.shared
     @ObservedObject private var weather = WeatherStore.shared
-
+    @ObservedObject private var store = SatelliteStore.shared
     @State private var now = Date()
     @State private var expanded: Set<Int32> = []
 
     private let ticker = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
-    // MARK: - 过滤与排序
-
-    private var categorizedNumbers: Set<Int32> {
-        Set(categoryManager.snapshot.membership.keys)
-    }
-
-    private var amsatNorads: Set<Int32> {
-        Set(model.satellites.lazy.filter { model.amsatStatus(norad: $0.norad) != nil }.map { $0.norad })
-    }
-
-    private var filtered: [TleRecord] {
-        filter.apply(
-            to: model.satellites,
-            membership: categoryManager.snapshot.membership,
-            passByNorad: model.passByNorad,
-            amsatNorads: amsatNorads
-        )
-    }
-
-    /// 排序与 Android 一致：已分类优先 → 在境优先 → AOS 升序（无过境排最后）
-    private var sorted: [TleRecord] {
-        let passes = model.passByNorad
-        return filtered.sorted { lhs, rhs in
-            let lhsCat = categorizedNumbers.contains(lhs.norad)
-            let rhsCat = categorizedNumbers.contains(rhs.norad)
-            if lhsCat != rhsCat { return lhsCat }
-            let lhsVisible = passes[lhs.norad]?.isCurrentlyVisible ?? false
-            let rhsVisible = passes[rhs.norad]?.isCurrentlyVisible ?? false
-            if lhsVisible != rhsVisible { return lhsVisible }
-            // 与 Android 一致：在境之后优先有活跃转发器的卫星
-            let lhsActive = (model.transmittersByNorad[lhs.norad] ?? []).contains { $0.isActive }
-            let rhsActive = (model.transmittersByNorad[rhs.norad] ?? []).contains { $0.isActive }
-            if lhsActive != rhsActive { return lhsActive }
-            return (passes[lhs.norad]?.aosMs ?? Int64.max) < (passes[rhs.norad]?.aosMs ?? Int64.max)
-        }
-    }
-
-    private var categorizedCount: Int {
-        model.satellites.lazy.filter { categorizedNumbers.contains($0.norad) }.count
+    init(model: TrackerModel, location: LocationProvider) {
+        self.model = model
+        self.location = location
+        SatelliteStore.shared.configure(model: model)
     }
 
     var body: some View {
         List {
             overviewSection
             Section {
-                ForEach(sorted, id: \.norad) { record in
-                    satelliteCard(record)
+                if store.visibleItems.isEmpty {
+                    Text(store.filter.isActive ? "没有符合筛选条件的卫星" : "没有卫星数据")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(store.visibleItems) { item in
+                    satelliteCard(item)
                 }
             }
         }
@@ -78,24 +43,21 @@ struct SatelliteManagementView: View {
         }
     }
 
-    // MARK: - 顶部概览
+    // MARK: - 顶部概览（搜索 / 统计 / 入口 / 状态）
 
     private var overviewSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
-                // 搜索
                 HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("搜索卫星名称或编号", text: $filter.query)
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField("搜索卫星名称或编号", text: $store.filter.nameQuery)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    if !filter.query.isEmpty {
+                    if !store.filter.nameQuery.isEmpty {
                         Button {
-                            filter.query = ""
+                            store.filter.nameQuery = ""
                         } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                         }
                         .buttonStyle(.borderless)
                     }
@@ -108,14 +70,12 @@ struct SatelliteManagementView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                // 统计
                 HStack(spacing: 0) {
-                    statItem(value: "\(model.satellites.count)", label: "共 \(model.satellites.count) 颗")
-                    statItem(value: "\(categorizedCount)", label: "已分类")
-                    statItem(value: "\(categoryManager.snapshot.categories.count)", label: "分类数")
+                    statItem("\(store.totalCount)", "共 \(store.totalCount) 颗")
+                    statItem("\(store.categorizedCount)", "已分类")
+                    statItem("\(store.categoryCount)", "分类数")
                 }
 
-                // 筛选 / 分类
                 HStack(spacing: 24) {
                     NavigationLink(value: Route.satelliteFilter) {
                         Label("筛选卫星", systemImage: "line.3.horizontal.decrease")
@@ -126,14 +86,12 @@ struct SatelliteManagementView: View {
                 }
                 .font(.subheadline)
 
-                if !filter.categoryIds.isEmpty {
+                if !store.filter.categoryIds.isEmpty {
                     HStack(spacing: 6) {
-                        Text("已按分类筛选")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        ForEach(Array(filter.categoryIds), id: \.self) { id in
+                        Text("已按分类筛选").font(.footnote).foregroundStyle(.secondary)
+                        ForEach(Array(store.filter.categoryIds), id: \.self) { id in
                             Button {
-                                filter.categoryIds.remove(id)
+                                store.filter.categoryIds.remove(id)
                             } label: {
                                 HStack(spacing: 4) {
                                     Text(categoryManager.snapshot.category(byId: id)?.name ?? id)
@@ -152,7 +110,6 @@ struct SatelliteManagementView: View {
 
                 Divider()
 
-                // 定位 / 卫星源状态
                 HStack(alignment: .top, spacing: 10) {
                     Button {
                         location.requestLocation()
@@ -190,11 +147,8 @@ struct SatelliteManagementView: View {
                     .buttonStyle(.borderless)
                     .disabled(model.isLoadingSatellites)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(model.lastUpdatedText)
-                            .font(.subheadline.monospacedDigit())
-                        Text(model.dataStatusText)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        Text(model.lastUpdatedText).font(.subheadline.monospacedDigit())
+                        Text(model.dataStatusText).font(.footnote).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -203,74 +157,56 @@ struct SatelliteManagementView: View {
         .listRowSeparator(.hidden)
     }
 
-    private func statItem(value: String, label: String) -> some View {
+    private func statItem(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
-            Text(value)
-                .font(.title2.weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(Color.accentColor)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(value).font(.title2.weight(.semibold)).monospacedDigit().foregroundStyle(Color.accentColor)
+            Text(label).font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - 卫星卡片
 
-    private func satelliteCard(_ record: TleRecord) -> some View {
-        let pass = model.passByNorad[record.norad]
-        let categoryIds = categoryManager.snapshot.categoryIds(of: record.norad)
-        let categoryNames = categoryIds.compactMap { categoryManager.snapshot.category(byId: $0)?.name }.sorted()
-        let reminderOn = categoryManager.snapshot.reminderFlags.contains(record.norad)
-        let modes = HamKitApi.shared.satelliteModes(norad: record.norad)
-            .split(separator: ",")
-            .map(String.init)
-        let radios = model.transmittersByNorad[record.norad] ?? []
-        let activeRadios = radios.filter { $0.isActive }.count
-        let status = model.amsatStatus(norad: record.norad)
+    private func satelliteCard(_ item: SatelliteListItem) -> some View {
+        let categoryNames = item.categoryIds
+            .compactMap { categoryManager.snapshot.category(byId: $0)?.name }
+            .sorted()
         let hasCategory = !categoryNames.isEmpty
-        let inPass = pass?.isCurrentlyVisible ?? false
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
-                NavigationLink(value: Route.satelliteDetail(norad: record.norad)) {
+                NavigationLink(value: Route.satelliteDetail(norad: item.record.norad)) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(record.name)
-                            .font(.headline)
-                            .lineLimit(1)
-                            .foregroundStyle(.primary)
-                        Text(String(format: "#%05d", record.norad))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        Text(item.record.name).font(.headline).lineLimit(1).foregroundStyle(.primary)
+                        Text(String(format: "#%05d", item.record.norad))
+                            .font(.caption2).foregroundStyle(.secondary)
                     }
                 }
                 .buttonStyle(.plain)
                 Spacer()
                 HStack(spacing: 12) {
-                    if let pass {
+                    if let pass = item.pass {
                         Text("\(Int(pass.maxElevationDeg.rounded()))°")
-                            .font(.subheadline.weight(.semibold))
-                            .monospacedDigit()
+                            .font(.subheadline.weight(.semibold)).monospacedDigit()
                     }
-                    NavigationLink(value: Route.satelliteAssignment(norad: record.norad)) {
+                    NavigationLink(value: Route.satelliteAssignment(norad: item.record.norad)) {
                         Image(systemName: hasCategory ? "folder.fill" : "folder")
                     }
                     Button {
-                        categoryManager.toggleReminder(norad: record.norad)
+                        categoryManager.toggleReminder(norad: item.record.norad)
                     } label: {
-                        Image(systemName: reminderOn ? "bell.fill" : "bell")
-                            .foregroundStyle(reminderOn ? Color.accentColor : Color.secondary)
+                        Image(systemName: item.reminderEnabled ? "bell.fill" : "bell")
+                            .foregroundStyle(item.reminderEnabled ? Color.accentColor : Color.secondary)
                     }
                     .buttonStyle(.borderless)
                     Button {
-                        if expanded.contains(record.norad) {
-                            expanded.remove(record.norad)
+                        if expanded.contains(item.record.norad) {
+                            expanded.remove(item.record.norad)
                         } else {
-                            expanded.insert(record.norad)
+                            expanded.insert(item.record.norad)
                         }
                     } label: {
-                        Image(systemName: expanded.contains(record.norad) ? "chevron.up" : "chevron.down")
+                        Image(systemName: expanded.contains(item.record.norad) ? "chevron.up" : "chevron.down")
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.borderless)
@@ -278,14 +214,14 @@ struct SatelliteManagementView: View {
                 .font(.callout)
             }
 
-            // 状态 + 模式 + 分类 + 转发器数量 chip
-            if let status {
+            if let status = item.amsatStatus {
                 chip(status, color: status.localizedCaseInsensitiveContains("HEARD") ? .green : .secondary)
             }
-            if !modes.isEmpty || hasCategory || !radios.isEmpty {
+
+            if !item.modes.isEmpty || hasCategory || !item.radios.isEmpty {
                 HStack(spacing: 6) {
                     chip("CelesTrak", color: .blue)
-                    ForEach(modes.prefix(4), id: \.self) { mode in
+                    ForEach(item.modes.prefix(4), id: \.self) { mode in
                         chip(mode, color: .secondary)
                     }
                     ForEach(categoryNames.prefix(3), id: \.self) { name in
@@ -294,23 +230,23 @@ struct SatelliteManagementView: View {
                     if categoryNames.count > 3 {
                         chip("+\(categoryNames.count - 3)", color: .accentColor)
                     }
-                    if !radios.isEmpty {
-                        Label("\(activeRadios)/\(radios.count)", systemImage: "antenna.radiowaves.left.and.right")
+                    if !item.radios.isEmpty {
+                        let active = item.radios.filter { $0.isActive }.count
+                        Label("\(active)/\(item.radios.count)", systemImage: "antenna.radiowaves.left.and.right")
                             .font(.caption2)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
-                            .background((activeRadios > 0 ? Color.accentColor : Color.secondary).opacity(0.14))
-                            .foregroundStyle(activeRadios > 0 ? Color.accentColor : Color.secondary)
+                            .background((active > 0 ? Color.accentColor : Color.secondary).opacity(0.14))
+                            .foregroundStyle(active > 0 ? Color.accentColor : Color.secondary)
                             .clipShape(Capsule())
                     }
                 }
             }
 
-            // 展开区：转发器列表 + 详情/雷达/地图入口
-            if expanded.contains(record.norad) {
-                if !radios.isEmpty {
+            if expanded.contains(item.record.norad) {
+                if !item.radios.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(radios.enumerated()), id: \.offset) { _, radio in
+                        ForEach(Array(item.radios.enumerated()), id: \.offset) { _, radio in
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text((radio.inverted ? "INV: " : "") + (radio.name.isEmpty ? "未命名转发器" : radio.name))
@@ -330,30 +266,28 @@ struct SatelliteManagementView: View {
                     .background(Color(.tertiarySystemFill))
                     .clipShape(RoundedRectangle(cornerRadius: 9))
                 }
-
                 HStack(spacing: 16) {
-                    NavigationLink(value: Route.satelliteDetail(norad: record.norad)) {
+                    NavigationLink(value: Route.satelliteDetail(norad: item.record.norad)) {
                         Label("详情", systemImage: "info.circle")
                     }
-                    NavigationLink(value: Route.satelliteRadar(norad: record.norad)) {
+                    NavigationLink(value: Route.satelliteRadar(norad: item.record.norad)) {
                         Label("雷达", systemImage: "dot.scope")
                     }
-                    NavigationLink(value: Route.satelliteMap(norad: record.norad)) {
+                    NavigationLink(value: Route.satelliteMap(norad: item.record.norad)) {
                         Label("地图", systemImage: "map")
                     }
                 }
                 .font(.subheadline)
             }
 
-            // 时间徽章
-            timeBadge(pass: pass)
+            timeBadge(item.pass)
         }
         .padding(14)
         .background(hasCategory ? Color.accentColor.opacity(0.08) : Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(inPass ? Color.accentColor : Color.clear, lineWidth: 1.5)
+                .stroke(item.isVisible ? Color.accentColor : Color.clear, lineWidth: 1.5)
         )
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
@@ -370,30 +304,26 @@ struct SatelliteManagementView: View {
     }
 
     @ViewBuilder
-    private func timeBadge(pass: PassSnapshot?) -> some View {
+    private func timeBadge(_ pass: PassSnapshot?) -> some View {
         if let pass {
             if pass.isCurrentlyVisible {
                 HStack {
-                    badge(label: "出境", value: Self.dateFormatter.string(from: pass.losMs.date))
+                    badge("出境", Self.dateFormatter.string(from: pass.losMs.date))
                     Spacer()
-                    badge(label: "剩余", value: remainingText(until: pass.losMs))
+                    badge("剩余", remainingText(until: pass.losMs))
                 }
             } else {
-                badge(label: "AOS", value: Self.dateFormatter.string(from: pass.aosMs.date))
+                badge("AOS", Self.dateFormatter.string(from: pass.aosMs.date))
             }
         } else {
-            badge(label: "无过境窗口", value: "48 小时内不可见")
+            badge("无过境窗口", "48 小时内不可见")
         }
     }
 
-    private func badge(label: String, value: String) -> some View {
+    private func badge(_ label: String, _ value: String) -> some View {
         HStack(spacing: 6) {
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(Color.accentColor)
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+            Text(value).font(.caption.monospacedDigit()).foregroundStyle(Color.accentColor)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
@@ -406,7 +336,6 @@ struct SatelliteManagementView: View {
         return "\(seconds / 60)分\(seconds % 60)秒"
     }
 
-    /// "RX 145.800 MHz  TX 437.800 MHz  FM"（与 Android 转发器行一致）
     private static func frequencyText(_ radio: Transmitter) -> String {
         var parts: [String] = []
         if radio.downlinkHz > 0 {
