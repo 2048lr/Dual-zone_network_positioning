@@ -46,6 +46,8 @@ struct ToolsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(MiuixTheme.background)
         .navigationTitle("工具")
         .navigationBarTitleDisplayMode(.inline)
         // 路由目标由 AppRootView 的 NavigationStack 统一注册；

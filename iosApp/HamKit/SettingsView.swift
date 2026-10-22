@@ -97,6 +97,8 @@ struct SettingsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(MiuixTheme.background)
         .navigationTitle("设置")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: reminderSettings.enabled) { _ in

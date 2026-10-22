@@ -48,6 +48,7 @@ struct AppRootView: View {
                 Label("设置", systemImage: "gearshape.fill")
             }
         }
+        .tint(MiuixTheme.primary)
         .onAppear {
             // 数据层必须在启动时就接上：之前 SatelliteStore.configure 只在
             // 「卫星管理」页的 init 里调用，导致筛选页 / 分类页 / 详情页在首次

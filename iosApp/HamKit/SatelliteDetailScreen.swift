@@ -114,7 +114,7 @@ struct SatelliteDetailScreen: View {
             }
             .padding(12)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(MiuixTheme.background)
         .navigationTitle(record?.name ?? "卫星详情")
         .navigationBarTitleDisplayMode(.inline)
         .onReceive(ticker) { now = $0 }
@@ -281,8 +281,8 @@ struct SatelliteDetailScreen: View {
         VStack(alignment: .leading, spacing: 8, content: content)
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(MiuixTheme.card)
+            .clipShape(RoundedRectangle(cornerRadius: MiuixTheme.radius, style: .continuous))
     }
 
     private var divider: some View {

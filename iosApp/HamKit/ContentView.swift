@@ -40,7 +40,7 @@ struct ContentView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(MiuixTheme.background)
         .navigationTitle("HamKit")
         .onAppear {
             WeatherStore.shared.refresh(latitude: model.latitude, longitude: model.longitude)
@@ -99,10 +99,7 @@ private struct HomeTimeCard: View {
                 .lineLimit(2)
                 .padding(.top, 2)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .miuixCard()
         .onReceive(timer) { now = $0 }
         .onAppear { quote.refreshIfNeeded() }
     }
@@ -183,9 +180,7 @@ private struct NearbyPassesCard: View {
                     .font(.subheadline)
             }
         }
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .miuixCard()
     }
 
     private static let timeFormatter: DateFormatter = {
@@ -224,9 +219,7 @@ struct EntryCard: View {
                     .font(.footnote)
                     .foregroundStyle(.tertiary)
             }
-            .padding(14)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .miuixCard(padding: 14, radius: 14)
         }
         .buttonStyle(.plain)
     }

@@ -47,6 +47,8 @@ struct SatelliteManagementView: View {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(MiuixTheme.background)
         .navigationTitle("卫星详情")
         .navigationBarTitleDisplayMode(.large)
         .onReceive(ticker) { now = $0 }
@@ -300,8 +302,8 @@ struct SatelliteManagementView: View {
             timeBadge(item.pass)
         }
         .padding(14)
-        .background(hasCategory ? Color.accentColor.opacity(0.08) : Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(hasCategory ? MiuixTheme.primary.opacity(0.08) : MiuixTheme.card)
+        .clipShape(RoundedRectangle(cornerRadius: MiuixTheme.radius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(item.isVisible ? Color.accentColor : Color.clear, lineWidth: 1.5)
