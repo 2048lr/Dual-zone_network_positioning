@@ -137,6 +137,8 @@ final class SstvStore: ObservableObject {
     @Published private(set) var images: [SstvImage] = []
     @Published var forcedVis: Int = 0
     @Published var autoSave: Bool = true
+    /// 「为发射选图」的交接点：图库/详情页选中后写入，发射页读取后清空。
+    @Published var txSourceImage: UIImage?
 
     private let dir: URL
     private let indexURL: URL
@@ -417,7 +419,7 @@ struct SstvMainView: View {
                     Label("发射", systemImage: "waveform")
                 }
             } footer: {
-                Text("发射需从相册选取图片并编码为 SSTV 音频；当前版本先完成接收与图库，发射在后续提交补齐。")
+                Text("发射：选图（相册或 SSTV 图库）→ 编码成 SSTV 音频 → 播放，或导出 WAV 用别的设备播。")
             }
         }
         .listStyle(.insetGrouped)
@@ -484,6 +486,7 @@ struct SstvGalleryView: View {
 
     @ObservedObject var store = SstvStore.shared
     var pickForTx: Bool
+    @Environment(\.dismiss) private var dismiss
 
     private let columns = [GridItem(.adaptive(minimum: 140), spacing: 8)]
 
@@ -493,24 +496,29 @@ struct SstvGalleryView: View {
                 Text("暂无 SSTV 图片").foregroundStyle(.secondary)
             } else {
                 ScrollView {
+                    if pickForTx {
+                        Text("点击任意图片，把它带回「SSTV 发射」页作为发射内容。")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                    }
                     LazyVGrid(columns: columns, spacing: 8) {
                         ForEach(store.images) { record in
-                            NavigationLink {
-                                SstvImageDetailView(record: record)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    if let image = store.image(for: record) {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(height: 110)
-                                            .clipped()
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    Text(record.modeName).font(.caption)
-                                    Text(record.receivedAt, style: .date)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                            if pickForTx {
+                                Button {
+                                    store.txSourceImage = store.image(for: record)
+                                    dismiss()
+                                } label: {
+                                    cell(record)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                NavigationLink {
+                                    SstvImageDetailView(record: record)
+                                } label: {
+                                    cell(record)
                                 }
                             }
                         }
@@ -519,8 +527,25 @@ struct SstvGalleryView: View {
                 }
             }
         }
-        .navigationTitle("SSTV 图库")
+        .navigationTitle(pickForTx ? "选择发射图片" : "SSTV 图库")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func cell(_ record: SstvImage) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let image = store.image(for: record) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 110)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            Text(record.modeName).font(.caption)
+            Text(record.receivedAt, style: .date)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -529,6 +554,7 @@ struct SstvImageDetailView: View {
     let record: SstvImage
     @Environment(\.dismiss) private var dismiss
     @State private var shareURL: URL?
+    @State private var showTx = false
 
     var body: some View {
         Group {
@@ -546,6 +572,14 @@ struct SstvImageDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
+                // 把这张图直接带进发射页（复用同一份解码结果，省得再从相册找）
+                Button {
+                    store.txSourceImage = store.image(for: record)
+                    showTx = true
+                } label: {
+                    Image(systemName: "waveform")
+                }
+                .disabled(store.image(for: record) == nil)
                 Button {
                     shareURL = store.fileURL(for: record)
                 } label: {
@@ -559,6 +593,9 @@ struct SstvImageDetailView: View {
                     Image(systemName: "trash")
                 }
             }
+        }
+        .navigationDestination(isPresented: $showTx) {
+            SstvTxView()
         }
         .sheet(item: Binding(
             get: { shareURL.map { SharedSstvFile(url: $0) } },
@@ -595,7 +632,7 @@ struct SstvSettingsView: View {
     }
 }
 
-/// SSTV 发射页：相册选图 → 编码为 SSTV 音频 → 播放（或导出 WAV 留待后续）。
+/// SSTV 发射页：相册/图库选图 → 编码为 SSTV 音频 → 播放，或导出 WAV 交给别的设备播。
 struct SstvTxView: View {
 
     @ObservedObject var store = SstvStore.shared
@@ -606,6 +643,12 @@ struct SstvTxView: View {
     @State private var modeVis: Int = 0
     @State private var status = "选择一张图片开始"
     @State private var isEncoding = false
+    @State private var progress: Double = 0
+    @State private var progressTimer: Timer?
+    /// 最近一次编码结果：导出 WAV / 重播都复用它，避免重复编码
+    @State private var lastPcm: Data?
+    @State private var lastMode: SstvModeInfo?
+    @State private var shareURL: URL?
 
     private var modes: [SstvModeInfo] {
         store.modes().filter { $0.visCode != 0 }
@@ -620,6 +663,9 @@ struct SstvTxView: View {
             Section("图片") {
                 PhotosPicker(selection: $pickerItem, matching: .images) {
                     Label("从相册选择", systemImage: "photo.on.rectangle")
+                }
+                NavigationLink(value: Route.sstvGallery(pickForTx: true)) {
+                    LabeledContent("从 SSTV 图库选择", value: "\(store.images.count) 张")
                 }
                 if let image {
                     Image(uiImage: image)
@@ -643,30 +689,80 @@ struct SstvTxView: View {
                 Button(isEncoding ? "编码中…" : (player.isPlaying ? "停止发射" : "开始发射")) {
                     if player.isPlaying {
                         player.stop()
+                        stopProgress()
                         status = "已停止"
                     } else {
                         encodeAndPlay()
                     }
                 }
                 .disabled(isEncoding || image == nil)
+
+                if player.isPlaying {
+                    ProgressView(value: progress)
+                    Text(String(format: "已发送 %.0f%%", progress * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
                 Text(status).font(.footnote).foregroundStyle(.secondary)
             } footer: {
-                Text("发射会把图片编码成 SSTV 音频并直接播放；请用对讲机/电台的音频输入发送。iOS 没有「录其他 App 音频」的能力。")
+                Text("发射 = 把图片编码成 SSTV 音频后播放：用音频线（最好带衰减）接电台 MIC 口，手机音量调到最大，发射期间保持 App 在前台。")
+            }
+
+            Section("导出") {
+                Button {
+                    exportWav()
+                } label: {
+                    Label("导出 WAV", systemImage: "square.and.arrow.up")
+                }
+                .disabled(lastPcm == nil)
+                if let lastMode {
+                    Text("当前缓存：\(lastMode.name) · \(Int(lastMode.frameSeconds)) 秒")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .navigationTitle("SSTV 发射")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if modeVis == 0 { modeVis = Int(modes.first?.visCode ?? 0) }
+            // 图库「为发射选图」回来时接住图片
+            if let picked = store.txSourceImage {
+                image = picked
+                store.txSourceImage = nil
+                lastPcm = nil
+                lastMode = nil
+                status = "已从图库选入，确认模式后开始发射"
+            }
+        }
+        .onDisappear {
+            stopProgress()
+            player.stop()
+        }
+        .onChange(of: modeVis) { _ in
+            // 换模式后旧音频不能再用（帧长不同），避免导出张冠李戴
+            lastPcm = nil
+            lastMode = nil
         }
         .onChange(of: pickerItem) { item in
             guard let item else { return }
             Task {
                 if let data = try? await item.loadTransferable(type: Data.self),
                    let loaded = UIImage(data: data) {
-                    await MainActor.run { image = loaded }
+                    await MainActor.run {
+                        image = loaded
+                        lastPcm = nil
+                        lastMode = nil
+                        status = "图片已就绪，确认模式后开始发射"
+                    }
                 }
             }
+        }
+        .sheet(item: Binding(
+            get: { shareURL.map { SharedSstvFile(url: $0) } },
+            set: { if $0 == nil { shareURL = nil } }
+        )) { file in
+            ShareSheet(url: file.url)
         }
     }
 
@@ -711,12 +807,81 @@ struct SstvTxView: View {
             }
             DispatchQueue.main.async {
                 isEncoding = false
+                lastPcm = data
+                lastMode = mode
                 status = "正在发射 \(mode.name)…"
+                startProgress(duration: mode.frameSeconds)
                 player.play(pcm: data, sampleRate: Int(SstvBridge.shared.sampleRate)) {
+                    stopProgress()
+                    progress = 1
                     status = "发射完成"
                 }
             }
         }
+    }
+
+    // MARK: - 发射进度 / 导出
+
+    private func startProgress(duration: TimeInterval) {
+        progress = 0
+        progressTimer?.invalidate()
+        guard duration > 0 else { return }
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            progress = min(1, progress + 0.5 / duration)
+        }
+    }
+
+    private func stopProgress() {
+        progressTimer?.invalidate()
+        progressTimer = nil
+    }
+
+    /// 把最近一次编码结果写成 16-bit 单声道 WAV，交给系统分享。
+    private func exportWav() {
+        guard let pcm = lastPcm, let mode = lastMode else { return }
+        let name = "HamKit-SSTV-\(mode.name)-\(Int(Date().timeIntervalSince1970)).wav"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        let wav = Self.wavData(pcm: pcm, sampleRate: Int(SstvBridge.shared.sampleRate))
+        do {
+            try wav.write(to: url, options: .atomic)
+            shareURL = url
+            status = "已导出 \(name)"
+        } catch {
+            status = "导出失败：\(error.localizedDescription)"
+        }
+    }
+
+    /// 最小可用的 WAV 封装（PCM16 单声道）。
+    private static func wavData(pcm: Data, sampleRate: Int) -> Data {
+        var data = Data()
+        func appendUInt32(_ value: UInt32) {
+            var v = value.littleEndian
+            withUnsafeBytes(of: &v) { data.append(contentsOf: $0) }
+        }
+        func appendUInt16(_ value: UInt16) {
+            var v = value.littleEndian
+            withUnsafeBytes(of: &v) { data.append(contentsOf: $0) }
+        }
+        let channels: UInt16 = 1
+        let bits: UInt16 = 16
+        let byteRate = UInt32(sampleRate * Int(channels) * Int(bits) / 8)
+        let blockAlign = channels * bits / 8
+
+        data.append(contentsOf: Array("RIFF".utf8))
+        appendUInt32(UInt32(36 + pcm.count))
+        data.append(contentsOf: Array("WAVE".utf8))
+        data.append(contentsOf: Array("fmt ".utf8))
+        appendUInt32(16)                 // fmt chunk 长度
+        appendUInt16(1)                  // PCM
+        appendUInt16(channels)
+        appendUInt32(UInt32(sampleRate))
+        appendUInt32(byteRate)
+        appendUInt16(blockAlign)
+        appendUInt16(bits)
+        data.append(contentsOf: Array("data".utf8))
+        appendUInt32(UInt32(pcm.count))
+        data.append(pcm)
+        return data
     }
 
     /// UIImage → 指定尺寸的 0xRRGGBB 行优先数组。
@@ -782,7 +947,7 @@ final class SstvPlayer: ObservableObject {
         }
         engine.connect(player, to: engine.mainMixerNode, format: format)
         do {
-            try AudioSession.activateRecording()
+            try AudioSession.activatePlayback()
             try engine.start()
         } catch {
             return
