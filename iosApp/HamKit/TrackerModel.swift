@@ -367,7 +367,22 @@ final class TrackerModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self, requestId == self.nearbyRequestId else { return }
                 self.nearbyPasses = nearby
+                self.refreshScheduledReminders()
             }
+        }
+    }
+
+    /// 按分类配置里的「卫星级提醒开关」为下一次过境重建本地通知。
+    /// 对齐 Android `refreshRemindersFromPrediction`；iOS 只能在 App 运行时刷新，
+    /// 后台刷新由系统调度近似（见 docs/IOS_ADAPTATION.md）。
+    private func refreshScheduledReminders() {
+        let flags = SatelliteCategoryManager.shared.snapshot.reminderFlags
+        guard !flags.isEmpty else { return }
+        for item in nearbyPasses where flags.contains(Int32(item.norad)) {
+            NotificationManager.shared.schedulePassReminder(
+                satelliteName: item.name,
+                aosMs: item.pass.aosMs
+            )
         }
     }
 
