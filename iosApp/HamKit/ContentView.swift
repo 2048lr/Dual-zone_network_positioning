@@ -26,26 +26,15 @@ struct ContentView: View {
                 EntryCard(
                     title: "定位详情",
                     summary: "定位状态与地面站坐标",
-                    systemImage: "location.fill"
-                ) {
-                    LocationDetailView(model: model, location: location)
-                }
+                    systemImage: "location.fill",
+                    route: .locationDetail
+                )
 
-                EntryCard(title: "CW 练习", summary: "自由练习 / 教程 / 摩斯电码编解码", systemImage: "dot.radiowaves.left.and.right") {
-                    CwPracticeHomeView()
-                }
-                EntryCard(title: "APRS", summary: "业余无线电位置报告", systemImage: "dot.circle.and.cursorlines.rectangle") {
-                    AprsMainView(model: model, location: location)
-                }
-                EntryCard(title: "FT8", summary: "数字模式编解码与通联", systemImage: "waveform.path.ecg") {
-                    Ft8MainView()
-                }
-                EntryCard(title: "SSTV", summary: "慢扫描电视接收与解码", systemImage: "photo.on.rectangle.angled") {
-                    SstvMainView(presetModeName: nil, autoStart: false)
-                }
-                EntryCard(title: "QSO 日志", summary: "通联记录与 ADIF 导出", systemImage: "book.closed") {
-                    QsoLogListView()
-                }
+                EntryCard(title: "CW 练习", summary: "自由练习 / 教程 / 摩斯电码编解码", systemImage: "dot.radiowaves.left.and.right", route: .cwPractice)
+                EntryCard(title: "APRS", summary: "业余无线电位置报告", systemImage: "dot.circle.and.cursorlines.rectangle", route: .aprsMain)
+                EntryCard(title: "FT8", summary: "数字模式编解码与通联", systemImage: "waveform.path.ecg", route: .ft8Main)
+                EntryCard(title: "SSTV", summary: "慢扫描电视接收与解码", systemImage: "photo.on.rectangle.angled", route: .sstvMain(presetModeName: nil, autoStart: false))
+                EntryCard(title: "QSO 日志", summary: "通联记录与 ADIF 导出", systemImage: "book.closed", route: .qsoLogList)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
@@ -191,17 +180,17 @@ private struct NearbyPassesCard: View {
 // MARK: - 通用入口卡
 
 /// 功能入口卡，对应 Android `BasicComponent` 风格：标题 + 摘要 + 右箭头。
-struct EntryCard<Destination: View>: View {
+struct EntryCard: View {
 
     let title: String
     let summary: String
     let systemImage: String
-    @ViewBuilder let destination: () -> Destination
+    /// 统一用值式导航：与页面内「设置」等 Route 链接走同一套 NavigationPath，
+    /// 避免视图式 + 值式混用时新页面被压到栈底（点了没反应、返回才出现）。
+    let route: Route
 
     var body: some View {
-        NavigationLink {
-            destination()
-        } label: {
+        NavigationLink(value: route) {
             HStack(spacing: 12) {
                 Image(systemName: systemImage)
                     .frame(width: 28)
