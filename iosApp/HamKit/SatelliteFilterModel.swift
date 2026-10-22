@@ -55,7 +55,7 @@ final class SatelliteFilterModel: ObservableObject {
 
             if !modes.isEmpty {
                 let satelliteModes = Set(
-                    HamKitApi.shared.satelliteModes(norad: Int(record.norad))
+                    HamKitApi.shared.satelliteModes(norad: record.norad)
                         .split(separator: ",")
                         .map(String.init)
                 )
