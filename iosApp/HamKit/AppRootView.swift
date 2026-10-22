@@ -88,12 +88,14 @@ struct AppRootView: View {
         let args = ProcessInfo.processInfo.arguments
         let wantsManage = args.contains("-smokeManage") || args.contains("-smokeDetail")
         guard wantsManage else { return }
-        // 给 TLE（业余源 + 全量目录）留出下载与解析时间
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            homePath.append(Route.satelliteManagement)
+        // 给 TLE（业余源 + 全量目录）留出下载与解析时间。
+        // 转义闭包里必须显式写 self（Swift 的 capture 规则），@State 的存储是引用盒，
+        // 拷贝出去的 self 仍然指向同一份 NavigationPath。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [self] in
+            self.homePath.append(Route.satelliteManagement)
             guard args.contains("-smokeDetail") else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                homePath.append(Route.satelliteDetail(norad: 25544))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [self] in
+                self.homePath.append(Route.satelliteDetail(norad: 25544))
             }
         }
     }
