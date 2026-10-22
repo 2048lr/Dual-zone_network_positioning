@@ -61,6 +61,22 @@ struct SatelliteDetailScreen: View {
                 dopplerCard
                 transceiverCard
 
+                // 归类与提醒是独立入口（与 Android 一致）：列表行只负责进详情，
+                // 避免同一行两个 NavigationLink 触发双跳转。
+                card {
+                    NavigationLink(value: Route.satelliteAssignment(norad: norad)) {
+                        HStack {
+                            Label("归类与提醒", systemImage: "folder")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.footnote)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 card {
                     row("日照状态", eclipse ? "蚀中（地影）" : "日照中",
                         color: eclipse ? .red : .green)

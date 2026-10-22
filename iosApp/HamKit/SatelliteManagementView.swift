@@ -189,6 +189,8 @@ struct SatelliteManagementView: View {
                         Text(String(format: "#%05d", item.record.norad))
                             .font(.caption2).foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 Spacer()
@@ -197,9 +199,8 @@ struct SatelliteManagementView: View {
                         Text("\(Int(pass.maxElevationDeg.rounded()))°")
                             .font(.subheadline.weight(.semibold)).monospacedDigit()
                     }
-                    NavigationLink(value: Route.satelliteAssignment(norad: item.record.norad)) {
-                        Image(systemName: hasCategory ? "folder.fill" : "folder")
-                    }
+                    // 归类入口已移到详情页：同一行里再放一个 NavigationLink，
+                    // 一次点击会同时触发两个 push（先归类、后详情）。
                     Button {
                         categoryManager.toggleReminder(norad: item.record.norad)
                     } label: {
