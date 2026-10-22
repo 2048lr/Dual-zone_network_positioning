@@ -240,7 +240,7 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | FT8 | ⬜ 待移植 | 骨架页 | ⬜ |
 | SSTV | ⬜ 待移植（Android 端 31 文件 / 9.6k 行） | 骨架页 | ⬜；无「录其他 App 音频」 |
 | HF Fax | ⬜ 待移植 | 骨架页 | ⬜ |
-| QSO 日志 | ⬜ 待移植（Room → SQLDelight/JSON） | 骨架页 | ⬜ |
+| QSO 日志 | `QsoRecord`、`QsoExporter`（ADIF 3.1.4 / ADX XML） | 列表、新增/编辑、删除、分享导出 | ✅ 持久化用 JSON 文件（Android 用 Room） |
 | 天气 | ⬜ 待移植（高德 Web） | 首页占位 | ⬜ 需高德 Web Key 或改用其他源 |
 
 ### iOS 无等价能力的近似方案

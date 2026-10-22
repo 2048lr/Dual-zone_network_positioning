@@ -118,13 +118,3 @@ struct HfFaxView: View {
 // MARK: - CW
 // MARK: - QSO 日志
 
-struct QsoLogListView: View {
-    var body: some View {
-        List {
-            Text("暂无通联记录；QSO 日志（含 ADIF 导出）开发中。")
-                .foregroundStyle(.secondary)
-        }
-        .navigationTitle("QSO 日志")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
