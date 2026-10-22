@@ -68,9 +68,12 @@ struct AppRootView: View {
             case .background:
                 // 申请后台提醒刷新；音频会话保持激活以尽量延续接收
                 BackgroundReminderScheduler.shared.schedule()
+                AprsStore.shared.appDidEnterBackground()
             case .active:
                 AudioSession.refreshIfNeeded()
                 BackgroundReminderScheduler.shared.schedule()
+                // APRS-IS 是常驻 TCP：进后台会被系统挂起，回前台必须确认还在线
+                AprsStore.shared.appDidBecomeActive()
             default:
                 break
             }
