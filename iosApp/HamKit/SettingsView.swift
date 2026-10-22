@@ -1,114 +1,156 @@
 import SwiftUI
-import Shared
 
-/// 「设置」Tab：对应 Android 端 Settings / About / PrivacyPolicy 的入口结构。
-/// 目前只读展示；后续把收藏清理、提醒开关、单位切换做成可编辑项。
+/// 「设置」页：照抄 Android Settings 页结构 ——
+/// 外观 / 隐私 / 关于 三个分组；iOS 端暂无外观项，先落分组骨架。
 struct SettingsView: View {
 
     @ObservedObject var model: TrackerModel
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section("观测") {
-                    NavigationLink {
-                        StationEditView(model: model)
-                    } label: {
-                        Label("地面站坐标", systemImage: "location")
-                    }
-                    .badge(locationBadge)
-
-                    NavigationLink {
-                        FavoritesView(model: model)
-                    } label: {
-                        LabeledContent("收藏卫星", value: "\(model.favorites.count)")
-                    }
+        List {
+            Section("观测") {
+                NavigationLink(value: Route.locationDetail) {
+                    Label("定位详情", systemImage: "location")
                 }
-
-                Section("数据源") {
-                    LabeledContent("TLE 分组", value: "amateur (CelesTrak)")
-                    LabeledContent("更新于", value: model.lastUpdatedText)
-                    Button {
-                        model.loadSatellites(force: true)
-                    } label: {
-                        Label("立即刷新 TLE", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                    .disabled(model.isLoadingSatellites)
-                }
-
-                Section("关于") {
-                    NavigationLink {
-                        AboutCoreView()
-                    } label: {
-                        Label("关于内核", systemImage: "cpu")
-                    }
-                    LabeledContent("版本", value: HamKitApi.shared.version())
+                NavigationLink(value: Route.reminderList) {
+                    LabeledContent("过境提醒", value: "本地通知")
                 }
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("设置")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
 
-    private var locationBadge: String {
-        model.zone?.grid ?? "—"
+            Section("外观") {
+                NavigationLink(value: Route.colorPalette) {
+                    Label("主题配色", systemImage: "paintpalette")
+                }
+            }
+
+            Section("隐私") {
+                NavigationLink(value: Route.privacyPolicy) {
+                    Label("隐私政策", systemImage: "hand.raised")
+                }
+                NavigationLink(value: Route.permissions) {
+                    Label("权限管理", systemImage: "lock.shield")
+                }
+            }
+
+            Section("数据源") {
+                LabeledContent("TLE 分组", value: "amateur (CelesTrak)")
+                LabeledContent("更新于", value: model.lastUpdatedText)
+                Button {
+                    model.loadSatellites(force: true)
+                } label: {
+                    Label("立即刷新 TLE", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(model.isLoadingSatellites)
+            }
+
+            Section("关于") {
+                NavigationLink(value: Route.about) {
+                    Label("关于 HamKit", systemImage: "info.circle")
+                }
+                LabeledContent("内核版本", value: HamKitApi.shared.version())
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("设置")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: Route.self) { route in
+            RouteDestination(route: route, model: model)
+        }
     }
 }
 
-/// 手动编辑地面站坐标：对应 Android 的定位详情页里「手动输入」能力。
-/// 保存后走与自动定位相同的 `updateStation` 链路，分区 / 雷达 / 过境全量重算。
-struct StationEditView: View {
+/// 「关于」页：对应 Android About 页。
+struct AboutView: View {
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("应用", value: "HamKit iOS")
+                LabeledContent("版本", value: "0.2.0")
+                LabeledContent("内核版本", value: HamKitApi.shared.version())
+            }
+            Section("项目") {
+                LabeledContent("定位", value: "业余无线电卫星观测工具")
+                LabeledContent("内核", value: "Kotlin Multiplatform（与 Android 同源）")
+                LabeledContent("开源", value: "github.com/fuxue-linkong/HamKit")
+            }
+            Section("说明") {
+                Text("iOS 端为 SwiftUI 壳，业务计算全部由共享内核提供：分区定位、SGP4/SDP4 过境计算、多普勒。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("关于")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
 
-    @ObservedObject var model: TrackerModel
-    @Environment(\.dismiss) private var dismiss
+/// 「隐私政策」页：对应 Android PrivacyPolicy 页（离线全文）。
+struct PrivacyPolicyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("HamKit 隐私政策（iOS）")
+                    .font(.title3.weight(.semibold))
+                Text("""
+HamKit iOS 端不收集、不上传任何个人数据：
 
-    @State private var latitudeText: String = ""
-    @State private var longitudeText: String = ""
-    @State private var altitudeText: String = ""
-    @State private var errorMessage: String?
+• 定位：仅用于本地计算卫星过境，不离开设备；
+• TLE 数据：从 CelesTrak / tle.hamkit.click 匿名拉取，不含用户身份；
+• 通知：过境提醒由系统本地通知发出，无服务器参与；
+• 无广告、无统计 SDK、无第三方追踪。
+
+Android 端地图/天气使用高德服务，iOS 端当前未接入地图 SDK，因此不涉及高德数据上传。
+""")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            }
+            .padding()
+        }
+        .navigationTitle("隐私政策")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// 「权限管理」页：对应 Android Permissions 页；iOS 权限由系统设置管理，这里展示状态并给跳转。
+struct PermissionsView: View {
+
+    @ObservedObject var location: LocationProvider
 
     var body: some View {
-        Form {
+        List {
             Section {
-                TextField("纬度（-90 ~ 90）", text: $latitudeText)
-                    .keyboardType(.numbersAndPunctuation)
-                TextField("经度（-180 ~ 180）", text: $longitudeText)
-                    .keyboardType(.numbersAndPunctuation)
-                TextField("海拔（米）", text: $altitudeText)
-                    .keyboardType(.numbersAndPunctuation)
-            } header: {
-                Text("地面站坐标")
-            } footer: {
-                if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red)
+                LabeledContent("定位", value: location.statusText)
+                Button("打开系统设置") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
                 }
-            }
-
-            Section {
-                Button("保存并重算") { save() }
+            } header: {
+                Text("权限状态")
+            } footer: {
+                Text("iOS 权限只能到系统设置里开关，HamKit 不存储这些状态。")
             }
         }
-        .navigationTitle("地面站")
+        .listStyle(.insetGrouped)
+        .navigationTitle("权限管理")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            if latitudeText.isEmpty {
-                latitudeText = String(format: "%.4f", model.latitude)
-                longitudeText = String(format: "%.4f", model.longitude)
-                altitudeText = String(format: "%.0f", model.altitudeM)
+    }
+}
+
+/// 「主题配色」页：对应 Android ColorPalette 页；iOS 端跟随系统深浅色，先落说明页。
+struct ColorPaletteView: View {
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("外观", value: "跟随系统")
+                LabeledContent("主题色", value: "系统强调色")
+            } footer: {
+                Text("Android 端的自定义配色（Miuix 主题）尚未移植到 iOS；届时会在这里提供选择。")
             }
         }
-    }
-
-    private func save() {
-        guard let lat = Double(latitudeText), lat >= -90, lat <= 90,
-              let lon = Double(longitudeText), lon >= -180, lon <= 180 else {
-            errorMessage = "纬度或经度格式不对"
-            return
-        }
-        let altitude = Double(altitudeText) ?? 0
-        model.altitudeM = altitude
-        model.updateStation(latitude: lat, longitude: lon)
-        dismiss()
+        .listStyle(.insetGrouped)
+        .navigationTitle("主题配色")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

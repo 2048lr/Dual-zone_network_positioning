@@ -1,7 +1,7 @@
 import SwiftUI
 import Shared
 
-/// iOS 端根视图：底部三个 Tab（首页 / 工具 / 设置），对应 Android 端的
+/// iOS 端根视图：底部 Tab（首页 / 工具 / 设置），对应 Android 的
 /// 「Home + 功能子页面 + 设置」结构。
 ///
 /// 全局只持有一份 `TrackerModel` 与 `LocationProvider`，三个 Tab 共享，
@@ -15,20 +15,33 @@ struct AppRootView: View {
         TabView {
             NavigationStack {
                 ContentView(model: model, location: location)
+                    .navigationDestination(for: Route.self) { route in
+                        RouteDestination(route: route, model: model, location: location)
+                    }
             }
             .tabItem {
                 Label("首页", systemImage: "house.fill")
             }
 
-            ToolsView(model: model)
-                .tabItem {
-                    Label("工具", systemImage: "wrench.and.screwdriver.fill")
-                }
+            NavigationStack {
+                ToolsView(model: model)
+                    .navigationDestination(for: Route.self) { route in
+                        RouteDestination(route: route, model: model, location: location)
+                    }
+            }
+            .tabItem {
+                Label("工具", systemImage: "wrench.and.screwdriver.fill")
+            }
 
-            SettingsView(model: model)
-                .tabItem {
-                    Label("设置", systemImage: "gearshape.fill")
-                }
+            NavigationStack {
+                SettingsView(model: model)
+                    .navigationDestination(for: Route.self) { route in
+                        RouteDestination(route: route, model: model, location: location)
+                    }
+            }
+            .tabItem {
+                Label("设置", systemImage: "gearshape.fill")
+            }
         }
         .onAppear {
             model.start()

@@ -28,23 +28,23 @@ struct ContentView: View {
                     summary: "定位状态与地面站坐标",
                     systemImage: "location.fill"
                 ) {
-                    StationEditView(model: model)
+                    LocationDetailView(model: model, location: location)
                 }
 
-                EntryCard(title: "CW 练习", summary: "自由练习 / 教程 / 摩斯电码编解码（规划中）", systemImage: "dot.radiowaves.left.and.right") {
-                    PlaceholderView(title: "CW 练习", detail: "iOS 端 CW 音频链路规划中，内核侧摩斯电码能力已就绪。")
+                EntryCard(title: "CW 练习", summary: "自由练习 / 教程 / 摩斯电码编解码", systemImage: "dot.radiowaves.left.and.right") {
+                    CwPracticeView()
                 }
-                EntryCard(title: "APRS", summary: "业余无线电位置报告（规划中）", systemImage: "dot.circle.and.cursorlines.rectangle") {
-                    PlaceholderView(title: "APRS", detail: "APRS iGate / 地图功能规划中。")
+                EntryCard(title: "APRS", summary: "业余无线电位置报告", systemImage: "dot.circle.and.cursorlines.rectangle") {
+                    AprsMainView()
                 }
-                EntryCard(title: "FT8", summary: "数字模式编解码与通联（规划中）", systemImage: "waveform.path.ecg") {
-                    PlaceholderView(title: "FT8", detail: "FT8 编解码已由共享内核实现，iOS 音频链路规划中。")
+                EntryCard(title: "FT8", summary: "数字模式编解码与通联", systemImage: "waveform.path.ecg") {
+                    Ft8MainView()
                 }
-                EntryCard(title: "SSTV", summary: "慢扫描电视接收与解码（规划中）", systemImage: "photo.on.rectangle.angled") {
-                    PlaceholderView(title: "SSTV", detail: "SSTV 解码依赖跨帧音频采集，iOS 后台音频链路规划中。")
+                EntryCard(title: "SSTV", summary: "慢扫描电视接收与解码", systemImage: "photo.on.rectangle.angled") {
+                    SstvMainView(presetModeName: nil, autoStart: false)
                 }
-                EntryCard(title: "QSO 日志", summary: "通联记录与 ADIF 导出（规划中）", systemImage: "book.closed") {
-                    PlaceholderView(title: "QSO 日志", detail: "通联日志功能规划中。")
+                EntryCard(title: "QSO 日志", summary: "通联记录与 ADIF 导出", systemImage: "book.closed") {
+                    QsoLogListView()
                 }
             }
             .padding(.horizontal, 12)
@@ -221,31 +221,6 @@ struct EntryCard<Destination: View>: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-    }
-}
-
-/// 尚未实现功能的占位子页。
-struct PlaceholderView: View {
-
-    let title: String
-    let detail: String
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "hammer")
-                .font(.system(size: 40))
-                .foregroundStyle(.secondary)
-            Text(title).font(.title3.weight(.semibold))
-            Text(detail)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

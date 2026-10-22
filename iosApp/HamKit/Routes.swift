@@ -1,0 +1,47 @@
+import SwiftUI
+
+/// iOS 端路由：与 Android `Routes.kt` 一一对应（iOS 用 enum + associated value）。
+/// 每个页面都是 NavigationStack 里的一个目的地；列表页 → 详情页的层级与 Android 相同。
+enum Route: Hashable {
+    // MARK: 主入口
+    case home
+    case settings
+    case about
+    case privacyPolicy
+    case colorPalette
+    case permissions
+
+    // MARK: 卫星链路（全部做实）
+    case satelliteManagement
+    case satelliteFilter
+    case satelliteDetail(norad: Int32)
+    case satelliteRadar(norad: Int32)
+    case satelliteMap(norad: Int32)
+    case reminderList
+    case locationDetail
+
+    // MARK: APRS（占位）
+    case aprsMain
+    case aprsSettings
+    case aprsStations
+    case aprsMessages
+    case aprsMap
+    case aprsSymbolPicker
+
+    // MARK: FT8（占位）
+    case ft8Main
+    case ft8Settings
+
+    // MARK: SSTV（占位）
+    case sstvMain(presetModeName: String?, autoStart: Bool)
+    case sstvSettings
+    case sstvGallery(pickForTx: Bool)
+    case sstvTx
+
+    // MARK: HF Fax（占位）
+    case hfFax
+
+    // MARK: CW / QSO（占位）
+    case cwPractice
+    case qsoLogList
+}
