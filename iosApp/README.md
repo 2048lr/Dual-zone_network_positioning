@@ -119,6 +119,23 @@ CI 会额外构建一份**未签名真机 IPA**（artifact：`HamKit-unsigned-ip
 > 不要使用来历不明的「企业证书」重签：证书被吊销后 App 会直接打不开。
 > 未签名 IPA 只从本仓库 Releases / Actions artifact 下载。
 
+### 报错「无法安装此 App，因为无法验证其完整性」
+
+这句是 iOS 在**验证签名链失败**时的统一提示，和 App 内容无关。按顺序排查：
+
+| 情况 | 现象 | 处理 |
+| --- | --- | --- |
+| 直接把未签名 IPA 拖进 Finder / 用「文件」App 点开 / 用 Apple Configurator 安装 | 一定报这句 | **未签名包不能直接装**，必须用 Sideloadly / AltStore 重签后再装 |
+| 免费 Apple ID 签名过期 | 装好用了几天，忽然打不开或重装报这句 | 重新用 Sideloadly 签一次（7 天有效期，数据不丢） |
+| 设备上有**同一个 Bundle ID** 的旧版本，用的是另一张证书 | 重装时报这句 | 先删除设备上的旧 HamKit，再装 |
+| 设备日期/时间不对 | 证书「尚未生效/已过期」 | 设置 → 通用 → 日期与时间 → 自动设置 |
+| Sideloadly 版本过旧 / 没装 Xcode 命令行工具 | 签名过程静默失败 | 更新 Sideloadly；`xcode-select --install` |
+| iOS 18+ 首次装自签 App | 装完点开闪退或提示未受信任 | 设置 → 隐私与安全性 → 开发者模式 打开；或在「VPN 与设备管理」里信任开发者证书 |
+
+**最省事的替代方案**：不用 IPA，直接把手机连上 Mac，在 Xcode 里
+`Signing & Capabilities` 选自己的 Apple ID（免费账号即可），
+Scheme 选 `HamKit` + 真机，⌘R 直接装 —— 签名/续签都由 Xcode 处理。
+
 ## 已知限制
 
 - 只在 Apple Silicon 模拟器与 iOS 16+ 上验证目标；Intel 模拟器（`iosX64`）未配置，
