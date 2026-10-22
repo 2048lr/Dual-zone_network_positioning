@@ -51,7 +51,10 @@ final class AprsClient {
         self.port = port
         handshakeLines = [login]
         if let filter, !filter.isEmpty {
-            handshakeLines.append("#filter \(filter)")
+            // 与 Android `AprsConnection` 完全一致的写法（`# filter xxx`，井号后有空格）。
+            // APRS-IS 的过滤器语法在某些入口站点上对 `#filter`（无空格）也会当成
+            // 非法客户端行直接断连，这里不做「优化」，照抄能跑通的实现。
+            handshakeLines.append("# filter \(filter)")
         }
         retryAttempt = 0
         // 统一在 client 自己的串行队列上建连，避免和重连定时器并发改 connection
@@ -272,6 +275,8 @@ final class AprsStore: ObservableObject {
     @Published private(set) var messages: [AprsChatMessage] = []
     @Published private(set) var statusText: String = "未连接"
     @Published private(set) var isConnected = false
+    /// 与 APRS-IS 的收发日志（最近 200 行，密码已打码），用来排查「连上就被踢」。
+    @Published private(set) var log: [String] = []
 
     private let client = AprsClient()
     private let defaults = UserDefaults.standard
@@ -343,22 +348,61 @@ final class AprsStore: ObservableObject {
             return
         }
         let login = Aprs.shared.formatLogin(
-            callsign: config.callsign,
-            ssid: config.ssid,
+            // APRS-IS 的 login 只接受大写呼号，带空格/小写会被当成非法登录直接断连。
+            callsign: config.callsign.trimmingCharacters(in: .whitespaces).uppercased(),
+            ssid: config.ssid.trimmingCharacters(in: .whitespaces),
             passcode: config.effectivePasscode,
             version: "HamKit-iOS"
         )
         statusText = "正在连接 \(config.server):\(config.port)…"
-        // 登录行与 #filter 都交给 client 在每次连接建立后发送：
+        // 登录行与 filter 都交给 client 在每次连接建立后发送：
         // 自动重连时 filter 不会丢（以前 filter 只在首次 connect() 时发一次）。
+        let filter = effectiveFilter()
         client.connect(
             host: config.server,
             port: UInt16(config.port),
             login: login,
-            filter: config.filter.trimmingCharacters(in: .whitespaces).isEmpty ? nil : config.filter
+            filter: filter
         )
+        appendLog("> user \(config.fullCallsign) pass *** vers HamKit-iOS")
+        appendLog("> # filter \(filter)")
         startBeaconIfNeeded()
     }
+
+    /// 与 Android 一致：用户没填 filter 时给一个**地理范围**过滤器。
+    ///
+    /// 不设 filter 时，APRS-IS 只推送「发给我这个 callsign」的报文，表现就是
+    /// 「连上了，但站点/消息永远是 0」。Android 用固定的 `r/35/105/1000`；
+    /// 这里优先用当前观测点，拿不到坐标才退回同一个默认值。
+    private func effectiveFilter() -> String {
+        let custom = config.filter.trimmingCharacters(in: .whitespaces)
+        if !custom.isEmpty { return custom }
+        if currentLatitude != 0 || currentLongitude != 0 {
+            return String(format: "r/%.3f/%.3f/1000", currentLatitude, currentLongitude)
+        }
+        return "r/35/105/1000"
+    }
+
+    /// 往连接日志里追加一行（时间 + 方向），最多保留 200 行。
+    private func appendLog(_ line: String) {
+        let stamped = "\(Self.logTime.string(from: Date())) \(line)"
+        DispatchQueue.main.async {
+            self.log.append(stamped)
+            if self.log.count > 200 {
+                self.log.removeFirst(self.log.count - 200)
+            }
+        }
+    }
+
+    func clearLog() {
+        log.removeAll()
+    }
+
+    private static let logTime: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
 
     /// App 回到前台：后台期间 socket 很可能已被系统回收，这里主动重建。
     func appDidBecomeActive() {
@@ -433,17 +477,36 @@ final class AprsStore: ObservableObject {
             compressed: config.useCompression
         )
         client.send("\(config.fullCallsign)>APRS,TCPIP*:\(payload)")
+        appendLog("> \(config.fullCallsign)>APRS,TCPIP*:\(payload)")
+    }
+
+    /// 服务器注释里带这些词通常意味着登录/过滤器被拒，或者服务器要断开我们。
+    private static func isServerErrorLine(_ line: String) -> Bool {
+        let lower = line.lowercased()
+        let keywords = [
+            "invalid", "unverified", "rejected", "denied", "error",
+            "already", "duplicate", "closed", "closing", "too many",
+            "filter", "login",
+        ]
+        return keywords.contains { lower.contains($0) }
     }
 
     private func handle(line: String) {
+        appendLog("< \(line)")
         if line.hasPrefix("#") {
-            // APRS-IS 服务器注释：登录成功提示
+            // APRS-IS 服务器注释：登录结果 / 过滤器状态 / 断连原因
             if line.contains("logresp") && line.contains("verified") {
                 DispatchQueue.main.async {
                     self.statusText = line.contains("unverified")
                         ? "已连接（只读：未填写 passcode）"
                         : "已连接并验证"
                     self.isConnected = true
+                }
+            } else if Self.isServerErrorLine(line) {
+                // 服务器主动告知的原因（登录被拒 / 重复登录 / 过滤器被拒…）直接显示，
+                // 不再只留一句「服务器断开连接」。
+                DispatchQueue.main.async {
+                    self.statusText = "服务器：\(line)"
                 }
             }
             return

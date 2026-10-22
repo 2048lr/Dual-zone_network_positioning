@@ -54,6 +54,25 @@ struct AprsMainView: View {
             }
 
             Section {
+                if store.log.isEmpty {
+                    Text("暂无日志").font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(store.log.suffix(20).enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Button("清空日志") { store.clearLog() }
+                        .font(.footnote)
+                }
+            } header: {
+                Text("连接日志")
+            } footer: {
+                Text("与服务器的原始收发记录（密码已打码）。连不上或被踢时，`#` 开头的那几行就是服务器给的原因。")
+            }
+
+            Section {
                 NavigationLink(value: Route.aprsSettings) {
                     Label("APRS 设置", systemImage: "gearshape")
                 }
