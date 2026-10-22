@@ -10,65 +10,49 @@ import Shared
 /// 与 Android 端调用的是同一份实现。
 struct ContentView: View {
 
-    @StateObject private var model = TrackerModel()
-    @StateObject private var location = LocationProvider()
+    @ObservedObject var model: TrackerModel
+    @ObservedObject var location: LocationProvider
 
     @State private var showReminderAlert = false
     @State private var reminderMessage = ""
 
     var body: some View {
-        NavigationStack {
-            ScrollViewReader { proxy in
-                List {
-                    stationSection
-                    zoneSection
-                    dataSection
-                    satelliteSection.id("satellite")
-                    passSection.id("passes")
+        ScrollViewReader { proxy in
+            List {
+                stationSection
+                zoneSection
+                dataSection
+                satelliteSection.id("satellite")
+                passSection.id("passes")
 
-                    if let error = model.errorText {
-                        Section {
-                            Text(error).foregroundStyle(.red).font(.footnote)
-                        }
-                    }
-
+                if let error = model.errorText {
                     Section {
-                        Text("共享内核 v\(HamKitApi.shared.version())")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        Text(error).foregroundStyle(.red).font(.footnote)
                     }
                 }
-                .listStyle(.insetGrouped)
-                .onAppear {
-                    model.start()
-                    // 首次进入主动要一次定位：定位类 App 的默认预期，
-                    // 也让 CI 冒烟测试能验证 CoreLocation 链路
-                    location.requestLocation()
-                    scheduleSmokeScrollIfNeeded(proxy)
-                }
-                .onDisappear { model.stop() }
-                .onReceive(location.$coordinate.dropFirst()) { coordinate in
-                    guard let coordinate else { return }
-                    model.updateStation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                }
             }
-            .navigationTitle("HamKit")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        model.refreshTrack()
-                        model.searchNextPass()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .disabled(model.isSearchingPass)
+            .listStyle(.insetGrouped)
+            .onAppear {
+                // 生命周期由 AppRootView 统一管理；这里只挂 CI 冒烟滚动钩子
+                scheduleSmokeScrollIfNeeded(proxy)
+            }
+        }
+        .navigationTitle("HamKit")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    model.refreshTrack()
+                    model.searchNextPass()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
                 }
+                .disabled(model.isSearchingPass)
             }
-            .alert("过境提醒", isPresented: $showReminderAlert) {
-                Button("好", role: .cancel) {}
-            } message: {
-                Text(reminderMessage)
-            }
+        }
+        .alert("过境提醒", isPresented: $showReminderAlert) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(reminderMessage)
         }
     }
 
@@ -238,45 +222,14 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(model.passes, id: \.aosMs) { pass in
-                    passRow(pass)
+                    PassRow(
+                        pass: pass,
+                        satelliteName: model.selectedSatelliteName,
+                        onRemind: { scheduleReminder(for: pass) }
+                    )
                 }
             }
         }
-    }
-
-    private func passRow(_ pass: PassSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(Self.timeFormatter.string(from: pass.aosMs.date))
-                    .font(.headline)
-                    .monospacedDigit()
-                if pass.isCurrentlyVisible {
-                    Text("在境")
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.15))
-                        .foregroundStyle(.green)
-                        .clipShape(Capsule())
-                }
-                Spacer()
-                Button {
-                    scheduleReminder(for: pass)
-                } label: {
-                    Image(systemName: "bell")
-                        .foregroundStyle(Color.accentColor)
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("为这次过境设置提醒")
-            }
-            Text("LOS \(Self.timeFormatter.string(from: pass.losMs.date)) · 最大仰角 \(String(format: "%.1f°", pass.maxElevationDeg)) · \(pass.durationSeconds / 60) 分 \(pass.durationSeconds % 60) 秒")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Text("方位 \(pass.aosAzimuthDeg)° → \(pass.losAzimuthDeg)°")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 2)
     }
 
     private func scheduleReminder(for pass: PassSnapshot) {
@@ -311,5 +264,7 @@ private extension Int64 {
 }
 
 #Preview {
-    ContentView()
+    NavigationStack {
+        ContentView(model: TrackerModel(), location: LocationProvider())
+    }
 }

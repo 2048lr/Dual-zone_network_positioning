@@ -4,7 +4,7 @@ import SwiftUI
 struct HamKitApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppRootView()
         }
     }
 }
