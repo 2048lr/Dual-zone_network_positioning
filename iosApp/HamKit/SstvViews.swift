@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import AVFoundation
+import PhotosUI
 import Combine
 import Shared
 
@@ -412,23 +413,217 @@ struct SstvSettingsView: View {
     }
 }
 
-/// SSTV 发射页（待补图片编码）。
+/// SSTV 发射页：相册选图 → 编码为 SSTV 音频 → 播放（或导出 WAV 留待后续）。
 struct SstvTxView: View {
+
+    @ObservedObject var store = SstvStore.shared
+    @StateObject private var player = SstvPlayer()
+
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var image: UIImage?
+    @State private var modeVis: Int = 0
+    @State private var status = "选择一张图片开始"
+    @State private var isEncoding = false
+
+    private var modes: [SstvModeInfo] {
+        store.modes().filter { $0.visCode != 0 }
+    }
+
+    private var selectedMode: SstvModeInfo? {
+        modes.first { Int($0.visCode) == modeVis } ?? modes.first
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "photo.on.rectangle")
-                .font(.system(size: 40))
-                .foregroundStyle(.secondary)
-            Text("SSTV 发射")
-                .font(.title3.weight(.semibold))
-            Text("共享内核已具备编码器；iOS 端还需接入相册选图与编码播放，将在后续提交补齐。")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+        Form {
+            Section("图片") {
+                PhotosPicker(selection: $pickerItem, matching: .images) {
+                    Label("从相册选择", systemImage: "photo.on.rectangle")
+                }
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+
+            Section("模式") {
+                Picker("SSTV 模式", selection: $modeVis) {
+                    ForEach(modes, id: \.visCode) { mode in
+                        Text("\(mode.name) · \(mode.width)×\(mode.height) · \(Int(mode.frameSeconds))s")
+                            .tag(Int(mode.visCode))
+                    }
+                }
+            }
+
+            Section {
+                Button(isEncoding ? "编码中…" : (player.isPlaying ? "停止发射" : "开始发射")) {
+                    if player.isPlaying {
+                        player.stop()
+                        status = "已停止"
+                    } else {
+                        encodeAndPlay()
+                    }
+                }
+                .disabled(isEncoding || image == nil)
+                Text(status).font(.footnote).foregroundStyle(.secondary)
+            } footer: {
+                Text("发射会把图片编码成 SSTV 音频并直接播放；请用对讲机/电台的音频输入发送。iOS 没有「录其他 App 音频」的能力。")
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("SSTV 发射")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if modeVis == 0 { modeVis = Int(modes.first?.visCode ?? 0) }
+        }
+        .onChange(of: pickerItem) { item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let loaded = UIImage(data: data) {
+                    await MainActor.run { image = loaded }
+                }
+            }
+        }
+    }
+
+    private func encodeAndPlay() {
+        guard let image, let mode = selectedMode else { return }
+        isEncoding = true
+        status = "正在编码…"
+        let targetWidth = Int(mode.width)
+        let targetHeight = Int(mode.height)
+        let vis = Int(mode.visCode)
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let pixels = Self.rgbPixels(from: image, width: targetWidth, height: targetHeight)
+            guard !pixels.isEmpty else {
+                DispatchQueue.main.async {
+                    isEncoding = false
+                    status = "图片转换失败"
+                }
+                return
+            }
+            let kotlinPixels = KotlinIntArray(size: Int32(pixels.count))
+            for (index, value) in pixels.enumerated() {
+                kotlinPixels.set(index: Int32(index), value: Int32(bitPattern: value))
+            }
+            let pcm = SstvBridge.shared.encodePcm(
+                pixels: kotlinPixels,
+                width: Int32(targetWidth),
+                height: Int32(targetHeight),
+                forcedVis: Int32(vis),
+                freqOffsetHz: 0
+            )
+            guard pcm.size > 0 else {
+                DispatchQueue.main.async {
+                    isEncoding = false
+                    status = "该模式暂不支持编码"
+                }
+                return
+            }
+            var data = Data(count: Int(pcm.size))
+            for i in 0..<Int(pcm.size) {
+                data[i] = UInt8(bitPattern: pcm.get(index: Int32(i)))
+            }
+            DispatchQueue.main.async {
+                isEncoding = false
+                status = "正在发射 \(mode.name)…"
+                player.play(pcm: data, sampleRate: Int(SstvBridge.shared.sampleRate)) {
+                    status = "发射完成"
+                }
+            }
+        }
+    }
+
+    /// UIImage → 指定尺寸的 0xRRGGBB 行优先数组。
+    private static func rgbPixels(from image: UIImage, width: Int, height: Int) -> [UInt32] {
+        guard width > 0, height > 0 else { return [] }
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        guard let cgImage = resized.cgImage else { return [] }
+        var rgba = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(
+            data: &rgba,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return [] }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        var pixels = [UInt32](repeating: 0, count: width * height)
+        for y in 0..<height {
+            for x in 0..<width {
+                let i = (y * width + x) * 4
+                let r = UInt32(rgba[i])
+                let g = UInt32(rgba[i + 1])
+                let b = UInt32(rgba[i + 2])
+                pixels[y * width + x] = (r << 16) | (g << 8) | b
+            }
+        }
+        return pixels
+    }
+}
+
+/// SSTV 音频播放器：按内核采样率播放编码后的 PCM。
+final class SstvPlayer: ObservableObject {
+
+    @Published private(set) var isPlaying = false
+
+    private let engine = AVAudioEngine()
+    private let player = AVAudioPlayerNode()
+    private var completion: (() -> Void)?
+
+    func play(pcm: Data, sampleRate: Int, onComplete: (() -> Void)? = nil) {
+        stop()
+        guard !pcm.isEmpty, let format = AVAudioFormat(standardFormatWithSampleRate: Double(sampleRate), channels: 1) else {
+            return
+        }
+        let sampleCount = pcm.count / 2
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(sampleCount)),
+              let channel = buffer.floatChannelData?[0] else { return }
+        buffer.frameLength = AVAudioFrameCount(sampleCount)
+        pcm.withUnsafeBytes { raw in
+            let int16 = raw.bindMemory(to: Int16.self)
+            for i in 0..<sampleCount {
+                channel[i] = Float(Int16(littleEndian: int16[i])) / 32768.0
+            }
+        }
+        if engine.attachedNodes.contains(player) == false {
+            engine.attach(player)
+        }
+        engine.connect(player, to: engine.mainMixerNode, format: format)
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            try session.setActive(true)
+            try engine.start()
+        } catch {
+            return
+        }
+        completion = onComplete
+        isPlaying = true
+        player.scheduleBuffer(buffer, at: nil, options: []) { [weak self] in
+            DispatchQueue.main.async {
+                self?.isPlaying = false
+                let callback = self?.completion
+                self?.completion = nil
+                callback?()
+            }
+        }
+        player.play()
+    }
+
+    func stop() {
+        completion = nil
+        if player.isPlaying { player.stop() }
+        if engine.isRunning { engine.stop() }
+        isPlaying = false
     }
 }

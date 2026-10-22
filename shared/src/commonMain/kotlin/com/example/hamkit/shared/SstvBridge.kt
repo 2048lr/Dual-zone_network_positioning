@@ -51,12 +51,35 @@ object SstvBridge {
             }
 
     /**
+     * 把一张图片编码为 SSTV 音频（PCM16 小端，内核采样率）。
+     *
+     * @param pixels 行优先 0xRRGGBB，长度须为 width×height
+     * @param forcedVis 目标模式 VIS（不能为 0）
+     * @param freqOffsetHz 频率偏移（模拟失谐/多普勒）
+     * @return 编码成功返回 PCM 字节；参数非法或模式不可编码时返回空数组
+     */
+    fun encodePcm(pixels: IntArray, width: Int, height: Int, forcedVis: Int, freqOffsetHz: Double): ByteArray {
+        if (width <= 0 || height <= 0 || pixels.size < width * height) return ByteArray(0)
+        val mode = SstvMode.fromVisCode(forcedVis) ?: return ByteArray(0)
+        if (!mode.decodable) return ByteArray(0)
+        val encoder = com.example.hamkit.data.sstv.SstvEncoder(SstvVisDetector.DEFAULT_SAMPLE_RATE)
+        val source = com.example.hamkit.data.sstv.SstvPixelImageSource(width, height, pixels)
+        val audio = encoder.encode(source, mode, freqOffsetHz, true)
+        val bytes = ByteArray(audio.size * 2)
+        for (i in audio.indices) {
+            val v = (audio[i] * 32767.0f).toInt().coerceIn(-32768, 32767)
+            bytes[i * 2] = (v and 0xFF).toByte()
+            bytes[i * 2 + 1] = ((v shr 8) and 0xFF).toByte()
+        }
+        return bytes
+    }
+
+    /**
      * 解码一段单声道 PCM（16-bit 小端）。
      *
      * @param forcedVis 强制模式 VIS；0 表示自动识别
      */
-    fun decodePcm(bytes: ByteArray, forcedVis: Int): SstvDecodeOutcome {
-        if (bytes.size < 4) return failure("音频过短")
+    fun decodePcm(bytes: ByteArray, forcedVis: Int): SstvDecodeOutcome {        if (bytes.size < 4) return failure("音频过短")
         val samples = FloatArray(bytes.size / 2)
         for (i in samples.indices) {
             val lo = bytes[i * 2].toInt() and 0xFF
