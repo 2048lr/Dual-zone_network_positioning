@@ -40,6 +40,8 @@ final class TrackerModel: ObservableObject {
     @Published private(set) var favorites: Set<Int32> = []
     /// SatNOGS 转发器：NORAD → 该星全部转发器（含 inactive）
     @Published private(set) var transmittersByNorad: [Int32: [Transmitter]] = [:]
+    /// AMSAT 状态：AMSAT 名称（如 "AO-91_[FM]"）→ 状态值
+    @Published private(set) var amsatStatusByName: [String: String] = [:]
     @Published private(set) var errorText: String?
 
     private var timer: Timer?
@@ -99,9 +101,31 @@ final class TrackerModel: ObservableObject {
         restoreCachedSatellites()
         loadSatellites(force: false)
         loadTransmitters()
+        loadAmsatStatus()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.tickPosition()
         }
+    }
+
+    /// 拉取 AMSAT 状态摘要（每颗卫星一条代表状态），失败静默降级。
+    func loadAmsatStatus() {
+        HamKitApi.shared.fetchAmsatStatus { [weak self] snapshot in
+            guard let self, snapshot.error == nil else { return }
+            var map: [String: String] = [:]
+            for item in snapshot.summaries {
+                map[item.name] = item.status
+            }
+            DispatchQueue.main.async {
+                self.amsatStatusByName = map
+            }
+        }
+    }
+
+    /// 某颗卫星的 AMSAT 状态；目录中没有该星或未拉取到状态时返回 nil。
+    func amsatStatus(norad: Int32) -> String? {
+        let name = HamKitApi.shared.amsatStatusName(norad: Int(norad))
+        guard !name.isEmpty else { return nil }
+        return amsatStatusByName[name]
     }
 
     /// 拉取 SatNOGS 转发器（列表卡片的模式/数量徽章与展开区依赖它）。

@@ -11,9 +11,8 @@ struct SatelliteManagementView: View {
     @ObservedObject var model: TrackerModel
     @ObservedObject var location: LocationProvider
     @ObservedObject var categoryManager = SatelliteCategoryManager.shared
+    @ObservedObject var filter = SatelliteFilterModel.shared
 
-    @State private var query = ""
-    @State private var filterCategoryIds: Set<String> = []
     @State private var now = Date()
     @State private var expanded: Set<Int32> = []
 
@@ -25,22 +24,17 @@ struct SatelliteManagementView: View {
         Set(categoryManager.snapshot.membership.keys)
     }
 
+    private var amsatNorads: Set<Int32> {
+        Set(model.satellites.lazy.filter { model.amsatStatus(norad: $0.norad) != nil }.map { $0.norad })
+    }
+
     private var filtered: [TleRecord] {
-        var list = model.satellites
-        if !filterCategoryIds.isEmpty {
-            list = list.filter { record in
-                !categoryManager.snapshot.categoryIds(of: record.norad)
-                    .isDisjoint(with: filterCategoryIds)
-            }
-        }
-        let keyword = query.trimmingCharacters(in: .whitespaces)
-        if !keyword.isEmpty {
-            list = list.filter {
-                $0.name.localizedCaseInsensitiveContains(keyword)
-                    || String($0.norad).contains(keyword)
-            }
-        }
-        return list
+        filter.apply(
+            to: model.satellites,
+            membership: categoryManager.snapshot.membership,
+            passByNorad: model.passByNorad,
+            amsatNorads: amsatNorads
+        )
     }
 
     /// 排序与 Android 一致：已分类优先 → 在境优先 → AOS 升序（无过境排最后）
@@ -85,12 +79,12 @@ struct SatelliteManagementView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    TextField("搜索卫星名称或编号", text: $query)
+                    TextField("搜索卫星名称或编号", text: $filter.query)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    if !query.isEmpty {
+                    if !filter.query.isEmpty {
                         Button {
-                            query = ""
+                            filter.query = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(.secondary)
@@ -124,14 +118,14 @@ struct SatelliteManagementView: View {
                 }
                 .font(.subheadline)
 
-                if !filterCategoryIds.isEmpty {
+                if !filter.categoryIds.isEmpty {
                     HStack(spacing: 6) {
                         Text("已按分类筛选")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        ForEach(Array(filterCategoryIds), id: \.self) { id in
+                        ForEach(Array(filter.categoryIds), id: \.self) { id in
                             Button {
-                                filterCategoryIds.remove(id)
+                                filter.categoryIds.remove(id)
                             } label: {
                                 HStack(spacing: 4) {
                                     Text(categoryManager.snapshot.category(byId: id)?.name ?? id)
@@ -226,6 +220,7 @@ struct SatelliteManagementView: View {
             .map(String.init)
         let radios = model.transmittersByNorad[record.norad] ?? []
         let activeRadios = radios.filter { $0.isActive }.count
+        let status = model.amsatStatus(norad: record.norad)
         let hasCategory = !categoryNames.isEmpty
         let inPass = pass?.isCurrentlyVisible ?? false
 
@@ -275,7 +270,10 @@ struct SatelliteManagementView: View {
                 .font(.callout)
             }
 
-            // 模式 + 分类 + 转发器数量 chip
+            // 状态 + 模式 + 分类 + 转发器数量 chip
+            if let status {
+                chip(status, color: status.localizedCaseInsensitiveContains("HEARD") ? .green : .secondary)
+            }
             if !modes.isEmpty || hasCategory || !radios.isEmpty {
                 HStack(spacing: 6) {
                     ForEach(modes.prefix(4), id: \.self) { mode in

@@ -13,49 +13,115 @@ import Shared
 struct SatelliteFilterView: View {
 
     @ObservedObject var model: TrackerModel
-    @State private var query = ""
-    @State private var favoritesOnly = false
+    @ObservedObject var filter = SatelliteFilterModel.shared
+    @ObservedObject var categoryManager = SatelliteCategoryManager.shared
+    @Environment(\.dismiss) private var dismiss
 
-    private var filtered: [TleRecord] {
-        var list = model.satellites
-        if favoritesOnly { list = list.filter { model.favorites.contains($0.norad) } }
-        let keyword = query.trimmingCharacters(in: .whitespaces)
-        if !keyword.isEmpty {
-            list = list.filter {
-                $0.name.localizedCaseInsensitiveContains(keyword)
-                    || String($0.norad).contains(keyword)
-            }
-        }
-        return list
-    }
+    @State private var query = ""
+    @State private var modes: Set<String> = []
+    @State private var categoryIds: Set<String> = []
+    @State private var onlyInPass = false
+    @State private var onlyUpcoming = false
+    @State private var onlyAmsat = false
 
     var body: some View {
         List {
-            Section {
-                Toggle("只看收藏", isOn: $favoritesOnly)
+            Section("名称 / 编号") {
+                TextField("搜索卫星名称或 NORAD", text: $query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
             }
-            Section("结果（\(filtered.count)）") {
-                ForEach(filtered, id: \.norad) { record in
+
+            Section("工作模式") {
+                ForEach(SatelliteFilterModel.selectableModes, id: \.self) { mode in
                     Button {
-                        model.selectSatellite(norad: record.norad)
+                        if modes.contains(mode) { modes.remove(mode) } else { modes.insert(mode) }
                     } label: {
                         HStack {
-                            Text(record.name)
-                                .foregroundStyle(.primary)
+                            Text(mode).foregroundStyle(.primary)
                             Spacer()
-                            if record.norad == model.selectedNorad {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(Color.accentColor)
+                            if modes.contains(mode) {
+                                Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
                             }
                         }
                     }
+                }
+                Button {
+                    if modes.contains("") { modes.remove("") } else { modes.insert("") }
+                } label: {
+                    HStack {
+                        Text("未知模式").foregroundStyle(.primary)
+                        Spacer()
+                        if modes.contains("") {
+                            Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                        }
+                    }
+                }
+            }
+
+            Section("分类") {
+                if categoryManager.snapshot.sortedCategories.isEmpty {
+                    Text("还没有分类，先到「分类管理」新建。").foregroundStyle(.secondary)
+                }
+                ForEach(categoryManager.snapshot.sortedCategories) { category in
+                    Button {
+                        if categoryIds.contains(category.id) {
+                            categoryIds.remove(category.id)
+                        } else {
+                            categoryIds.insert(category.id)
+                        }
+                    } label: {
+                        HStack {
+                            Text(category.name).foregroundStyle(.primary)
+                            Spacer()
+                            if categoryIds.contains(category.id) {
+                                Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Section("状态") {
+                Toggle("仅当前在境", isOn: $onlyInPass)
+                Toggle("仅即将入境", isOn: $onlyUpcoming)
+                Toggle("仅有 AMSAT 状态报告", isOn: $onlyAmsat)
+            }
+
+            Section {
+                Button("应用筛选") { apply() }
+                Button("清除全部", role: .destructive) {
+                    filter.reset()
+                    query = ""
+                    modes = []
+                    categoryIds = []
+                    onlyInPass = false
+                    onlyUpcoming = false
+                    onlyAmsat = false
                 }
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("筛选卫星")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, prompt: "名称或 NORAD")
+        .onAppear {
+            query = filter.query
+            modes = filter.modes
+            categoryIds = filter.categoryIds
+            onlyInPass = filter.onlyInPass
+            onlyUpcoming = filter.onlyUpcoming
+            onlyAmsat = filter.onlyAmsat
+        }
+    }
+
+    private func apply() {
+        filter.query = query
+        filter.modes = modes
+        filter.categoryIds = categoryIds
+        filter.onlyInPass = onlyInPass
+        filter.onlyUpcoming = onlyUpcoming
+        filter.onlyAmsat = onlyAmsat
+        dismiss()
     }
 }
 
@@ -105,6 +171,16 @@ struct SatelliteDetailView: View {
             } header: {
                 Text(record?.name ?? "NORAD \(norad)")
             }
+            Section("卫星信息") {
+                if let status = model.amsatStatus(norad: norad) {
+                    LabeledContent("AMSAT 状态", value: status)
+                }
+                let radios = model.transmittersByNorad[norad] ?? []
+                if !radios.isEmpty {
+                    LabeledContent("转发器", value: "\(radios.filter { $0.isActive }.count) 活跃 / \(radios.count) 总数")
+                }
+            }
+
             Section("入口") {
                 NavigationLink(value: Route.satelliteRadar(norad: norad)) {
                     Label("雷达图", systemImage: "dot.scope")

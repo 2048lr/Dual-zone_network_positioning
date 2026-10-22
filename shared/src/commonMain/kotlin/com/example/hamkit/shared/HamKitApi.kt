@@ -153,6 +153,26 @@ object HamKitApi {
     }
 
     /**
+     * 拉取 AMSAT 状态摘要（过去 24 小时，每颗卫星一条代表状态）。
+     * 与 Android `AmsatStatusApiService.fetchStatusSummaries` 同源。
+     */
+    fun fetchAmsatStatus(callback: (AmsatStatusSnapshot) -> Unit) {
+        val transport = httpTransport
+        if (transport == null) {
+            callback(AmsatStatusSnapshot(emptyList(), "未安装网络实现"))
+            return
+        }
+        AmsatStatus.fetchSummary(transport, 24, callback)
+    }
+
+    /**
+     * 某颗卫星的 AMSAT 状态名（用于把 summary 的 name 映射回 NORAD）；
+     * 目录中没有该星时返回空串。
+     */
+    fun amsatStatusName(norad: Int): String =
+        com.example.hamkit.data.satellite.SatelliteCatalog.AMSAT_STATUS_NAME_BY_CATALOG_NUMBER[norad].orEmpty()
+
+    /**
      * 拉取 TLE 列表（默认带 6 小时内存缓存）。
      *
      * @param group CelesTrak 分组名：`amateur` / `satnogs` / `active` / `weather`，
