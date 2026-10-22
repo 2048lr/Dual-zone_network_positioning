@@ -206,8 +206,10 @@ struct SatelliteDetailScreen: View {
     }
 
     private var transceiverCard: some View {
-        card {
-            row("转发器（\(radios.filter { $0.isActive }.count)/\(radios.count) 活跃）", "")
+        let activeCount = radios.filter { $0.isActive }.count
+        return card {
+            row("活跃转发器", "\(activeCount)/\(radios.count)",
+                color: activeCount > 0 ? .accentColor : .secondary)
             if radios.isEmpty {
                 divider
                 if model.isTransmittersLoading {

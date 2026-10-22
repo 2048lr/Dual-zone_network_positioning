@@ -239,7 +239,7 @@ struct SatelliteManagementView: View {
                 chip(status, color: status.localizedCaseInsensitiveContains("HEARD") ? .green : .secondary)
             }
 
-            if !item.modes.isEmpty || hasCategory || !item.radios.isEmpty {
+            if !item.modes.isEmpty || hasCategory {
                 HStack(spacing: 6) {
                     ForEach(item.modes.prefix(4), id: \.self) { mode in
                         chip(mode, color: .secondary)
@@ -250,17 +250,14 @@ struct SatelliteManagementView: View {
                     if categoryNames.count > 3 {
                         chip("+\(categoryNames.count - 3)", color: .accentColor)
                     }
-                    if !item.radios.isEmpty {
-                        let active = item.radios.filter { $0.isActive }.count
-                        Label("\(active)/\(item.radios.count)", systemImage: "antenna.radiowaves.left.and.right")
-                            .font(.caption2)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background((active > 0 ? Color.accentColor : Color.secondary).opacity(0.14))
-                            .foregroundStyle(active > 0 ? Color.accentColor : Color.secondary)
-                            .clipShape(Capsule())
-                    }
                 }
+            }
+
+            // 转发器数量单独占一行：它原来和模式 chip 挤在同一行，
+            // 窄屏上会被压成两行（"41/" 换行 "50"），看起来像坏掉了。
+            if !item.radios.isEmpty {
+                transceiverCountChip(item.radios)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if expanded.contains(item.record.norad) {
@@ -316,11 +313,36 @@ struct SatelliteManagementView: View {
     private func chip(_ text: String, color: Color) -> some View {
         Text(text)
             .font(.caption2)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(color.opacity(0.14))
             .foregroundStyle(color)
             .clipShape(Capsule())
+    }
+
+    /// 转发器数量徽章：`活跃 / 全部`（对应 Android `TransceiverCountChip`）。
+    ///
+    /// 单行约束（`lineLimit` + `fixedSize`）是重点：这枚胶囊以前跟模式 chip 抢宽度，
+    /// `41/50` 会被折成两行显示，看着像数据错了。
+    private func transceiverCountChip(_ radios: [Transmitter]) -> some View {
+        let active = radios.filter { $0.isActive }.count
+        let total = radios.count
+        let color: Color = active > 0 ? .accentColor : .secondary
+        return HStack(spacing: 4) {
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.caption2)
+            Text("转发器 \(active)/\(total)")
+                .font(.caption2.monospacedDigit())
+                .lineLimit(1)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.14))
+        .foregroundStyle(color)
+        .clipShape(Capsule())
     }
 
     @ViewBuilder
