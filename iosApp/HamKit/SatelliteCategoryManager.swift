@@ -1,6 +1,6 @@
 import Foundation
 import Combine
-
+import Shared
 /// 卫星分类状态管理（iOS 侧）。
 ///
 /// 逻辑层（增删改/归属/提醒开关）全部在共享内核 `HamKitApi`，配置以 JSON 字符串
