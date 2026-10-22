@@ -227,6 +227,32 @@ iOS 端已经不再使用硬编码 TLE，改为运行时拉取：
 | 高德 iOS SDK 合规 | Key 需按 Bundle ID 申请；国内地图资质 | 与 Android 同一套账号，提前申请 |
 | 双端 UI 漂移 | Compose 与 SwiftUI 两套实现 | 先把「数据/算法」统一（已完成），UI 差异接受；后续评估 Compose Multiplatform |
 
+## 7.1 功能移植进度（按模块）
+
+> 目标：页面与业务逻辑对齐 Android；共享逻辑优先放 `:shared`，页面用 SwiftUI 复刻。
+
+| 模块 | 共享逻辑 | iOS 页面 | 状态 / 差异 |
+|---|---|---|---|
+| 卫星链路 | `HamKitApi`、`SatelliteCategory`、`SatnogsTransmitters`、`AmsatStatus` | 管理页、筛选、分类、详情、雷达、MapKit 地图、提醒 | ✅ 除 BJT 分段状态时间线外已对齐 |
+| 设置 / 隐私 / 权限 / 关于 | — | 全部页面 | ✅ |
+| CW | `MorseCode`（编解码、训练文本、节拍时间线） | 练习首页、自由练习、教程、编解码 | ✅ 音频用 AVAudioEngine；无「后台持续收听」 |
+| APRS | ⬜ 待移植 | 骨架页 | ⬜ 下一模块 |
+| FT8 | ⬜ 待移植 | 骨架页 | ⬜ |
+| SSTV | ⬜ 待移植（Android 端 31 文件 / 9.6k 行） | 骨架页 | ⬜；无「录其他 App 音频」 |
+| HF Fax | ⬜ 待移植 | 骨架页 | ⬜ |
+| QSO 日志 | ⬜ 待移植（Room → SQLDelight/JSON） | 骨架页 | ⬜ |
+| 天气 | ⬜ 待移植（高德 Web） | 首页占位 | ⬜ 需高德 Web Key 或改用其他源 |
+
+### iOS 无等价能力的近似方案
+
+| Android 能力 | iOS 近似 |
+|---|---|
+| 前台服务 + 后台持续音频接收 | 仅前台接收；锁屏后由系统决定是否继续 |
+| 「播放捕获」录其他 App 音频 | 仅麦克风 / 音频文件导入 |
+| WorkManager 定时刷新过境提醒 | App 启动/回前台时重建本地通知；后台刷新依赖 BGTaskScheduler（系统调度） |
+| 高德 Android SDK 地图 | MapKit；如需高德需按 Bundle ID 申请 iOS Key |
+| 应用内下载 APK 更新 | 不适用，iOS 走 App Store / TestFlight / 自签 |
+
 ## 8. 参考
 
 - [iosApp/README.md](../iosApp/README.md)：macOS 上的构建步骤
