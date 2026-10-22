@@ -48,4 +48,13 @@ final class NotificationManager {
         center.add(request)
         return true
     }
+
+    /// 清掉所有过境提醒（关闭提醒、改提前量、重新排期前都会先调它）。
+    func cancelPassReminders() {
+        center.getPendingNotificationRequests { [weak self] requests in
+            let identifiers = requests.map(\.identifier).filter { $0.hasPrefix("pass-") }
+            guard !identifiers.isEmpty else { return }
+            self?.center.removePendingNotificationRequests(withIdentifiers: identifiers)
+        }
+    }
 }

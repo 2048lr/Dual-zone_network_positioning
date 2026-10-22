@@ -18,7 +18,6 @@ struct SatelliteManagementView: View {
     init(model: TrackerModel, location: LocationProvider) {
         self.model = model
         self.location = location
-        SatelliteStore.shared.configure(model: model)
     }
 
     var body: some View {

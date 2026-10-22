@@ -383,9 +383,17 @@ final class TrackerModel: ObservableObject {
     /// 后台刷新由系统调度近似（见 docs/IOS_ADAPTATION.md）。
     private func refreshScheduledReminders() {
         let settings = ReminderSettingsStore.shared
-        guard settings.enabled else { return }
+        // 先清掉旧通知再按当前设置重建，避免「改了提前量/关了开关还要等重启」
+        NotificationManager.shared.cancelPassReminders()
+        guard settings.enabled else {
+            BackgroundReminderScheduler.shared.updatePlans([])
+            return
+        }
         let flags = SatelliteCategoryManager.shared.snapshot.reminderFlags
-        guard !flags.isEmpty else { return }
+        guard !flags.isEmpty else {
+            BackgroundReminderScheduler.shared.updatePlans([])
+            return
+        }
 
         var plans: [BackgroundReminderScheduler.Plan] = []
         for item in nearbyPasses where flags.contains(Int32(item.norad)) {
@@ -405,6 +413,11 @@ final class TrackerModel: ObservableObject {
         // 交给 BGAppRefreshTask 在后台重建通知
         BackgroundReminderScheduler.shared.updatePlans(plans)
         BackgroundReminderScheduler.shared.schedule()
+    }
+
+    /// 设置页改了「启用提醒 / 提前量」后立即生效，不用等下一轮过境计算。
+    func applyReminderSettings() {
+        refreshScheduledReminders()
     }
 
     // MARK: - 收藏

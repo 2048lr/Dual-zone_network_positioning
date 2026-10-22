@@ -90,6 +90,12 @@ struct SettingsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("设置")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: reminderSettings.enabled) { _ in
+            model.applyReminderSettings()
+        }
+        .onChange(of: reminderSettings.leadMinutes) { _ in
+            model.applyReminderSettings()
+        }
         .navigationDestination(for: Route.self) { route in
             RouteDestination(route: route, model: model)
         }

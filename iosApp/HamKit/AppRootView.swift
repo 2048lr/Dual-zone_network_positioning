@@ -45,6 +45,10 @@ struct AppRootView: View {
             }
         }
         .onAppear {
+            // 数据层必须在启动时就接上：之前 SatelliteStore.configure 只在
+            // 「卫星管理」页的 init 里调用，导致筛选页 / 分类页 / 详情页在首次
+            // 进入管理页之前全是空数据——表现就是「必须退出再进一次才看得到」。
+            SatelliteStore.shared.configure(model: model)
             model.start()
             // 首次进入主动要一次定位：定位类 App 的默认预期，
             // 也让 CI 冒烟测试能验证 CoreLocation 链路
