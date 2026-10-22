@@ -8,8 +8,8 @@ import Shared
 /// 时间卡（本地时间大字 + UTC + 每日一言）→ 附近过境卫星卡（top5 + 管理）→
 /// 定位详情 / CW / APRS / FT8 / SSTV / QSO 入口卡。
 ///
-/// 与 Android 的差异（均为 iOS 端尚未实现的能力，保留占位入口）：
-/// - 天气卡：Android 走高德 Web 服务，iOS 内核未接入，显示「规划中」占位；
+/// 与 Android 的差异：
+/// - 天气走 iOS 侧 WeatherStore（高德 Web 服务），嵌在时间卡里；
 /// - 雷达图移到「卫星详情」子页（Android 在 SatelliteDetail 页展示）。
 struct ContentView: View {
 
@@ -138,8 +138,11 @@ private struct NearbyPassesCard: View {
                 }
             }
 
-            if model.isSearchingPass && model.nearbyPasses.isEmpty {
-                Text("正在计算…").foregroundStyle(.secondary)
+            if model.isSearchingNearby && model.nearbyPasses.isEmpty {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("正在计算过境…").foregroundStyle(.secondary)
+                }
             } else if model.nearbyPasses.isEmpty {
                 Text("48 小时内暂无过境").foregroundStyle(.secondary)
             } else {

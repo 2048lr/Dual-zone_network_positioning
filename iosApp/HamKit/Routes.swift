@@ -22,7 +22,7 @@ enum Route: Hashable {
     case reminderList
     case locationDetail
 
-    // MARK: APRS（占位）
+    // MARK: APRS
     case aprsMain
     case aprsSettings
     case aprsStations
@@ -30,20 +30,20 @@ enum Route: Hashable {
     case aprsMap
     case aprsSymbolPicker
 
-    // MARK: FT8（占位）
+    // MARK: FT8
     case ft8Main
     case ft8Settings
 
-    // MARK: SSTV（占位）
+    // MARK: SSTV
     case sstvMain(presetModeName: String?, autoStart: Bool)
     case sstvSettings
     case sstvGallery(pickForTx: Bool)
     case sstvTx
 
-    // MARK: HF Fax（占位）
+    // MARK: HF Fax
     case hfFax
 
-    // MARK: CW / QSO（占位）
+    // MARK: CW / QSO
     case cwPractice
     case cwFreePractice
     case cwTutorial

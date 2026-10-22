@@ -37,6 +37,8 @@ final class TrackerModel: ObservableObject {
     /// 附近过境卫星：每颗卫星的下一次过境（在境优先、按 AOS 排序），对齐 Android 逻辑
     @Published private(set) var nearbyPasses: [Shared.SatelliteNextPass] = []
     @Published private(set) var isSearchingPass = false
+    /// 首页「附近过境」跨星预测是否在跑（与单星搜索分开，避免互相盖住状态）
+    @Published private(set) var isSearchingNearby = false
     @Published private(set) var favorites: Set<Int32> = []
     /// SatNOGS 转发器：NORAD → 该星全部转发器（含 inactive）
     @Published private(set) var transmittersByNorad: [Int32: [Transmitter]] = [:]
@@ -173,17 +175,19 @@ final class TrackerModel: ObservableObject {
 
     // MARK: - TLE 拉取
 
-    /// 拉取 CelesTrak `active` 全量源（1.6 万+ 颗）；6 小时内命中内核缓存。
+    /// 拉取 CelesTrak `amateur` 分组（约 100 颗业余卫星）；6 小时内命中内核缓存。
+    ///
+    /// 这里刻意**不**用 `active` 全量目录（1.6 万+ 颗）：首页「附近过境」会把
+    /// LAGEOS、COSMOS、CXO 这类非业余卫星当成"在境"排在前面，既不对也没意义，
+    /// 而且 1.6 万颗 × 48 小时的跨星预测要跑几十秒。需要全量目录时再单独做
+    /// 「分类筛选 + 全量」入口，而不是直接喂给首页。
     func loadSatellites(force: Bool) {
         guard !isLoadingSatellites else { return }
         isLoadingSatellites = true
         dataStatusText = force ? "正在从 CelesTrak 拉取…" : "加载中…"
 
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
-        // 与 Android 对齐：用 CelesTrak `active` 全量源（1.6 万+ 颗），
-        // 而不是 amateur 分组（约 100 颗）。跨星过境预测在后台队列，
-        // 每颗只算 1 次下一次过境，全量也算得动。
-        HamKitApi.shared.fetchTles(group: "active", forceRefresh: force, nowMs: nowMs) { [weak self] snapshot in
+        HamKitApi.shared.fetchTles(group: "amateur", forceRefresh: force, nowMs: nowMs) { [weak self] snapshot in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isLoadingSatellites = false
@@ -352,6 +356,7 @@ final class TrackerModel: ObservableObject {
         let lat = latitude
         let lon = longitude
         let alt = altitudeM
+        isSearchingNearby = true
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
@@ -367,6 +372,7 @@ final class TrackerModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self, requestId == self.nearbyRequestId else { return }
                 self.nearbyPasses = nearby
+                self.isSearchingNearby = false
                 self.refreshScheduledReminders()
             }
         }
