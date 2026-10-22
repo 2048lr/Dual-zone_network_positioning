@@ -208,7 +208,7 @@ final class AprsStore: ObservableObject {
             statusText = "请先在设置中确认持照与责任声明"
             return
         }
-        let login = Aprs.formatLogin(
+        let login = Aprs.shared.formatLogin(
             callsign: config.callsign,
             ssid: config.ssid,
             passcode: config.effectivePasscode,
@@ -235,7 +235,7 @@ final class AprsStore: ObservableObject {
             statusText = "未连接，无法发送"
             return
         }
-        let payload = Aprs.formatMessage(destination: destination, message: body, msgNumber: "")
+        let payload = Aprs.shared.formatMessage(destination: destination, message: body, msgNumber: "")
         client.send("\(config.fullCallsign)>APRS,TCPIP*:\(payload)")
         messages.append(
             AprsChatMessage(
@@ -268,7 +268,7 @@ final class AprsStore: ObservableObject {
 
     func sendPosition(latitude: Double, longitude: Double) {
         guard isConnected, config.enableTransmit, !config.isReadOnly else { return }
-        let payload = Aprs.formatPosition(
+        let payload = Aprs.shared.formatPosition(
             latitude: latitude,
             longitude: longitude,
             symbolTable: config.symbolTable,
@@ -292,7 +292,7 @@ final class AprsStore: ObservableObject {
             }
             return
         }
-        let parsed = Aprs.parsePacket(packet: line)
+        let parsed = Aprs.shared.parsePacket(packet: line)
         guard parsed.type != "unsupported" else { return }
 
         DispatchQueue.main.async {
