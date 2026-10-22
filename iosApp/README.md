@@ -84,6 +84,31 @@ cd "$SRCROOT/.."
 CI 会额外构建一份**未签名真机 IPA**（artifact：`HamKit-unsigned-ipa-<run_id>`），
 结构是标准的 `Payload/HamKit.app`，附带 SHA-256 校验值。
 
+### 在本机（Mac）自己导出
+
+```bash
+./iosApp/scripts/export-unsigned-ipa.sh          # Release，默认
+./iosApp/scripts/export-unsigned-ipa.sh --debug  # Debug 配置
+```
+
+产物是 `iosApp/HamKit-unsigned.ipa` + `HamKit-unsigned.ipa.sha256`，
+完整构建日志写到仓库根目录的 `ios-device-build.log`。
+脚本做的事就是 CI 那一套：`xcodegen generate` → `xcodebuild -sdk iphoneos`
+（`ARCHS=arm64`，`CODE_SIGNING_ALLOWED=NO`）→ 把 `HamKit.app` 塞进 `Payload/` → `zip`。
+
+> **没有 Mac 命令行也可以用 Xcode 图形界面手工出包**，等价步骤：
+> 1. Scheme 选 `HamKit`，运行目标选 **Any iOS Device (arm64)**；
+> 2. 选中工程 → **Signing & Capabilities** → 取消勾选 *Automatically manage signing*，
+>    把 Team / Signing Certificate / Provisioning Profile 都设为 **None**；
+> 3. `Product → Build`（⌘B）。**不要用 `Product → Archive`** —— 未签名 archive
+>    在 Organizer 里无法 Export，会一直要求选证书；
+> 4. 打开 DerivedData 里的 `Build/Products/Release-iphoneos/HamKit.app`
+>    （Xcode：`Product → Show Build Folder in Finder`，再进 `Products`）；
+> 5. 新建一个 `Payload` 文件夹 → 把 `HamKit.app` 放进去 → 右键压缩 `Payload`
+>    → 把 `Payload.zip` 改名 `HamKit-unsigned.ipa`。
+
+### 安装
+
 它**不能双击安装**，需要用工具用自己的 Apple ID 重签：
 
 1. 电脑装 [Sideloadly](https://sideloadly.io/) 或 [AltStore](https://altstore.io/)；
