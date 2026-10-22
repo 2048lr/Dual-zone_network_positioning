@@ -8,6 +8,7 @@ import com.example.hamkit.data.satellite.tle.TleClient
 import com.example.hamkit.data.satellite.tle.TleGroup
 import com.example.hamkit.data.satellite.tle.TleRecord
 import com.example.hamkit.data.satellite.tle.TleRepository
+import com.example.hamkit.data.satellite.tle.TleSnapshot
 import com.example.hamkit.data.zone.ZoneResolver
 import com.example.hamkit.shared.net.HttpTransport
 import kotlin.math.PI
@@ -100,6 +101,14 @@ data class TleListSnapshot(
     val fromCache: Boolean,
     /** 非空表示本次拉取失败 */
     val error: String?,
+    /**
+     * 是否已经拿到全量目录（含 active 16k+）。
+     *
+     * [HamKitApi.fetchCatalog] 会分两次回调：先给业余卫星（约 600 颗，
+     * 首页立刻可用，此字段为 false），再给合并后的全量（此字段为 true）。
+     * [HamKitApi.fetchTles] 只拉单个分组，恒为 false。
+     */
+    val catalogComplete: Boolean = false,
 )
 
 /**
@@ -127,6 +136,25 @@ object HamKitApi {
 
     /** 保留一份供非 TLE 数据源（SatNOGS 等）复用。 */
     private var httpTransport: HttpTransport? = null
+
+    /**
+     * 全量目录的**拉取顺序**：amateur → satnogs → active。
+     *
+     * 与 Android 的合并优先级（satnogs 先入、amateur 覆盖、active 补全）效果一致，
+     * 但把最小、最稳的 amateur（约 100KB）放在最前面：首页不必等 satnogs 的超时，
+     * 更不必等 active 的 2.6MB。
+     */
+    private val CATALOG_GROUPS: List<TleGroup> =
+        listOf(TleGroup.AMATEUR, TleGroup.SATNOGS, TleGroup.ACTIVE)
+
+    /** 业余两源：足够首页「附近过境」用，且不必等 active 的 2.6MB。 */
+    private val CORE_GROUPS: List<TleGroup> = listOf(TleGroup.AMATEUR, TleGroup.SATNOGS)
+
+    /**
+     * active 目录的合理下限。当前 16k+，低于 1 万说明源被截断/降级，
+     * 不能拿它覆盖已有全量（对齐 Android `MIN_ACTIVE_TLE_COUNT`）。
+     */
+    private val MIN_ACTIVE_TLE_COUNT: Int = 10_000
 
     /**
      * 安装平台的 HTTP 实现。必须在 [fetchTles] 之前调用一次。
@@ -226,6 +254,105 @@ object HamKitApi {
                 )
             )
         }
+    }
+
+    /**
+     * 拉取**完整卫星目录**：与 Android `SatelliteDataSource.fetchAmateurTLEs` 同源、同合并顺序。
+     *
+     * 数据源（都走 `tle.hamkit.click` CDN，CelesTrak 兜底）：
+     * 1. `amateur`（约 100 颗）——合并时优先，同名 NORAD 以它为准
+     * 2. `satnogs`（约 650 颗）
+     * 3. `active`（1.6 万+ 颗，全部活跃卫星）——只补全前两个源里没有的 NORAD
+     *
+     * 这正是 Android 端 `SatelliteDataSource` 的效果：业余星排前面、全量目录补后面。
+     *
+     * @param forceRefresh true 时忽略各分组缓存
+     * @param nowMs 当前时间（UTC 毫秒，用于判断缓存是否过期）
+     * @param callback **可能被多次调用**：
+     *   - `amateur` / `satnogs` 各自到手后各回调一次（`catalogComplete = false`），
+     *     首页「附近过境」可以立刻开工，不必等 2.6MB 的 active；
+     *   - 最后 `catalogComplete = true`：并入 active 后的全量（1.6 万+ 颗）。
+     */
+    fun fetchCatalog(forceRefresh: Boolean, nowMs: Long, callback: (TleListSnapshot) -> Unit) {
+        val repository = tleRepository
+        if (repository == null) {
+            callback(
+                TleListSnapshot(
+                    records = emptyList(),
+                    fetchedAtMs = 0L,
+                    fromCache = false,
+                    error = "未安装网络实现：请先调用 installHttpTransport",
+                )
+            )
+            return
+        }
+
+        val collected = mutableMapOf<TleGroup, TleSnapshot>()
+        val errors = mutableListOf<String>()
+        var index = 0
+
+        // 三个分组串行拉取：上一个的回调里才发起下一个，所以 collected / errors
+        // 只会被顺序写，不需要锁（也不依赖 iOS 的线程模型）。
+        fun step() {
+            if (index >= CATALOG_GROUPS.size) {
+                callback(buildCatalogSnapshot(CATALOG_GROUPS, collected, errors, complete = true))
+                return
+            }
+            val group = CATALOG_GROUPS[index]
+            index += 1
+            repository.load(group, forceRefresh, nowMs) { snapshot ->
+                var effective = snapshot
+                if (group == TleGroup.ACTIVE &&
+                    snapshot.error == null &&
+                    snapshot.records.size < MIN_ACTIVE_TLE_COUNT
+                ) {
+                    // 只有几百条说明源被降级/截断：丢掉，别拿它盖掉已有的 16k+。
+                    errors += "active 仅 ${snapshot.records.size} 条（< $MIN_ACTIVE_TLE_COUNT），已忽略"
+                    effective = snapshot.copy(records = emptyList())
+                } else if (snapshot.error != null) {
+                    errors += "${group.wireName}：${snapshot.error}"
+                }
+                collected[group] = effective
+                if (group != TleGroup.ACTIVE) {
+                    // 业余源到手就先发一次：首页不必等 2.6MB 的 active 下载完。
+                    callback(buildCatalogSnapshot(CORE_GROUPS, collected, errors, complete = false))
+                }
+                step()
+            }
+        }
+        step()
+    }
+
+    /** 按 [groups] 的先后顺序合并快照：先到者优先，后到者只补缺失的 NORAD。 */
+    private fun buildCatalogSnapshot(
+        groups: List<TleGroup>,
+        collected: Map<TleGroup, TleSnapshot>,
+        errors: List<String>,
+        complete: Boolean,
+    ): TleListSnapshot {
+        val merged = LinkedHashMap<Int, TleRecord>()
+        var fetchedAtMs = 0L
+        var fromCache = true
+        var anyRecords = false
+
+        for (group in groups) {
+            val snapshot = collected[group] ?: continue
+            if (snapshot.records.isEmpty()) continue
+            anyRecords = true
+            if (!snapshot.fromCache) fromCache = false
+            if (snapshot.fetchedAtMs > fetchedAtMs) fetchedAtMs = snapshot.fetchedAtMs
+            for (record in snapshot.records) {
+                if (!merged.containsKey(record.norad)) merged[record.norad] = record
+            }
+        }
+
+        return TleListSnapshot(
+            records = merged.values.toList(),
+            fetchedAtMs = fetchedAtMs,
+            fromCache = anyRecords && fromCache,
+            error = errors.takeIf { it.isNotEmpty() }?.joinToString("；"),
+            catalogComplete = complete && merged.size >= MIN_ACTIVE_TLE_COUNT,
+        )
     }
 
     /**

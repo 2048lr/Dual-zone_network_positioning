@@ -70,7 +70,9 @@ struct SettingsView: View {
             }
 
             Section("数据源") {
-                LabeledContent("TLE 分组", value: "amateur (CelesTrak)")
+                LabeledContent("TLE 源", value: "tle.hamkit.click（amateur + satnogs + active）")
+                LabeledContent("轨道目录", value: "\(model.satellites.count) 颗")
+                LabeledContent("业余卫星", value: "\(model.amateurSatellites.count) 颗")
                 LabeledContent("更新于", value: model.lastUpdatedText)
                 Button {
                     model.loadSatellites(force: true)

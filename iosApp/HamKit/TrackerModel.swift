@@ -19,9 +19,15 @@ final class TrackerModel: ObservableObject {
 
     @Published private(set) var zone: ZoneSnapshot?
 
-    // MARK: - 卫星数据（CelesTrak）
+    // MARK: - 卫星数据（tle.hamkit.click，与 Android 同源）
 
+    /// 全量目录（satnogs + amateur + active 合并，1.6 万+ 颗）：卫星管理/筛选/分类用。
     @Published private(set) var satellites: [TleRecord] = []
+    /// 业余子集（satnogs + amateur，约 600 颗）：首页「附近过境」、提醒、默认选中用。
+    ///
+    /// 与 Android 一致：过境预测只跑业余星，全量目录里的 LAGEOS / COSMOS 之类
+    /// 不参与「附近过境」，否则既不对、又要把跨星预测拖到几十秒。
+    @Published private(set) var amateurSatellites: [TleRecord] = []
     @Published private(set) var selectedNorad: Int32?
     @Published private(set) var dataStatusText: String = "尚未加载"
     @Published private(set) var lastUpdatedText: String = "—"
@@ -50,10 +56,12 @@ final class TrackerModel: ObservableObject {
     private var passRequestId = 0
     private var nearbyRequestId = 0
     private var nearbyFingerprint = ""
+    private var nearbyWorkItem: DispatchWorkItem?
     private var trackRequestId = 0
     private var tickCount = 0
 
     private let cache = TleDiskCache()
+    private let amateurCache = TleDiskCache(filename: "tle-cache-amateur.json")
     private static let favoritesKey = "hamkit.favorites"
 
     var isSelectedFavorite: Bool {
@@ -93,6 +101,13 @@ final class TrackerModel: ObservableObject {
 
     private var tleLines: [String] {
         selectedSatellite?.lines ?? []
+    }
+
+    /// 首页过境的计算范围：业余子集；冷启动还没拿到业余源时退到全量目录的前
+    /// 300 颗（设上限是为了绝不把 1.6 万颗丢进跨星预测）。
+    private var nearbySatellites: [TleRecord] {
+        if !amateurSatellites.isEmpty { return amateurSatellites }
+        return Array(satellites.prefix(Self.nearbyFallbackLimit))
     }
 
     // MARK: - 生命周期
@@ -147,11 +162,20 @@ final class TrackerModel: ObservableObject {
 
     /// 冷启动先上磁盘缓存，界面立刻有数据；网络结果回来后再替换。
     private func restoreCachedSatellites() {
-        guard let cached = cache.load() else { return }
+        // 业余子集先恢复：首页过境只依赖它，不必等全量目录的 3MB 读完。
+        if let amateur = amateurCache.load() {
+            amateurSatellites = amateur.records
+        }
+        guard let cached = cache.load() else {
+            if !amateurSatellites.isEmpty {
+                satellites = amateurSatellites
+            }
+            return
+        }
         satellites = cached.records
         let date = Date(timeIntervalSince1970: Double(cached.fetchedAtMs) / 1000)
         lastUpdatedText = Self.timeFormatter.string(from: date)
-        dataStatusText = "本地缓存 · \(cached.records.count) 颗（刷新中…）"
+        dataStatusText = "本地缓存 · \(Self.countText(cached.records.count)) 颗（刷新中…）"
         selectDefaultIfNeeded()
         tickPosition()
         refreshTrack()
@@ -175,51 +199,73 @@ final class TrackerModel: ObservableObject {
 
     // MARK: - TLE 拉取
 
-    /// 拉取 CelesTrak `amateur` 分组（约 100 颗业余卫星）；6 小时内命中内核缓存。
+    /// 拉取**完整卫星目录**，与 Android `SatelliteDataSource` 同源同优先级：
+    /// `amateur`（≈100）→ `satnogs`（≈650）→ `active`（1.6 万+，只补全前面没有的 NORAD）。
     ///
-    /// 这里刻意**不**用 `active` 全量目录（1.6 万+ 颗）：首页「附近过境」会把
-    /// LAGEOS、COSMOS、CXO 这类非业余卫星当成"在境"排在前面，既不对也没意义，
-    /// 而且 1.6 万颗 × 48 小时的跨星预测要跑几十秒。需要全量目录时再单独做
-    /// 「分类筛选 + 全量」入口，而不是直接喂给首页。
+    /// 共享内核按分组逐步回调：
+    /// 1. `catalogComplete == false`：业余源到手（约 100～650 颗）→ 首页、过境、提醒立刻可用；
+    /// 2. `catalogComplete == true`：并入 active 后的全量 → 卫星管理/筛选/分类用。
+    ///
+    /// 之前 iOS 只拉 `amateur`（约 95 颗），是为了绕开「全量目录把 LAGEOS/COSMOS
+    /// 排成在境」的问题；正确解法是**数据源用全量、过境只算业余星**，而不是砍掉数据。
     func loadSatellites(force: Bool) {
         guard !isLoadingSatellites else { return }
         isLoadingSatellites = true
-        dataStatusText = force ? "正在从 CelesTrak 拉取…" : "加载中…"
+        dataStatusText = force ? "正在从 tle.hamkit.click 拉取…" : "加载中…"
 
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
-        HamKitApi.shared.fetchTles(group: "amateur", forceRefresh: force, nowMs: nowMs) { [weak self] snapshot in
+        HamKitApi.shared.fetchCatalog(forceRefresh: force, nowMs: nowMs) { [weak self] snapshot in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.isLoadingSatellites = false
-                // 完全离线（首次启动且无网络）时用内置 ISS TLE 兜底，
-                // 保证首屏永远有内容；一旦联网成功就会被真实数据替换。
-                self.satellites = snapshot.records.isEmpty ? [Self.fallbackTle] : snapshot.records
+                let records = snapshot.records
 
-                if snapshot.fetchedAtMs > 0 {
-                    let date = Date(timeIntervalSince1970: Double(snapshot.fetchedAtMs) / 1000)
-                    self.lastUpdatedText = Self.timeFormatter.string(from: date)
-                } else if snapshot.records.isEmpty {
+                guard !records.isEmpty else {
+                    // 业余轮就空了 → 继续等 active 轮；全量轮也空才认输。
+                    guard snapshot.catalogComplete else { return }
+                    self.isLoadingSatellites = false
+                    if self.satellites.isEmpty { self.satellites = [Self.fallbackTle] }
                     self.lastUpdatedText = "内置示例"
+                    self.dataStatusText = "离线 · 内置示例 TLE（\(snapshot.error ?? "无数据")）"
+                    self.selectDefaultIfNeeded()
+                    self.tickPosition()
+                    self.refreshTrack()
+                    self.searchNextPass()
+                    return
                 }
 
-                if let error = snapshot.error {
-                    self.dataStatusText = snapshot.records.isEmpty
-                        ? "离线 · 内置示例 TLE（\(error)）"
-                        : "离线缓存 · \(snapshot.records.count) 颗（\(error)）"
+                if snapshot.fetchedAtMs > 0 {
+                    self.lastUpdatedText = Self.timeFormatter.string(
+                        from: Date(timeIntervalSince1970: Double(snapshot.fetchedAtMs) / 1000)
+                    )
+                }
+
+                if snapshot.catalogComplete {
+                    self.isLoadingSatellites = false
+                    self.satellites = records
+                    var status = (snapshot.fromCache ? "缓存" : "已更新")
+                        + " · \(Self.countText(records.count)) 颗"
+                    if let error = snapshot.error {
+                        status += "（\(error)）"
+                    }
+                    self.dataStatusText = status
+                    // 只有拿到全量目录才写盘：几百条的部分结果不能盖掉已有的 1.6 万+。
+                    if snapshot.error == nil {
+                        self.cache.save(records: records, fetchedAtMs: snapshot.fetchedAtMs)
+                    }
                 } else {
-                    self.dataStatusText = (snapshot.fromCache ? "缓存" : "已更新")
-                        + " · \(snapshot.records.count) 颗"
+                    // 业余子集：首页/过境/提醒的唯一输入，单独缓存（约 100KB）。
+                    self.amateurSatellites = records
+                    self.amateurCache.save(records: records, fetchedAtMs: snapshot.fetchedAtMs)
+                    if self.satellites.isEmpty {
+                        self.satellites = records
+                    }
+                    self.dataStatusText = "已更新 · \(Self.countText(records.count)) 颗（正在拉取全量目录…）"
                 }
 
                 self.selectDefaultIfNeeded()
                 self.tickPosition()
                 self.refreshTrack()
                 self.searchNextPass()
-
-                // 只有真正来自网络的新数据才写盘
-                if snapshot.error == nil && !snapshot.records.isEmpty {
-                    self.cache.save(records: snapshot.records, fetchedAtMs: snapshot.fetchedAtMs)
-                }
             }
         }
     }
@@ -343,11 +389,22 @@ final class TrackerModel: ObservableObject {
     }
 
     /// 附近过境卫星：跨星各算下一次过境（对齐 Android SatellitePredictor）。
-    /// 数据源或地面站没变时跳过；有新请求时旧结果按序号丢弃。
+    ///
+    /// 拉取过程中内核会连发几次目录更新（amateur → satnogs → active），每次都
+    /// 把 600 多颗星重算一遍纯属浪费，所以这里做 0.8s 防抖：只对最后一次算。
     func searchNearbyPasses() {
-        let snapshot = satellites
+        nearbyWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.performNearbySearch() }
+        nearbyWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
+    }
+
+    private func performNearbySearch() {
+        // 只对业余星算过境：与 Android 一致，也避免 1.6 万颗 × 48 小时跑几十秒。
+        let snapshot = nearbySatellites
         guard !snapshot.isEmpty else { return }
-        let fingerprint = "\(snapshot.count)-\(snapshot.first?.norad ?? 0)-\(Int(latitude * 100))-\(Int(longitude * 100))"
+        let fingerprint = "\(snapshot.count)-\(snapshot.first?.norad ?? 0)-\(snapshot.last?.norad ?? 0)"
+            + "-\(Int(latitude * 100))-\(Int(longitude * 100))"
         if fingerprint == nearbyFingerprint { return }
         nearbyFingerprint = fingerprint
 
@@ -437,6 +494,20 @@ final class TrackerModel: ObservableObject {
         formatter.locale = Locale(identifier: "zh_CN")
         return formatter
     }()
+
+    /// 16900 → "16,900"：全量目录上万颗时读起来更直观。
+    private static let countFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
+
+    private static func countText(_ count: Int) -> String {
+        countFormatter.string(from: NSNumber(value: count)) ?? "\(count)"
+    }
+
+    /// 缺少业余源时首页过境的回退上限（颗）。
+    private static let nearbyFallbackLimit = 300
 
     /// 离线兜底：2026-08-09 拉取的 ISS TLE。
     /// 只在「从未成功联网」时使用，联网后会立刻被 CelesTrak 数据替换。

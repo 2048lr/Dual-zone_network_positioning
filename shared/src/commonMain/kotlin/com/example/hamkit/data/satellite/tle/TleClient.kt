@@ -91,7 +91,7 @@ class TleClient(
  * 行为：
  * - 缓存未过期（默认 6 小时）且未强制刷新 → 立即回调缓存，不发请求；
  * - 网络失败 → 回退到上一次成功的数据（离线可用），同时把错误交给 UI 展示；
- * - 只保留最近一次成功拉取的分组，切换分组会自动重新拉取。
+ * - 每个分组各有一份缓存，`amateur` 与 `active` 可以同时驻留、互不覆盖。
  *
  * 时间由调用方传入（`nowMs`），这样跨平台不需要日期库，单测也能精确控制过期。
  */
@@ -101,12 +101,18 @@ class TleRepository(
 ) {
 
     private data class Entry(
-        val group: TleGroup,
         val records: List<TleRecord>,
         val fetchedAtMs: Long,
     )
 
-    private var entry: Entry? = null
+    /**
+     * 每个分组一份缓存。
+     *
+     * 之前只存「最近一次拉取的分组」，结果拉完 `amateur` 再拉 `active` 会把
+     * amateur 踢掉（反之亦然），iOS 只能二选一。Android 是 satnogs + amateur +
+     * active 三源合并，iOS 要对齐就必须让两个分组的缓存同时驻留。
+     */
+    private val entries = mutableMapOf<TleGroup, Entry>()
 
     fun load(
         group: TleGroup,
@@ -114,36 +120,44 @@ class TleRepository(
         nowMs: Long,
         callback: (TleSnapshot) -> Unit,
     ) {
-        val cached = entry
+        val cached = entries[group]
         if (!forceRefresh &&
             cached != null &&
-            cached.group == group &&
             nowMs - cached.fetchedAtMs in 0..ttlMs
         ) {
             callback(TleSnapshot(cached.records, cached.fetchedAtMs, fromCache = true, error = null))
             return
         }
 
-        client.fetch(group) { outcome ->
+        client.fetch(group, timeoutMsFor(group)) { outcome ->
             if (outcome.error != null) {
-                val fallback = entry?.takeIf { it.group == group }
                 callback(
                     TleSnapshot(
-                        records = fallback?.records.orEmpty(),
-                        fetchedAtMs = fallback?.fetchedAtMs ?: 0L,
-                        fromCache = fallback != null,
+                        records = cached?.records.orEmpty(),
+                        fetchedAtMs = cached?.fetchedAtMs ?: 0L,
+                        fromCache = cached != null,
                         error = outcome.error,
                     )
                 )
             } else {
-                entry = Entry(group, outcome.records, nowMs)
+                entries[group] = Entry(outcome.records, nowMs)
                 callback(TleSnapshot(outcome.records, nowMs, fromCache = false, error = null))
             }
         }
     }
 
+    /**
+     * 全量目录（active）原文 2.6MB / gzip 后约 900KB，弱网下 15s 读不完。
+     * Android 端给 active 单独配了 90s 读取超时，否则只会拿到 600 多颗的降级结果。
+     */
+    private fun timeoutMsFor(group: TleGroup): Int =
+        if (group == TleGroup.ACTIVE) ACTIVE_TIMEOUT_MS else TleClient.DEFAULT_TIMEOUT_MS
+
     companion object {
         /** 缓存有效期：6 小时。TLE 每天更新数次，6 小时足够新且不会频繁打数据源。 */
         const val DEFAULT_TTL_MS: Long = 6L * 60L * 60L * 1000L
+
+        /** active 全量目录的下载超时（对齐 Android `SatelliteDataSource.activeClient`）。 */
+        const val ACTIVE_TIMEOUT_MS: Int = 90_000
     }
 }

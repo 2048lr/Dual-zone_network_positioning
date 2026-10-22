@@ -83,13 +83,14 @@ struct SatelliteManagementView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 0) {
-                    statItem("\(store.totalCount)", "共 \(store.totalCount) 颗")
+                    statItem(Self.countText(store.totalCount), "轨道目录")
+                    statItem(Self.countText(model.amateurSatellites.count), "业余卫星")
                     statItem("\(store.categorizedCount)", "已分类")
                     statItem("\(store.categoryCount)", "分类数")
                 }
 
                 HStack(spacing: 24) {
-                    Text("筛选与分类入口在下方")
+                    Text("「轨道目录」为全量卫星；「附近过境」只预测业余卫星")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -185,7 +186,18 @@ struct SatelliteManagementView: View {
             HStack(alignment: .top) {
                 NavigationLink(value: Route.satelliteDetail(norad: item.record.norad)) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.record.name).font(.headline).lineLimit(1).foregroundStyle(.primary)
+                        HStack(spacing: 6) {
+                            Text(item.record.name).font(.headline).lineLimit(1).foregroundStyle(.primary)
+                            // 数据来源与 Android 一致：satnogs + amateur 的业余子集参与过境预测，
+                            // active 只补全目录，不参与「附近过境」。
+                            Text(item.isAmateur ? "业余" : "目录")
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background((item.isAmateur ? Color.blue : Color.secondary).opacity(0.14))
+                                .foregroundStyle(item.isAmateur ? Color.blue : Color.secondary)
+                                .clipShape(Capsule())
+                        }
                         Text(String(format: "#%05d", item.record.norad))
                             .font(.caption2).foregroundStyle(.secondary)
                     }
@@ -229,7 +241,6 @@ struct SatelliteManagementView: View {
 
             if !item.modes.isEmpty || hasCategory || !item.radios.isEmpty {
                 HStack(spacing: 6) {
-                    chip("CelesTrak", color: .blue)
                     ForEach(item.modes.prefix(4), id: \.self) { mode in
                         chip(mode, color: .secondary)
                     }
@@ -368,6 +379,17 @@ struct SatelliteManagementView: View {
         f.dateFormat = "MM-dd HH:mm"
         return f
     }()
+
+    /// 16900 → "16,900"（全量目录上万颗，加千分位更好读）。
+    private static let countFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        return f
+    }()
+
+    private static func countText(_ count: Int) -> String {
+        countFormatter.string(from: NSNumber(value: count)) ?? "\(count)"
+    }
 }
 
 private extension Int64 {

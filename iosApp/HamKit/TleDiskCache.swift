@@ -21,11 +21,14 @@ final class TleDiskCache {
 
     private let fileURL: URL
 
-    init(fileManager: FileManager = .default) {
+    /// - Parameter filename: 缓存文件名。全量目录（1.6 万+，约 3MB）与业余子集
+    ///   （约 600 颗，约 100KB）分开存：首页「附近过境」只依赖业余子集，
+    ///   冷启动时不必为了算过境去碰全量目录。
+    init(filename: String = "tle-cache.json", fileManager: FileManager = .default) {
         let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fileManager.temporaryDirectory
         try? fileManager.createDirectory(at: base, withIntermediateDirectories: true)
-        fileURL = base.appendingPathComponent("tle-cache.json")
+        fileURL = base.appendingPathComponent(filename)
     }
 
     func load() -> (records: [TleRecord], fetchedAtMs: Int64)? {

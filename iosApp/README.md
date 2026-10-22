@@ -4,8 +4,10 @@
 `:shared`（`Shared.framework`），Swift 侧不重复实现任何定位 / 轨道算法。
 
 > 现状：**可运行的演示壳**，已实现「分区定位 + TLE 网络拉取 + 卫星列表页 + Look4Sat 风格雷达 + 实时位置 + 下一次过境」。
-> TLE 优先从 `https://tle.hamkit.click/tle/amateur.3le`（与 Android 同源）拉取，
+> TLE 与 Android `SatelliteDataSource` 同源：`tle.hamkit.click` 的
+> `amateur.3le` + `satnogs.3le` + `active.3le`（1.6 万+ 颗）按 NORAD 合并去重，
 > 失败自动回落到 CelesTrak 官方；网络全失败时使用内置 ISS TLE 兜底。
+> 「附近过境」只对业余子集（amateur + satnogs）预测，全量目录用于卫星管理与筛选。
 > 尚未接入：AMSAT 状态、收藏、提醒。
 > 完整迁移路线见 [docs/IOS_ADAPTATION.md](../docs/IOS_ADAPTATION.md)。
 
