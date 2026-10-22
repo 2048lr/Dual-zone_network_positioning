@@ -125,6 +125,9 @@ object HamKitApi {
     /** 网络实现由平台注入（iOS: URLSession；Android: OkHttp/JVM）。 */
     private var tleRepository: TleRepository? = null
 
+    /** 保留一份供非 TLE 数据源（SatNOGS 等）复用。 */
+    private var httpTransport: HttpTransport? = null
+
     /**
      * 安装平台的 HTTP 实现。必须在 [fetchTles] 之前调用一次。
      *
@@ -132,7 +135,21 @@ object HamKitApi {
      * （TLS / ATS / 代理策略都走系统默认行为），也避免把 cinterop 细节带进 commonMain。
      */
     fun installHttpTransport(transport: HttpTransport) {
+        httpTransport = transport
         tleRepository = TleRepository(TleClient(transport))
+    }
+
+    /**
+     * 拉取 SatNOGS DB 全部转发器（含 active/inactive）。
+     * 与 Android `TransmitterDataSource` 同源同解析规则。
+     */
+    fun fetchTransmitters(callback: (TransmitterSnapshot) -> Unit) {
+        val transport = httpTransport
+        if (transport == null) {
+            callback(TransmitterSnapshot(emptyList(), "未安装网络实现"))
+            return
+        }
+        SatnogsTransmitters.fetch(transport, callback)
     }
 
     /**
@@ -542,10 +559,19 @@ internal object MiniJson {
         return parser.parseObject()
     }
 
+    /** 解析顶层 JSON 数组（SatNOGS 等 API 的根节点是数组）。 */
+    fun parseArrayRoot(json: String): List<Any?> {
+        val parser = Parser(json)
+        parser.skipWs()
+        return parser.parseArrayRoot()
+    }
+
     private class Parser(private val text: String) {
         private var pos = 0
 
         fun skipWs() { while (pos < text.length && text[pos].isWhitespace()) pos++ }
+
+        fun parseArrayRoot(): List<Any?> = parseArray()
 
         fun parseObject(): Map<String, Any?> {
             expect('{')
@@ -591,6 +617,9 @@ internal object MiniJson {
                 '{' -> parseObject()
                 '[' -> parseArray()
                 '"' -> parseString()
+                't' -> { expectWord("true"); true }
+                'f' -> { expectWord("false"); false }
+                'n' -> { expectWord("null"); null }
                 else -> {
                     if (c == '-') pos++
                     val start = pos
@@ -599,6 +628,11 @@ internal object MiniJson {
                     text.substring(start, pos).toDoubleOrNull() ?: fail("数字")
                 }
             }
+        }
+
+        private fun expectWord(word: String) {
+            if (pos + word.length > text.length || text.substring(pos, pos + word.length) != word) fail(word)
+            pos += word.length
         }
 
         private fun parseString(): String {

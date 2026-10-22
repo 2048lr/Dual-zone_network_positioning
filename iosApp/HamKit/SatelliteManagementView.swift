@@ -224,6 +224,8 @@ struct SatelliteManagementView: View {
         let modes = HamKitApi.shared.satelliteModes(norad: record.norad)
             .split(separator: ",")
             .map(String.init)
+        let radios = model.transmittersByNorad[record.norad] ?? []
+        let activeRadios = radios.filter { $0.isActive }.count
         let hasCategory = !categoryNames.isEmpty
         let inPass = pass?.isCurrentlyVisible ?? false
 
@@ -273,8 +275,8 @@ struct SatelliteManagementView: View {
                 .font(.callout)
             }
 
-            // 模式 + 分类 chip
-            if !modes.isEmpty || hasCategory {
+            // 模式 + 分类 + 转发器数量 chip
+            if !modes.isEmpty || hasCategory || !radios.isEmpty {
                 HStack(spacing: 6) {
                     ForEach(modes.prefix(4), id: \.self) { mode in
                         chip(mode, color: .secondary)
@@ -285,11 +287,43 @@ struct SatelliteManagementView: View {
                     if categoryNames.count > 3 {
                         chip("+\(categoryNames.count - 3)", color: .accentColor)
                     }
+                    if !radios.isEmpty {
+                        Label("\(activeRadios)/\(radios.count)", systemImage: "antenna.radiowaves.left.and.right")
+                            .font(.caption2)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background((activeRadios > 0 ? Color.accentColor : Color.secondary).opacity(0.14))
+                            .foregroundStyle(activeRadios > 0 ? Color.accentColor : Color.secondary)
+                            .clipShape(Capsule())
+                    }
                 }
             }
 
-            // 展开区：当前选中卫星的位置详情入口
+            // 展开区：转发器列表 + 详情/雷达/地图入口
             if expanded.contains(record.norad) {
+                if !radios.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(radios.enumerated()), id: \.offset) { _, radio in
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text((radio.inverted ? "INV: " : "") + (radio.name.isEmpty ? "未命名转发器" : radio.name))
+                                        .font(.caption.weight(.medium))
+                                    Text(Self.frequencyText(radio))
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(radio.status)
+                                    .font(.caption2)
+                                    .foregroundStyle(radio.isActive ? Color.green : Color.secondary)
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .background(Color(.tertiarySystemFill))
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                }
+
                 HStack(spacing: 16) {
                     NavigationLink(value: Route.satelliteDetail(norad: record.norad)) {
                         Label("详情", systemImage: "info.circle")
@@ -363,6 +397,19 @@ struct SatelliteManagementView: View {
     private func remainingText(until ms: Int64) -> String {
         let seconds = max(0, Int(ms.date.timeIntervalSince(now)))
         return "\(seconds / 60)分\(seconds % 60)秒"
+    }
+
+    /// "RX 145.800 MHz  TX 437.800 MHz  FM"（与 Android 转发器行一致）
+    private static func frequencyText(_ radio: Transmitter) -> String {
+        var parts: [String] = []
+        if radio.downlinkHz > 0 {
+            parts.append(String(format: "RX %.3f MHz", Double(radio.downlinkHz) / 1_000_000))
+        }
+        if radio.uplinkHz > 0 {
+            parts.append(String(format: "TX %.3f MHz", Double(radio.uplinkHz) / 1_000_000))
+        }
+        if !radio.mode.isEmpty { parts.append(radio.mode) }
+        return parts.joined(separator: "  ")
     }
 
     private static let timeFormatter: DateFormatter = {

@@ -38,6 +38,8 @@ final class TrackerModel: ObservableObject {
     @Published private(set) var nearbyPasses: [Shared.SatelliteNextPass] = []
     @Published private(set) var isSearchingPass = false
     @Published private(set) var favorites: Set<Int32> = []
+    /// SatNOGS 转发器：NORAD → 该星全部转发器（含 inactive）
+    @Published private(set) var transmittersByNorad: [Int32: [Transmitter]] = [:]
     @Published private(set) var errorText: String?
 
     private var timer: Timer?
@@ -96,8 +98,24 @@ final class TrackerModel: ObservableObject {
         refreshZone()
         restoreCachedSatellites()
         loadSatellites(force: false)
+        loadTransmitters()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.tickPosition()
+        }
+    }
+
+    /// 拉取 SatNOGS 转发器（列表卡片的模式/数量徽章与展开区依赖它）。
+    /// 与 Android 一致：失败静默降级，不影响卫星列表。
+    func loadTransmitters() {
+        HamKitApi.shared.fetchTransmitters { [weak self] snapshot in
+            guard let self, snapshot.error == nil else { return }
+            var grouped: [Int32: [Transmitter]] = [:]
+            for transmitter in snapshot.transmitters {
+                grouped[Int32(transmitter.norad), default: []].append(transmitter)
+            }
+            DispatchQueue.main.async {
+                self.transmittersByNorad = grouped
+            }
         }
     }
 
