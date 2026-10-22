@@ -122,19 +122,7 @@ private struct NearbyPassesCard: View {
                 Text("附近过境卫星")
                     .font(.headline)
                 Spacer()
-                NavigationLink {
-                    SatelliteListView(
-                        satellites: model.satellites,
-                        selectedNorad: model.selectedNorad,
-                        favorites: model.favorites,
-                        onSelect: { record in
-                            model.selectSatellite(norad: record.norad)
-                        },
-                        onToggleFavorite: { norad in
-                            model.toggleFavorite(norad)
-                        }
-                    )
-                } label: {
+                NavigationLink(value: Route.satelliteManagement) {
                     Text("管理")
                         .font(.subheadline)
                 }

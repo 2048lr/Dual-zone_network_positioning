@@ -229,14 +229,18 @@ struct SatelliteManagementView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(record.name)
-                        .font(.headline)
-                        .lineLimit(1)
-                    Text(String(format: "#%05d", record.norad))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                NavigationLink(value: Route.satelliteDetail(norad: record.norad)) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(record.name)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .foregroundStyle(.primary)
+                        Text(String(format: "#%05d", record.norad))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .buttonStyle(.plain)
                 Spacer()
                 HStack(spacing: 12) {
                     if let pass {
@@ -305,11 +309,11 @@ struct SatelliteManagementView: View {
         }
         .padding(14)
         .background(hasCategory ? Color.accentColor.opacity(0.08) : Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(inPass ? Color.accentColor : Color.clear, lineWidth: 1.5)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
     }
