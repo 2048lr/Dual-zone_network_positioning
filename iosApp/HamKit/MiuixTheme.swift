@@ -1,11 +1,126 @@
 import SwiftUI
 
+/// 深浅模式：跟随系统 / 强制浅色 / 强制深色（对应 Android `AppSettings.colorMode`）。
+enum MiuixAppearance: String, CaseIterable, Identifiable {
+
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return "跟随系统"
+        case .light:  return "浅色"
+        case .dark:   return "深色"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
+        }
+    }
+}
+
+/// 强调色（对应 Android Miuix 的 `keyColor`，这里固定成常用的几档，避免 iOS 端
+/// 再去实现一套 Monet 取色器）。
+enum MiuixAccent: String, CaseIterable, Identifiable {
+
+    case blue, indigo, purple, pink, red, orange, green, teal, gray
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .blue:   return "MIUI 蓝"
+        case .indigo: return "靛青"
+        case .purple: return "紫"
+        case .pink:   return "粉"
+        case .red:    return "红"
+        case .orange: return "橙"
+        case .green:  return "绿"
+        case .teal:   return "青"
+        case .gray:   return "灰"
+        }
+    }
+
+    /// 浅色模式主色
+    var lightHex: UInt32 {
+        switch self {
+        case .blue:   return 0x3482FF
+        case .indigo: return 0x4F5BD5
+        case .purple: return 0x8B5CF6
+        case .pink:   return 0xD6438C
+        case .red:    return 0xE5484D
+        case .orange: return 0xE8730C
+        case .green:  return 0x1F9D55
+        case .teal:   return 0x0E8F8F
+        case .gray:   return 0x5C5C5C
+        }
+    }
+
+    /// 深色模式主色（略微提亮，保证深底上的对比度）
+    var darkHex: UInt32 {
+        switch self {
+        case .blue:   return 0x4C9BFF
+        case .indigo: return 0x8B93FF
+        case .purple: return 0xB18CFF
+        case .pink:   return 0xFF7AB8
+        case .red:    return 0xFF6369
+        case .orange: return 0xFF9F45
+        case .green:  return 0x4CC38A
+        case .teal:   return 0x3FD0D0
+        case .gray:   return 0xA0A0A0
+        }
+    }
+
+    /// 跟随当前深浅色的实际颜色（UIColor 动态色，由 trait 决定）。
+    var color: Color {
+        Color(UIColor { trait in
+            UIColor(hex: trait.userInterfaceStyle == .dark ? self.darkHex : self.lightHex)
+        })
+    }
+}
+
+/// 主题设置：深浅模式 + 强调色，持久化在 UserDefaults。
+///
+/// 对应 Android 的 `SettingsStore.colorMode` / `keyColor`：改完立即生效，
+/// 不需要重启，也不需要重启导航栈。
+final class ThemeStore: ObservableObject {
+
+    static let shared = ThemeStore()
+
+    @Published var appearance: MiuixAppearance {
+        didSet { defaults.set(appearance.rawValue, forKey: Self.keyAppearance) }
+    }
+
+    @Published var accent: MiuixAccent {
+        didSet { defaults.set(accent.rawValue, forKey: Self.keyAccent) }
+    }
+
+    private let defaults = UserDefaults.standard
+    private static let keyAppearance = "hamkit.theme.appearance"
+    private static let keyAccent = "hamkit.theme.accent"
+
+    private init() {
+        appearance = MiuixAppearance(rawValue: defaults.string(forKey: Self.keyAppearance) ?? "") ?? .system
+        accent = MiuixAccent(rawValue: defaults.string(forKey: Self.keyAccent) ?? "") ?? .blue
+    }
+
+    /// 当前强调色（已按深浅模式解析）。
+    var accentColor: Color { accent.color }
+}
+
 /// Miuix（MIUI / HyperOS 设计语言）主题，对齐 Android 端的 `MiuixTheme`。
 ///
 /// Android 侧用的是 `top.yukonga.miuix.kmp` 的 `ThemeController`（Monet 动态取色），
-/// iOS 没有对应的取色器，所以这里固化一套 Miuix 语义色：
+/// iOS 没有对应的取色器，所以这里固化一套 Miuix 语义色 + 可选的强调色：
 /// - 页面底色与卡片分层（浅色 `#F7F7F7` / 白色卡片；深色纯黑 / `#1A1A1A` 卡片）；
-/// - 主色是 MIUI 蓝 `#3482FF`（深色下提亮到 `#4C9BFF`，保证对比度）；
+/// - 主色由「设置 → 外观」决定（默认 MIUI 蓝 `#3482FF`）；
 /// - 文字三级：正文 / 次要 / 三级，以及分隔线、填充色；
 /// - 圆角统一 16（大卡片）/ 10（小控件），全部用 continuous 圆角。
 ///
@@ -23,7 +138,8 @@ enum MiuixTheme {
     static let cardElevated = dynamic(light: 0xFFFFFF, dark: 0x242424)
     static let fill = dynamic(light: 0xF0F0F0, dark: 0x2A2A2A)
 
-    static let primary = dynamic(light: 0x3482FF, dark: 0x4C9BFF)
+    /// 强调色：跟随「设置 → 外观」里的选择。
+    static var primary: Color { ThemeStore.shared.accentColor }
     static let onPrimary = dynamic(light: 0xFFFFFF, dark: 0xFFFFFF)
 
     static let text = dynamic(light: 0x000000, dark: 0xFFFFFF)

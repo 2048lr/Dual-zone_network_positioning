@@ -27,14 +27,57 @@ final class ReminderSettingsStore: ObservableObject {
 }
 
 /// 「设置」页：照抄 Android Settings 页结构 ——
-/// 外观 / 隐私 / 关于 三个分组；iOS 端暂无外观项，先落分组骨架。
+/// 外观 / 观测 / 数据源 / 隐私 / 关于。
 struct SettingsView: View {
 
     @ObservedObject var model: TrackerModel
     @ObservedObject private var reminderSettings = ReminderSettingsStore.shared
+    @ObservedObject private var theme = ThemeStore.shared
 
     var body: some View {
         List {
+            Section("外观") {
+                Picker("深浅模式", selection: $theme.appearance) {
+                    ForEach(MiuixAppearance.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("强调色").font(.subheadline)
+                    HStack(spacing: 10) {
+                        ForEach(MiuixAccent.allCases) { accent in
+                            Button {
+                                theme.accent = accent
+                            } label: {
+                                Circle()
+                                    .fill(accent.color)
+                                    .frame(width: 24, height: 24)
+                                    .overlay {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .opacity(theme.accent == accent ? 1 : 0)
+                                    }
+                                    .overlay {
+                                        Circle()
+                                            .strokeBorder(MiuixTheme.card, lineWidth: 2)
+                                            .opacity(theme.accent == accent ? 1 : 0)
+                                    }
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(Text(accent.label))
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+
+                Text("强调色会应用到按钮、链接与选中态；深浅模式可单独覆盖系统设置。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("观测") {
                 NavigationLink(value: Route.locationDetail) {
                     Label("定位详情", systemImage: "location")

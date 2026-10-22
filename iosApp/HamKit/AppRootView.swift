@@ -10,6 +10,7 @@ struct AppRootView: View {
 
     @StateObject private var model = TrackerModel()
     @StateObject private var location = LocationProvider()
+    @ObservedObject private var theme = ThemeStore.shared
     @Environment(\.scenePhase) private var scenePhase
     /// 首页的导航栈。平时由 `NavigationLink(value:)` 驱动；
     /// CI 冒烟场景（`-smokeManage` / `-smokeDetail`）需要代码里主动入栈，
@@ -48,7 +49,9 @@ struct AppRootView: View {
                 Label("设置", systemImage: "gearshape.fill")
             }
         }
-        .tint(MiuixTheme.primary)
+        // 主题：强调色 + 深浅模式（设置里改完立即生效）
+        .tint(theme.accentColor)
+        .preferredColorScheme(theme.appearance.colorScheme)
         .onAppear {
             // 数据层必须在启动时就接上：之前 SatelliteStore.configure 只在
             // 「卫星管理」页的 init 里调用，导致筛选页 / 分类页 / 详情页在首次
