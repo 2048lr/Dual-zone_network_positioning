@@ -153,7 +153,7 @@ struct Ft8MainView: View {
             set: { if $0 == nil { qsoSeed = nil } }
         )) { seed in
             NavigationStack {
-                QsoEditView(entry: makeQso(from: seed.message))
+                QsoEditView(entry: makeQso(from: seed.message.message))
             }
         }
         .onDisappear {
